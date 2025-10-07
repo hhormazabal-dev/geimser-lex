@@ -3,19 +3,21 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Create custom types
-CREATE TYPE user_role AS ENUM ('admin_firma', 'abogado', 'cliente');
+CREATE TYPE user_role AS ENUM ('admin_firma', 'abogado', 'analista', 'cliente');
 CREATE TYPE case_status AS ENUM ('activo', 'suspendido', 'archivado', 'terminado');
 CREATE TYPE case_priority AS ENUM ('baja', 'media', 'alta', 'urgente');
 CREATE TYPE stage_status AS ENUM ('pendiente', 'en_proceso', 'completado');
 CREATE TYPE note_type AS ENUM ('privada', 'publica');
 CREATE TYPE document_visibility AS ENUM ('privado', 'cliente');
-CREATE TYPE request_type AS ENUM ('documento', 'dato', 'pago', 'otro');
-CREATE TYPE request_status AS ENUM ('pendiente', 'recibido', 'vencido');
+CREATE TYPE request_type AS ENUM ('documento', 'informacion', 'reunion', 'otro');
+CREATE TYPE request_status AS ENUM ('pendiente', 'en_revision', 'respondida', 'cerrada');
+CREATE TYPE case_workflow_state AS ENUM ('preparacion', 'en_revision', 'activo', 'cerrado');
 
 -- Profiles table (extends auth.users)
 CREATE TABLE profiles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
     role user_role NOT NULL DEFAULT 'cliente',
     nombre TEXT NOT NULL,
     rut TEXT UNIQUE,
@@ -41,9 +43,16 @@ CREATE TABLE cases (
     estado case_status DEFAULT 'activo',
     fecha_inicio DATE DEFAULT CURRENT_DATE,
     abogado_responsable UUID REFERENCES profiles(id),
+    analista_id UUID REFERENCES profiles(id),
+    workflow_state case_workflow_state DEFAULT 'preparacion',
+    validado_at TIMESTAMPTZ,
     prioridad case_priority DEFAULT 'media',
     valor_estimado NUMERIC(15,2),
     observaciones TEXT,
+    descripcion_inicial TEXT,
+    objetivo_cliente TEXT,
+    documentacion_recibida TEXT,
+    cliente_principal_id UUID REFERENCES profiles(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -94,12 +103,18 @@ CREATE TABLE info_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     case_id UUID REFERENCES cases(id) ON DELETE CASCADE NOT NULL,
     creador_id UUID REFERENCES profiles(id) NOT NULL,
-    tipo request_type DEFAULT 'documento',
+    titulo TEXT NOT NULL,
+    tipo request_type DEFAULT 'informacion',
     descripcion TEXT NOT NULL,
+    prioridad case_priority DEFAULT 'media',
     fecha_limite DATE,
+    es_publica BOOLEAN DEFAULT true,
     estado request_status DEFAULT 'pendiente',
     respuesta TEXT,
     documento_respuesta_id UUID REFERENCES documents(id),
+    archivo_adjunto TEXT,
+    respondido_por UUID REFERENCES profiles(id),
+    respondido_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -146,6 +161,23 @@ CREATE TABLE portal_tokens (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Magic links table (self-service portal access)
+CREATE TABLE magic_links (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    token TEXT UNIQUE NOT NULL,
+    email TEXT NOT NULL,
+    case_id UUID REFERENCES cases(id) ON DELETE CASCADE NOT NULL,
+    client_profile_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    permissions TEXT[] DEFAULT ARRAY['view_case'],
+    expires_at TIMESTAMPTZ NOT NULL,
+    is_used BOOLEAN DEFAULT FALSE,
+    single_use BOOLEAN DEFAULT TRUE,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Create indexes for performance
 CREATE INDEX idx_profiles_user_id ON profiles(user_id);
 CREATE INDEX idx_profiles_role ON profiles(role);
@@ -170,6 +202,9 @@ CREATE INDEX idx_audit_log_entity ON audit_log(entity_type, entity_id);
 CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
 CREATE INDEX idx_portal_tokens_token ON portal_tokens(token);
 CREATE INDEX idx_portal_tokens_case_id ON portal_tokens(case_id);
+CREATE INDEX idx_magic_links_case_id ON magic_links(case_id);
+CREATE INDEX idx_magic_links_email ON magic_links(email);
+CREATE INDEX idx_magic_links_token ON magic_links(token);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -187,3 +222,4 @@ CREATE TRIGGER update_case_stages_updated_at BEFORE UPDATE ON case_stages FOR EA
 CREATE TRIGGER update_notes_updated_at BEFORE UPDATE ON notes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_info_requests_updated_at BEFORE UPDATE ON info_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_magic_links_updated_at BEFORE UPDATE ON magic_links FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

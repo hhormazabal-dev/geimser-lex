@@ -194,7 +194,7 @@ BEGIN
     MIN(al.created_at) as first_seen,
     MAX(al.created_at) as last_seen
   FROM audit_logs al
-  WHERE al.table_name IN ('cases', 'case_documents', 'case_notes')
+  WHERE al.table_name IN ('cases', 'documents', 'notes')
     AND al.action = 'SELECT'
     AND al.created_at > NOW() - INTERVAL '24 hours'
     AND (EXTRACT(hour FROM al.created_at) < 8 OR EXTRACT(hour FROM al.created_at) > 20)
@@ -266,7 +266,7 @@ BEGIN
     user_info.user_agent,
     user_info.session_id,
     CASE 
-      WHEN TG_TABLE_NAME IN ('cases', 'case_documents') THEN 'high'
+      WHEN TG_TABLE_NAME IN ('cases', 'documents') THEN 'high'
       WHEN TG_TABLE_NAME IN ('profiles', 'magic_links') THEN 'warning'
       ELSE 'info'
     END,
@@ -287,12 +287,12 @@ CREATE TRIGGER audit_profiles_trigger
   AFTER INSERT OR UPDATE OR DELETE ON profiles
   FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 
-CREATE TRIGGER audit_case_documents_trigger
-  AFTER INSERT OR UPDATE OR DELETE ON case_documents
+CREATE TRIGGER audit_documents_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON documents
   FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 
 CREATE TRIGGER audit_case_notes_trigger
-  AFTER INSERT OR UPDATE OR DELETE ON case_notes
+  AFTER INSERT OR UPDATE OR DELETE ON notes
   FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 
 CREATE TRIGGER audit_case_stages_trigger

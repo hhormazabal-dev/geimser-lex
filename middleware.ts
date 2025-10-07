@@ -1,20 +1,54 @@
-import { updateSession } from '@/lib/auth/middleware';
-import { type NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+// Rutas públicas que NO requieren sesión
+const PUBLIC_PATHS = [
+  '/login',
+  '/api',                 // toda tu API (login/logout/callback/webhooks/etc.)
+  '/_next',               // assets de Next
+  '/favicon.ico',
+  '/apple-touch-icon.png',
+  '/logo.svg',
+];
+
+function isPublic(pathname: string) {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
 }
 
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Permitir archivos estáticos o rutas marcadas como públicas
+  if (isPublic(pathname) || /\.\w+$/.test(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Lee cookies que setea /api/auth/callback
+  const access = req.cookies.get('sb-access-token')?.value;
+  const refresh = req.cookies.get('sb-refresh-token')?.value;
+  const isLoggedIn = Boolean(access || refresh);
+
+  // Si está logueado e intenta ir a /login, lo mandamos al dashboard
+  if (pathname === '/login' && isLoggedIn) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/dashboard';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+
+  // Si NO está logueado y no es público → a /login con redirectTo
+  if (!isLoggedIn && !isPublic(pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('redirectTo', pathname + req.nextUrl.search);
+    return NextResponse.redirect(url);
+  }
+
+  // Todo ok
+  return NextResponse.next();
+}
+
+// Aplica a todo excepto _next, archivos estáticos y api (ya filtrado arriba también)
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     * - api routes that don't require auth
-     */
-    '/((?!_next/static|_next/image|favicon.ico|logo.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next|.*\\..*).*)'],
 };

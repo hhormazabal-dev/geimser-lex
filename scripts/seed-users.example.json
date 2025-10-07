@@ -1,0 +1,10 @@
+[
+  {
+    "email": "usuario@lexser.com",
+    "password": "elige-una-contraseña-segura",
+    "role": "admin_firma",
+    "nombre": "Nombre Apellido",
+    "rut": "12345678-9",
+    "telefono": "+56999999999"
+  }
+]

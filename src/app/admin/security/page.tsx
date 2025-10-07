@@ -4,7 +4,7 @@ import { getCurrentProfile } from '@/lib/auth/roles';
 import { SecurityDashboard } from '@/components/SecurityDashboard';
 
 export const metadata: Metadata = {
-  title: 'Seguridad - LEXCHILE',
+  title: 'Seguridad - LEXSER',
   description: 'Panel de administración de seguridad y auditoría',
 };
 

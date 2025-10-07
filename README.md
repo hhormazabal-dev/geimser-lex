@@ -1,11 +1,11 @@
 '''
-# LEXCHILE - Plataforma Corporativa para Estudios Jurídicos
+# LEXSER - Plataforma Corporativa para Estudios Jurídicos
 
-![LEXCHILE Logo](./public/logo.svg)
+![LEXSER Logo](./public/logo.svg)
 
-**LEXCHILE** es una plataforma web corporativa de última generación, diseñada específicamente para las necesidades de los estudios jurídicos en Chile. Construida con un stack tecnológico moderno y robusto, ofrece una solución integral para la gestión de casos, clientes, documentos y comunicaciones, todo en un entorno seguro y escalable.
+**LEXSER** es una plataforma web corporativa de última generación, diseñada específicamente para las necesidades de los estudios jurídicos en Chile. Construida con un stack tecnológico moderno y robusto, ofrece una solución integral para la gestión de casos, clientes, documentos y comunicaciones, todo en un entorno seguro y escalable.
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/lexchile/lexchile-platform)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/lexser/lexser-platform)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-v2-green?logo=supabase)](https://supabase.com/)
@@ -34,7 +34,7 @@
 
 ## Visión General
 
-LEXCHILE nace de la necesidad de modernizar la gestión legal en Chile, proporcionando a los abogados y administradores una herramienta poderosa y centralizada. La plataforma se enfoca en la eficiencia operativa, la colaboración segura y la transparencia con el cliente, incorporando funcionalidades específicas para el contexto legal y procesal chileno.
+LEXSER nace de la necesidad de modernizar la gestión legal en Chile, proporcionando a los abogados y administradores una herramienta poderosa y centralizada. La plataforma se enfoca en la eficiencia operativa, la colaboración segura y la transparencia con el cliente, incorporando funcionalidades específicas para el contexto legal y procesal chileno.
 
 El sistema está diseñado como una aplicación de página única (SPA) altamente interactiva y de alto rendimiento, con renderizado del lado del servidor (SSR) y generación de sitios estáticos (SSG) gracias a Next.js 15. La persistencia de datos, autenticación y almacenamiento se gestionan a través de Supabase, una alternativa de código abierto a Firebase que utiliza PostgreSQL.
 
@@ -75,7 +75,7 @@ El sistema está diseñado como una aplicación de página única (SPA) altament
 El proyecto sigue una estructura modular y escalable, optimizada para el App Router de Next.js.
 
 ```
-/lexchile
+/lexser
 ├── /public                 # Archivos estáticos (imágenes, fuentes)
 ├── /scripts                # Scripts de utilidad (ej. test.sh)
 ├── /src
@@ -127,8 +127,8 @@ Sigue estos pasos para configurar y ejecutar el proyecto en tu entorno local.
 
 1.  **Clona el repositorio:**
     ```bash
-    git clone https://github.com/lexchile/lexchile-platform.git
-    cd lexchile-platform
+    git clone https://github.com/lexser/lexser-platform.git
+    cd lexser-platform
     ```
 
 2.  **Instala las dependencias:**
@@ -151,11 +151,19 @@ Sigue estos pasos para configurar y ejecutar el proyecto en tu entorno local.
 
 3.  **Actualiza `.env.local`** con las credenciales proporcionadas por la Supabase CLI.
 
-4.  **Aplica las migraciones y los datos de prueba:**
+4.  **Aplica las migraciones:**
     ```bash
     supabase db reset
     ```
-    Este comando limpiará la base de datos local, aplicará todas las migraciones en orden y ejecutará el archivo `seed.sql`.
+    El comando limpia la base de datos local y aplica todas las migraciones en orden. El archivo `seed.sql` queda disponible si necesitas agregar inserciones simples adicionales.
+
+5.  **Carga los datos de prueba y usuarios demo:**
+    ```bash
+    pnpm run seed:demo
+    # o, si prefieres no usar los scripts de package.json:
+    npx tsx scripts/seed-auth-users.ts
+    ```
+    Este script utiliza la `SUPABASE_SERVICE_ROLE_KEY` configurada en tu `.env.local` para crear los usuarios de ejemplo en `auth.users` y poblar las tablas relacionadas (`profiles`, `cases`, etc.).
 
 ### Ejecutar la Aplicación
 
@@ -167,9 +175,11 @@ npm run dev
 
 La aplicación estará disponible en [http://localhost:3000](http://localhost:3000).
 
-**Credenciales de prueba (definidas en `supabase/seed.sql`):**
-- **Admin:** `admin@lexchile.com` / `admin123`
-- **Abogado:** `abogado@lexchile.com` / `password123`
+**Credenciales de prueba (definidas para el entorno local):**
+- **Admin:** `admin@lexser.com` / `admin123`
+- **Analista:** `analista@lexser.com` / `analista123`
+- **Abogado:** `abogado@lexser.com` / `password123`
+- **Cliente:** `cliente@lexser.com` / `client123`
 
 ## Scripts Disponibles
 
@@ -180,6 +190,7 @@ La aplicación estará disponible en [http://localhost:3000](http://localhost:30
 - `npm run test`: Ejecuta la suite completa de tests (unitarios y e2e).
 - `npm run test:unit`: Ejecuta solo los tests unitarios.
 - `npm run test:e2e`: Ejecuta solo los tests e2e.
+- `pnpm run seed:demo`: Crea usuarios demo con la Service Role Key y vuelve a cargar los datos de ejemplo (puedes usar `npx tsx scripts/seed-auth-users.ts`).
 
 Para una lista completa, consulta la sección `scripts` en `package.json`.
 
@@ -193,7 +204,7 @@ El proyecto tiene una cobertura de testing exhaustiva para garantizar la calidad
 
 ## Seguridad
 
-La seguridad es un pilar fundamental de LEXCHILE. Se han implementado múltiples capas de protección:
+La seguridad es un pilar fundamental de LEXSER. Se han implementado múltiples capas de protección:
 
 - **Row Level Security (RLS)**: Todas las consultas a la base de datos están protegidas por políticas de RLS en Supabase, asegurando que los usuarios solo puedan acceder a los datos que les corresponden.
 - **Middleware de Seguridad**: Un middleware en Next.js inspecciona las peticiones entrantes para detectar y bloquear patrones de ataques comunes.

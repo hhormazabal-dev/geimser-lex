@@ -9,6 +9,7 @@ ALTER TABLE case_clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE case_collaborators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portal_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE magic_links ENABLE ROW LEVEL SECURITY;
 
 -- Helper function to get current user's profile
 CREATE OR REPLACE FUNCTION get_current_profile()
@@ -119,15 +120,19 @@ CREATE POLICY "Admins can update all profiles" ON profiles
 CREATE POLICY "Admins can view all cases" ON cases
     FOR SELECT USING (is_admin());
 
-CREATE POLICY "Abogados can view their assigned cases" ON cases
+CREATE POLICY "Abogados y analistas pueden ver casos asignados" ON cases
     FOR SELECT USING (
-        is_abogado() AND (
-            abogado_responsable = (SELECT id FROM get_current_profile()) OR
-            EXISTS (
-                SELECT 1 FROM case_collaborators 
-                WHERE case_id = cases.id 
-                AND abogado_id = (SELECT id FROM get_current_profile())
+        (
+            is_abogado() AND (
+                abogado_responsable = (SELECT id FROM get_current_profile()) OR
+                EXISTS (
+                    SELECT 1 FROM case_collaborators 
+                    WHERE case_id = cases.id 
+                    AND abogado_id = (SELECT id FROM get_current_profile())
+                )
             )
+        ) OR (
+            (SELECT role FROM get_current_profile()) = 'analista' AND analista_id = (SELECT id FROM get_current_profile())
         )
     );
 

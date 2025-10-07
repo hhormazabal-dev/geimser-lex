@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { getCurrentProfile, requireAuth, canAccessCase } from '@/lib/auth/roles';
 import { logAuditAction } from '@/lib/audit/log';
 import {
@@ -14,7 +14,49 @@ import {
   type CompleteStageInput,
   type StageFiltersInput,
 } from '@/lib/validators/stages';
-import type { CaseStage, CaseStageInsert } from '@/lib/supabase/types';
+import type { CaseStage } from '@/lib/supabase/types';
+
+// Payloads tipados hacia DB
+type CreateStageDB = Pick<
+  CaseStage,
+  | 'case_id'
+  | 'etapa'
+  | 'orden'
+  | 'estado'
+  | 'es_publica'
+  | 'responsable_id'
+  | 'descripcion'
+  | 'fecha_programada'
+  | 'fecha_cumplida'
+>;
+type UpdateStageDB = Partial<
+  Pick<
+    CaseStage,
+    | 'etapa'
+    | 'orden'
+    | 'estado'
+    | 'es_publica'
+    | 'responsable_id'
+    | 'descripcion'
+    | 'fecha_programada'
+    | 'fecha_cumplida'
+  >
+>;
+type CompleteStageDB = Partial<Pick<CaseStage, 'estado' | 'fecha_cumplida' | 'descripcion'>>;
+
+// Helper: copia condicional leyendo por índice (evita TS2339 aunque el tipo sea {}).
+function copyIfPresent<T extends object, K extends keyof any>(
+  src: any,
+  dst: T,
+  srcKey: K,
+  dstKey: keyof T,
+  map?: (v: any) => any
+) {
+  if (src && Object.prototype.hasOwnProperty.call(src, srcKey)) {
+    const val = src[srcKey as any];
+    (dst as any)[dstKey] = map ? map(val) : val;
+  }
+}
 
 /**
  * Crea una nueva etapa procesal
@@ -22,24 +64,25 @@ import type { CaseStage, CaseStageInsert } from '@/lib/supabase/types';
 export async function createStage(input: CreateStageInput) {
   try {
     const profile = await requireAuth();
-    const validatedInput = createStageSchema.parse(input);
-    
-    // Verificar acceso al caso
+    const validatedInput = createStageSchema.parse(input) as CreateStageInput;
     const hasAccess = await canAccessCase(validatedInput.case_id);
-    if (!hasAccess) {
-      throw new Error('Sin permisos para acceder a este caso');
-    }
+    if (!hasAccess) throw new Error('Sin permisos para acceder a este caso');
+    if (profile.role === 'cliente') throw new Error('Sin permisos para crear etapas');
 
-    // Solo abogados y admin pueden crear etapas
-    if (profile.role === 'cliente') {
-      throw new Error('Sin permisos para crear etapas');
-    }
+    const supabase = await createServerClient();
 
-    const supabase = createClient();
-
-    const stageData: CaseStageInsert = {
-      ...validatedInput,
-      responsable_id: validatedInput.responsable_id || profile.id,
+    const vi: any = validatedInput;
+    const stageData: CreateStageDB = {
+      case_id: vi.case_id,
+      etapa: vi.etapa,
+      orden: vi.orden,
+      estado: vi.estado,
+      es_publica: vi.es_publica,
+      responsable_id: vi.responsable_id ?? profile.id,
+      descripcion: vi.descripcion ?? null,
+      fecha_programada: vi.fecha_programada ?? null,
+      // validators -> DB
+      fecha_cumplida: vi.fecha_completada ?? null,
     };
 
     const { data: newStage, error } = await supabase
@@ -52,12 +95,8 @@ export async function createStage(input: CreateStageInput) {
       `)
       .single();
 
-    if (error) {
-      console.error('Error creating stage:', error);
-      throw new Error('Error al crear la etapa');
-    }
+    if (error) throw new Error('Error al crear la etapa');
 
-    // Log de auditoría
     await logAuditAction({
       action: 'CREATE',
       entity_type: 'case_stage',
@@ -65,15 +104,11 @@ export async function createStage(input: CreateStageInput) {
       diff_json: { created: stageData },
     });
 
-    revalidatePath(`/cases/${validatedInput.case_id}`);
-
+    revalidatePath(`/cases/${vi.case_id}`);
     return { success: true, stage: newStage };
   } catch (error) {
     console.error('Error in createStage:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
-    };
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
 
@@ -83,38 +118,39 @@ export async function createStage(input: CreateStageInput) {
 export async function updateStage(stageId: string, input: UpdateStageInput) {
   try {
     const profile = await requireAuth();
-    const validatedInput = updateStageSchema.parse(input);
-    const supabase = createClient();
+    const validatedInput = updateStageSchema.parse(input) as unknown as Record<string, any>;
+    const supabase = await createServerClient();
 
-    // Obtener la etapa existente
     const { data: existingStage, error: fetchError } = await supabase
       .from('case_stages')
       .select('*')
       .eq('id', stageId)
       .single();
+    if (fetchError || !existingStage) throw new Error('Etapa no encontrada');
 
-    if (fetchError || !existingStage) {
-      throw new Error('Etapa no encontrada');
-    }
-
-    // Verificar acceso al caso
     const hasAccess = await canAccessCase(existingStage.case_id);
-    if (!hasAccess) {
-      throw new Error('Sin permisos para acceder a este caso');
-    }
-
-    // Verificar permisos
-    if (profile.role === 'cliente') {
-      throw new Error('Sin permisos para editar etapas');
-    }
-
+    if (!hasAccess) throw new Error('Sin permisos para acceder a este caso');
+    if (profile.role === 'cliente') throw new Error('Sin permisos para editar etapas');
     if (profile.role === 'abogado' && existingStage.responsable_id !== profile.id) {
       throw new Error('Solo puedes editar etapas de las que eres responsable');
     }
 
+    const updatePayload: UpdateStageDB = {};
+
+    // Copias seguras (sin notación de punto sobre {}):
+    copyIfPresent(validatedInput, updatePayload, 'etapa', 'etapa');
+    copyIfPresent(validatedInput, updatePayload, 'orden', 'orden');
+    copyIfPresent(validatedInput, updatePayload, 'estado', 'estado');
+    copyIfPresent(validatedInput, updatePayload, 'es_publica', 'es_publica');
+    copyIfPresent(validatedInput, updatePayload, 'responsable_id', 'responsable_id');
+    copyIfPresent(validatedInput, updatePayload, 'descripcion', 'descripcion', (v) => (v ?? null));
+    copyIfPresent(validatedInput, updatePayload, 'fecha_programada', 'fecha_programada', (v) => (v ?? null));
+    // validators -> DB
+    copyIfPresent(validatedInput, updatePayload, 'fecha_completada', 'fecha_cumplida', (v) => (v ?? null));
+
     const { data: updatedStage, error } = await supabase
       .from('case_stages')
-      .update(validatedInput)
+      .update(updatePayload)
       .eq('id', stageId)
       .select(`
         *,
@@ -123,31 +159,20 @@ export async function updateStage(stageId: string, input: UpdateStageInput) {
       `)
       .single();
 
-    if (error) {
-      console.error('Error updating stage:', error);
-      throw new Error('Error al actualizar la etapa');
-    }
+    if (error) throw new Error('Error al actualizar la etapa');
 
-    // Log de auditoría
     await logAuditAction({
       action: 'UPDATE',
       entity_type: 'case_stage',
       entity_id: stageId,
-      diff_json: { 
-        from: existingStage, 
-        to: updatedStage 
-      },
+      diff_json: { from: existingStage, to: updatedStage },
     });
 
     revalidatePath(`/cases/${existingStage.case_id}`);
-
     return { success: true, stage: updatedStage };
   } catch (error) {
     console.error('Error in updateStage:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
-    };
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
 
@@ -157,44 +182,35 @@ export async function updateStage(stageId: string, input: UpdateStageInput) {
 export async function completeStage(stageId: string, input: CompleteStageInput = {}) {
   try {
     const profile = await requireAuth();
-    const validatedInput = completeStageSchema.parse(input);
-    const supabase = createClient();
+    const validatedInput = completeStageSchema.parse(input) as unknown as Record<string, any>;
+    const supabase = await createServerClient();
 
-    // Obtener la etapa existente
     const { data: existingStage, error: fetchError } = await supabase
       .from('case_stages')
       .select('*')
       .eq('id', stageId)
       .single();
+    if (fetchError || !existingStage) throw new Error('Etapa no encontrada');
 
-    if (fetchError || !existingStage) {
-      throw new Error('Etapa no encontrada');
-    }
-
-    // Verificar acceso al caso
     const hasAccess = await canAccessCase(existingStage.case_id);
-    if (!hasAccess) {
-      throw new Error('Sin permisos para acceder a este caso');
-    }
-
-    // Verificar permisos
-    if (profile.role === 'cliente') {
-      throw new Error('Sin permisos para completar etapas');
-    }
-
+    if (!hasAccess) throw new Error('Sin permisos para acceder a este caso');
+    if (profile.role === 'cliente') throw new Error('Sin permisos para completar etapas');
     if (profile.role === 'abogado' && existingStage.responsable_id !== profile.id) {
       throw new Error('Solo puedes completar etapas de las que eres responsable');
     }
 
-    const updateData = {
-      estado: 'completada' as const,
-      fecha_completada: validatedInput.fecha_completada || new Date().toISOString(),
-      observaciones: validatedInput.observaciones,
+    const completionDate = validatedInput['fecha_completada'] || new Date().toISOString();
+
+    const updatePayload: CompleteStageDB = {
+      estado: 'completado',
+      fecha_cumplida: completionDate,
     };
+    // observaciones -> descripcion
+    copyIfPresent(validatedInput, updatePayload, 'observaciones', 'descripcion', (v) => (v ?? null));
 
     const { data: updatedStage, error } = await supabase
       .from('case_stages')
-      .update(updateData)
+      .update(updatePayload)
       .eq('id', stageId)
       .select(`
         *,
@@ -203,31 +219,22 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
       `)
       .single();
 
-    if (error) {
-      console.error('Error completing stage:', error);
-      throw new Error('Error al completar la etapa');
-    }
+    if (error) throw new Error('Error al completar la etapa');
 
-    // Actualizar etapa actual del caso si es necesario
     await updateCaseCurrentStage(existingStage.case_id);
 
-    // Log de auditoría
     await logAuditAction({
       action: 'COMPLETE',
       entity_type: 'case_stage',
       entity_id: stageId,
-      diff_json: { completed: updateData },
+      diff_json: { completed: updatePayload },
     });
 
     revalidatePath(`/cases/${existingStage.case_id}`);
-
     return { success: true, stage: updatedStage };
   } catch (error) {
     console.error('Error in completeStage:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
-    };
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
 
@@ -237,41 +244,22 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
 export async function deleteStage(stageId: string) {
   try {
     const profile = await requireAuth();
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
-    // Obtener la etapa existente
     const { data: existingStage, error: fetchError } = await supabase
       .from('case_stages')
       .select('*')
       .eq('id', stageId)
       .single();
+    if (fetchError || !existingStage) throw new Error('Etapa no encontrada');
 
-    if (fetchError || !existingStage) {
-      throw new Error('Etapa no encontrada');
-    }
-
-    // Verificar acceso al caso
     const hasAccess = await canAccessCase(existingStage.case_id);
-    if (!hasAccess) {
-      throw new Error('Sin permisos para acceder a este caso');
-    }
+    if (!hasAccess) throw new Error('Sin permisos para acceder a este caso');
+    if (profile.role !== 'admin_firma') throw new Error('Sin permisos para eliminar etapas');
 
-    // Solo admin puede eliminar etapas
-    if (profile.role !== 'admin_firma') {
-      throw new Error('Sin permisos para eliminar etapas');
-    }
+    const { error } = await supabase.from('case_stages').delete().eq('id', stageId);
+    if (error) throw new Error('Error al eliminar la etapa');
 
-    const { error } = await supabase
-      .from('case_stages')
-      .delete()
-      .eq('id', stageId);
-
-    if (error) {
-      console.error('Error deleting stage:', error);
-      throw new Error('Error al eliminar la etapa');
-    }
-
-    // Log de auditoría
     await logAuditAction({
       action: 'DELETE',
       entity_type: 'case_stage',
@@ -280,186 +268,93 @@ export async function deleteStage(stageId: string) {
     });
 
     revalidatePath(`/cases/${existingStage.case_id}`);
-
     return { success: true };
   } catch (error) {
     console.error('Error in deleteStage:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
-    };
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
 
 /**
  * Obtiene etapas con filtros
  */
-export async function getStages(filters: StageFiltersInput = {}) {
+export async function getStages(filters?: Partial<StageFiltersInput>) {
   try {
     const profile = await getCurrentProfile();
-    if (!profile) {
-      throw new Error('No autenticado');
-    }
+    if (!profile) throw new Error('No autenticado');
 
-    const validatedFilters = stageFiltersSchema.parse(filters);
-    const supabase = createClient();
+    const input = { page: 1, limit: 20, ...(filters ?? {}) };
+    const validatedFilters = stageFiltersSchema.parse(input) as any;
+
+    const supabase = await createServerClient();
 
     let query = supabase
       .from('case_stages')
-      .select(`
+      .select(
+        `
         *,
         responsable:profiles(id, nombre),
         case:cases(id, caratulado)
-      `);
+      `,
+        { count: 'exact' }
+      );
 
-    // Aplicar filtros de acceso según rol
     if (profile.role === 'cliente') {
-      // Los clientes solo ven etapas públicas de sus casos
       query = query.eq('es_publica', true);
-      
-      // Obtener casos del cliente
       const { data: clientCases } = await supabase
         .from('case_clients')
         .select('case_id')
         .eq('client_profile_id', profile.id);
-      
-      const caseIds = clientCases?.map(cc => cc.case_id) || [];
+      const caseIds = clientCases?.map((cc: { case_id: string }) => cc.case_id) || [];
       if (caseIds.length === 0) {
-        return { success: true, stages: [], total: 0 };
+        return { success: true, stages: [], total: 0, page: validatedFilters.page, limit: validatedFilters.limit };
       }
-      
       query = query.in('case_id', caseIds);
     } else if (profile.role === 'abogado') {
-      // Los abogados ven etapas de sus casos
-      const { data: abogadoCases } = await supabase
-        .from('cases')
-        .select('id')
-        .eq('abogado_responsable', profile.id);
-      
-      const caseIds = abogadoCases?.map(c => c.id) || [];
+      const { data: abogadoCases } = await supabase.from('cases').select('id').eq('abogado_responsable', profile.id);
+      const caseIds = abogadoCases?.map((c: { id: string }) => c.id) || [];
       if (caseIds.length === 0) {
-        return { success: true, stages: [], total: 0 };
+        return { success: true, stages: [], total: 0, page: validatedFilters.page, limit: validatedFilters.limit };
       }
-      
       query = query.in('case_id', caseIds);
     }
 
-    // Aplicar filtros adicionales
     if (validatedFilters.case_id) {
-      // Verificar acceso al caso específico
       const hasAccess = await canAccessCase(validatedFilters.case_id);
-      if (!hasAccess) {
-        throw new Error('Sin permisos para acceder a este caso');
-      }
+      if (!hasAccess) throw new Error('Sin permisos para acceder a este caso');
       query = query.eq('case_id', validatedFilters.case_id);
     }
+    if (validatedFilters.estado) query = query.eq('estado', validatedFilters.estado);
+    if (validatedFilters.responsable_id) query = query.eq('responsable_id', validatedFilters.responsable_id);
+    if (validatedFilters.es_publica !== undefined) query = query.eq('es_publica', validatedFilters.es_publica);
+    if (validatedFilters.fecha_desde) query = query.gte('fecha_programada', validatedFilters.fecha_desde);
+    if (validatedFilters.fecha_hasta) query = query.lte('fecha_programada', validatedFilters.fecha_hasta);
 
-    if (validatedFilters.estado) {
-      query = query.eq('estado', validatedFilters.estado);
-    }
-
-    if (validatedFilters.responsable_id) {
-      query = query.eq('responsable_id', validatedFilters.responsable_id);
-    }
-
-    if (validatedFilters.es_publica !== undefined) {
-      query = query.eq('es_publica', validatedFilters.es_publica);
-    }
-
-    if (validatedFilters.fecha_desde) {
-      query = query.gte('fecha_programada', validatedFilters.fecha_desde);
-    }
-
-    if (validatedFilters.fecha_hasta) {
-      query = query.lte('fecha_programada', validatedFilters.fecha_hasta);
-    }
-
-    // Paginación
     const from = (validatedFilters.page - 1) * validatedFilters.limit;
     const to = from + validatedFilters.limit - 1;
 
-    const { data: stages, error, count } = await query
-      .range(from, to)
-      .order('orden', { ascending: true });
+    const { data: stages, error, count } = await query.range(from, to).order('orden', { ascending: true });
+    if (error) throw new Error('Error al obtener etapas');
 
-    if (error) {
-      console.error('Error fetching stages:', error);
-      throw new Error('Error al obtener etapas');
-    }
-
-    return { 
-      success: true, 
-      stages: stages || [], 
+    return {
+      success: true,
+      stages: stages || [],
       total: count || 0,
       page: validatedFilters.page,
       limit: validatedFilters.limit,
     };
   } catch (error) {
     console.error('Error in getStages:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido',
-      stages: [],
-      total: 0,
-    };
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido', stages: [], total: 0 };
   }
 }
 
 /**
- * Obtiene una etapa por ID
+ * Función auxiliar
  */
-export async function getStageById(stageId: string) {
-  try {
-    const profile = await getCurrentProfile();
-    if (!profile) {
-      throw new Error('No autenticado');
-    }
-
-    const supabase = createClient();
-
-    const { data: stage, error } = await supabase
-      .from('case_stages')
-      .select(`
-        *,
-        responsable:profiles(id, nombre),
-        case:cases(id, caratulado)
-      `)
-      .eq('id', stageId)
-      .single();
-
-    if (error || !stage) {
-      throw new Error('Etapa no encontrada');
-    }
-
-    // Verificar acceso
-    const hasAccess = await canAccessCase(stage.case_id);
-    if (!hasAccess) {
-      throw new Error('Sin permisos para ver esta etapa');
-    }
-
-    // Los clientes solo pueden ver etapas públicas
-    if (profile.role === 'cliente' && !stage.es_publica) {
-      throw new Error('Sin permisos para ver esta etapa');
-    }
-
-    return { success: true, stage };
-  } catch (error) {
-    console.error('Error in getStageById:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
-    };
-  }
-}
-
-/**
- * Funciones auxiliares
- */
-
 async function updateCaseCurrentStage(caseId: string) {
-  const supabase = createClient();
-  
-  // Obtener la siguiente etapa pendiente
+  const supabase = await createServerClient();
+
   const { data: nextStage } = await supabase
     .from('case_stages')
     .select('etapa')
@@ -467,13 +362,10 @@ async function updateCaseCurrentStage(caseId: string) {
     .eq('estado', 'pendiente')
     .order('orden', { ascending: true })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (nextStage) {
-    // Actualizar la etapa actual del caso
-    await supabase
-      .from('cases')
-      .update({ etapa_actual: nextStage.etapa })
-      .eq('id', caseId);
+  const nextEtapa = (nextStage as { etapa: string } | null)?.etapa ?? null;
+  if (nextEtapa) {
+    await supabase.from('cases').update({ etapa_actual: nextEtapa }).eq('id', caseId);
   }
 }

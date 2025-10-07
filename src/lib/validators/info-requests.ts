@@ -18,7 +18,9 @@ export const createInfoRequestSchema = z.object({
 });
 
 // Schema para actualizar una solicitud de información
-export const updateInfoRequestSchema = createInfoRequestSchema.partial().omit(['case_id']);
+export const updateInfoRequestSchema = createInfoRequestSchema
+  .partial()
+  .omit({ case_id: true }); // <- FIX: usar shape, no array
 
 // Schema para responder una solicitud
 export const respondInfoRequestSchema = z.object({

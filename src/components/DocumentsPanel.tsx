@@ -54,7 +54,7 @@ export function DocumentsPanel({
   const loadDocuments = async () => {
     setIsLoading(true);
     try {
-      const result = await getDocuments({ case_id: caseId, limit: 50 });
+      const result = await getDocuments({ case_id: caseId, page: 1, limit: 50 });
       
       if (result.success) {
         setDocuments(result.documents);

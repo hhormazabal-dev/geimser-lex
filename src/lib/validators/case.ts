@@ -1,50 +1,43 @@
 import { z } from 'zod';
 
-// Validador para RUT chileno
-const rutSchema = z
-  .string()
-  .optional()
-  .refine(
-    (rut) => {
-      if (!rut) return true; // RUT es opcional
-      
-      // Limpiar el RUT
-      const cleanRUT = rut.replace(/[^0-9kK]/g, '');
-      
-      if (cleanRUT.length < 8 || cleanRUT.length > 9) {
-        return false;
-      }
+// ---------- Util: validador RUT ----------
+function isValidRut(rut?: unknown): boolean {
+  // rut es opcional y debe ser string no vacío
+  if (typeof rut !== 'string' || rut.trim().length === 0) return true;
 
-      const body = cleanRUT.slice(0, -1);
-      const dv = cleanRUT.slice(-1).toUpperCase();
+  const clean = rut.replace(/[^0-9kK]/g, '');
+  if (clean.length < 8 || clean.length > 9) return false;
 
-      // Calcular dígito verificador
-      let sum = 0;
-      let multiplier = 2;
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1).toUpperCase();
 
-      for (let i = body.length - 1; i >= 0; i--) {
-        sum += parseInt(body[i]) * multiplier;
-        multiplier = multiplier === 7 ? 2 : multiplier + 1;
-      }
+  let sum = 0;
+  let mul = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    // body[i] es siempre char numérico en este punto
+    sum += parseInt(body[i] as string, 10) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
 
-      const remainder = sum % 11;
-      const calculatedDV = remainder < 2 ? remainder.toString() : 'K';
+  const mod = 11 - (sum % 11);
+  const calcDV = mod === 11 ? '0' : mod === 10 ? 'K' : String(mod);
+  return dv === calcDV;
+}
 
-      return dv === calculatedDV;
-    },
-    {
-      message: 'RUT inválido',
-    }
-  );
+// Validador para RUT chileno (opcional)
+const rutSchema = z.string().optional().refine(isValidRut, { message: 'RUT inválido' });
 
-// Schema para crear un caso
-export const createCaseSchema = z.object({
+// ---------- Base schema ----------
+const baseCaseSchema = z.object({
   numero_causa: z.string().optional(),
   caratulado: z
     .string()
     .min(1, 'El caratulado es requerido')
     .max(500, 'El caratulado no puede exceder 500 caracteres'),
-  materia: z.string().optional(),
+  materia: z
+    .string()
+    .min(1, 'La materia es requerida')
+    .max(100, 'La materia no puede exceder 100 caracteres'),
   tribunal: z.string().optional(),
   region: z.string().optional(),
   comuna: z.string().optional(),
@@ -58,30 +51,73 @@ export const createCaseSchema = z.object({
   estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado']).default('activo'),
   fecha_inicio: z.string().optional(),
   abogado_responsable: z.string().uuid('ID de abogado inválido').optional(),
+  analista_id: z.string().uuid('ID de analista inválido').optional(),
+  cliente_principal_id: z.string().uuid('ID de cliente inválido').optional(),
+  workflow_state: z
+    .enum(['preparacion', 'en_revision', 'activo', 'cerrado'])
+    .default('preparacion'),
   prioridad: z.enum(['baja', 'media', 'alta', 'urgente']).default('media'),
   valor_estimado: z.number().positive('El valor debe ser positivo').optional(),
   observaciones: z.string().optional(),
+  descripcion_inicial: z
+    .string()
+    .min(20, 'Describe el contexto del caso con al menos 20 caracteres')
+    .max(2000, 'La descripción inicial no puede exceder 2000 caracteres'),
+  objetivo_cliente: z.string().max(1000, 'El objetivo del cliente no puede exceder 1000 caracteres').optional(),
+  documentacion_recibida: z
+    .string()
+    .max(2000, 'El listado de documentación no puede exceder 2000 caracteres')
+    .optional(),
+  validado_at: z.string().optional().nullable(),
+  marcar_validado: z.boolean().optional(),
 });
 
-// Schema para actualizar un caso
-export const updateCaseSchema = createCaseSchema.partial();
+type BaseCaseSchema = z.infer<typeof baseCaseSchema>;
 
-// Schema para crear un caso desde un brief
+// ---------- helper de validación común ----------
+function validateWorkflowCommon(data: Partial<BaseCaseSchema>, ctx: z.RefinementCtx) {
+  if (data.marcar_validado) {
+    if (!data.abogado_responsable) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debes asignar un abogado responsable para validar el caso',
+        path: ['abogado_responsable'],
+      });
+    }
+    if (!data.cliente_principal_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debes vincular al menos un cliente principal para validar el caso',
+        path: ['cliente_principal_id'],
+      });
+    }
+  }
+}
+
+// ---------- Schemas públicos ----------
+export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
+  // aquí data es BaseCaseSchema (no-partial)
+  validateWorkflowCommon(data, ctx);
+});
+
+export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx) => {
+  // aquí data es Partial<BaseCaseSchema>
+  validateWorkflowCommon(data as Partial<BaseCaseSchema>, ctx);
+});
+
 export const createCaseFromBriefSchema = z.object({
   brief: z
     .string()
     .min(10, 'El brief debe tener al menos 10 caracteres')
     .max(2000, 'El brief no puede exceder 2000 caracteres'),
-  overrides: createCaseSchema.partial().optional(),
+  overrides: baseCaseSchema.partial().optional(),
 });
 
-// Schema para asignar abogado
 export const assignLawyerSchema = z.object({
   case_id: z.string().uuid('ID de caso inválido'),
   abogado_id: z.string().uuid('ID de abogado inválido'),
 });
 
-// Schema para filtros de casos
 export const caseFiltersSchema = z.object({
   estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado']).optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'urgente']).optional(),
@@ -94,14 +130,13 @@ export const caseFiltersSchema = z.object({
   limit: z.number().min(1).max(100).default(10),
 });
 
-// Schema para estadísticas de casos
 export const caseStatsSchema = z.object({
   abogado_id: z.string().uuid().optional(),
   fecha_desde: z.string().optional(),
   fecha_hasta: z.string().optional(),
 });
 
-// Tipos derivados
+// ---------- Tipos ----------
 export type CreateCaseInput = z.infer<typeof createCaseSchema>;
 export type UpdateCaseInput = z.infer<typeof updateCaseSchema>;
 export type CreateCaseFromBriefInput = z.infer<typeof createCaseFromBriefSchema>;
@@ -109,7 +144,7 @@ export type AssignLawyerInput = z.infer<typeof assignLawyerSchema>;
 export type CaseFiltersInput = z.infer<typeof caseFiltersSchema>;
 export type CaseStatsInput = z.infer<typeof caseStatsSchema>;
 
-// Constantes para opciones
+// ---------- Constantes ----------
 export const CASE_STATUSES = [
   { value: 'activo', label: 'Activo' },
   { value: 'suspendido', label: 'Suspendido' },
@@ -122,6 +157,13 @@ export const CASE_PRIORITIES = [
   { value: 'media', label: 'Media' },
   { value: 'alta', label: 'Alta' },
   { value: 'urgente', label: 'Urgente' },
+] as const;
+
+export const CASE_WORKFLOW_STATES = [
+  { value: 'preparacion', label: 'Preparación' },
+  { value: 'en_revision', label: 'Revisión interna' },
+  { value: 'activo', label: 'Activo' },
+  { value: 'cerrado', label: 'Cerrado' },
 ] as const;
 
 export const CASE_MATERIAS = [
@@ -145,7 +187,7 @@ export const REGIONES_CHILE = [
   'Coquimbo',
   'Valparaíso',
   'Metropolitana',
-  'O\'Higgins',
+  "O'Higgins",
   'Maule',
   'Ñuble',
   'Biobío',

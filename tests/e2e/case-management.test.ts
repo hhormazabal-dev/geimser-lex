@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 // Helper functions for common actions
 async function loginAsLawyer(page: Page) {
   await page.goto('/login');
-  await page.fill('[data-testid="email-input"]', 'abogado@lexchile.com');
+  await page.fill('[data-testid="email-input"]', 'abogado@lexser.com');
   await page.fill('[data-testid="password-input"]', 'password123');
   await page.click('[data-testid="login-button"]');
   await page.waitForURL('/dashboard');
@@ -11,7 +11,7 @@ async function loginAsLawyer(page: Page) {
 
 async function loginAsAdmin(page: Page) {
   await page.goto('/login');
-  await page.fill('[data-testid="email-input"]', 'admin@lexchile.com');
+  await page.fill('[data-testid="email-input"]', 'admin@lexser.com');
   await page.fill('[data-testid="password-input"]', 'admin123');
   await page.click('[data-testid="login-button"]');
   await page.waitForURL('/dashboard');
@@ -70,7 +70,7 @@ test.describe('Case Management E2E Tests', () => {
     test('should prevent client from accessing admin features', async ({ page }) => {
       // This would need a client login function
       await page.goto('/login');
-      await page.fill('[data-testid="email-input"]', 'cliente@lexchile.com');
+      await page.fill('[data-testid="email-input"]', 'cliente@lexser.com');
       await page.fill('[data-testid="password-input"]', 'client123');
       await page.click('[data-testid="login-button"]');
       

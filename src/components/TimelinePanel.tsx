@@ -17,7 +17,6 @@ import {
   Clock, 
   CheckCircle, 
   Circle, 
-  AlertCircle, 
   Plus, 
   Edit, 
   Trash2, 
@@ -27,7 +26,7 @@ import {
 } from 'lucide-react';
 import type { CaseStage } from '@/lib/supabase/types';
 import type { CreateStageInput } from '@/lib/validators/stages';
-import { STAGE_STATUSES, getStagesByMateria } from '@/lib/validators/stages';
+import { STAGE_STATUSES, getStageTemplatesByMateria } from '@/lib/validators/stages';
 
 interface TimelinePanelProps {
   caseId: string;
@@ -52,13 +51,14 @@ export function TimelinePanel({
     descripcion: '',
     fecha_programada: '',
     es_publica: true,
+    isCustom: false,
   });
   const { toast } = useToast();
 
   const loadStages = async () => {
     setIsLoading(true);
     try {
-      const result = await getStages({ case_id: caseId, limit: 50 });
+      const result = await getStages({ case_id: caseId, page: 1, limit: 50 });
       
       if (result.success) {
         setStages(result.stages);
@@ -105,6 +105,7 @@ export function TimelinePanel({
         descripcion: newStage.descripcion.trim() || undefined,
         fecha_programada: newStage.fecha_programada || undefined,
         es_publica: newStage.es_publica,
+        estado: 'pendiente',
         orden: maxOrden + 1,
       };
 
@@ -115,7 +116,7 @@ export function TimelinePanel({
           title: 'Etapa creada',
           description: 'La etapa ha sido creada exitosamente',
         });
-        setNewStage({ etapa: '', descripcion: '', fecha_programada: '', es_publica: true });
+        setNewStage({ etapa: '', descripcion: '', fecha_programada: '', es_publica: true, isCustom: false });
         setShowAddForm(false);
         await loadStages();
       } else {
@@ -197,12 +198,10 @@ export function TimelinePanel({
 
   const getStatusIcon = (estado: string) => {
     switch (estado) {
-      case 'completada':
+      case 'completado':
         return <CheckCircle className='h-5 w-5 text-green-600' />;
-      case 'en_progreso':
+      case 'en_proceso':
         return <Clock className='h-5 w-5 text-blue-600' />;
-      case 'cancelada':
-        return <AlertCircle className='h-5 w-5 text-red-600' />;
       default:
         return <Circle className='h-5 w-5 text-gray-400' />;
     }
@@ -230,7 +229,7 @@ export function TimelinePanel({
     ? stages 
     : stages.filter(stage => stage.es_publica);
 
-  const suggestedStages = getStagesByMateria(caseMateria);
+  const stageTemplates = getStageTemplatesByMateria(caseMateria);
 
   if (isLoading) {
     return (
@@ -281,23 +280,37 @@ export function TimelinePanel({
                     Etapa
                   </label>
                   <select
-                    value={newStage.etapa}
-                    onChange={(e) => setNewStage({ ...newStage, etapa: e.target.value })}
+                    value={newStage.isCustom ? 'custom' : newStage.etapa}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'custom') {
+                        setNewStage({ ...newStage, etapa: '', descripcion: '', isCustom: true });
+                        return;
+                      }
+
+                      const template = stageTemplates.find(stage => stage.etapa === value);
+                      setNewStage({
+                        ...newStage,
+                        etapa: value,
+                        descripcion: template?.descripcion || newStage.descripcion,
+                        isCustom: false,
+                      });
+                    }}
                     className='form-input'
                   >
                     <option value=''>Seleccionar etapa</option>
-                    {suggestedStages.map(etapa => (
-                      <option key={etapa} value={etapa}>
-                        {etapa}
+                    {stageTemplates.map(stage => (
+                      <option key={stage.etapa} value={stage.etapa}>
+                        {stage.etapa} {stage.diasEstimados ? `(≈ ${stage.diasEstimados} días)` : ''}
                       </option>
                     ))}
                     <option value='custom'>Etapa personalizada...</option>
                   </select>
-                  {newStage.etapa === 'custom' && (
+                  {newStage.isCustom && (
                     <input
                       type='text'
                       placeholder='Nombre de la etapa personalizada'
-                      value={newStage.etapa === 'custom' ? '' : newStage.etapa}
+                      value={newStage.etapa}
                       onChange={(e) => setNewStage({ ...newStage, etapa: e.target.value })}
                       className='form-input mt-2'
                     />
@@ -350,7 +363,7 @@ export function TimelinePanel({
                     variant='outline'
                     onClick={() => {
                       setShowAddForm(false);
-                      setNewStage({ etapa: '', descripcion: '', fecha_programada: '', es_publica: true });
+                      setNewStage({ etapa: '', descripcion: '', fecha_programada: '', es_publica: true, isCustom: false });
                     }}
                     disabled={isCreating}
                   >
@@ -374,8 +387,11 @@ export function TimelinePanel({
 
         {/* Timeline de etapas */}
         <div className='relative'>
-          {filteredStages.map((stage, index) => (
-            <div key={stage.id} className='relative flex items-start space-x-4 pb-8'>
+          {filteredStages.map((stage, index) => {
+            const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
+
+            return (
+              <div key={stage.id} className='relative flex items-start space-x-4 pb-8'>
               {/* Línea vertical */}
               {index < filteredStages.length - 1 && (
                 <div className='absolute left-2.5 top-8 w-0.5 h-full bg-gray-200' />
@@ -388,7 +404,7 @@ export function TimelinePanel({
 
               {/* Contenido de la etapa */}
               <div className='flex-1 min-w-0'>
-                <Card className={`${stage.estado === 'completada' ? 'bg-green-50' : ''}`}>
+                <Card className={`${stage.estado === 'completado' ? 'bg-green-50' : ''}`}>
                   <CardContent className='pt-4'>
                     <div className='flex items-start justify-between mb-3'>
                       <div className='flex-1'>
@@ -414,29 +430,29 @@ export function TimelinePanel({
                       {stage.fecha_programada && (
                         <div className='flex items-center gap-1'>
                           <Calendar className='h-4 w-4' />
-                          <span className={isDateInPast(stage.fecha_programada) && stage.estado !== 'completada' ? 'text-red-600 font-medium' : ''}>
+                          <span className={isDateInPast(stage.fecha_programada) && stage.estado !== 'completado' ? 'text-red-600 font-medium' : ''}>
                             {formatDate(stage.fecha_programada)}
                           </span>
                         </div>
                       )}
                       
-                      {stage.responsable?.nombre && (
+                      {stageResponsable?.nombre && (
                         <div className='flex items-center gap-1'>
                           <User className='h-4 w-4' />
-                          <span>{stage.responsable.nombre}</span>
+                          <span>{stageResponsable.nombre}</span>
                         </div>
                       )}
 
-                      {stage.fecha_completada && (
+                      {stage.fecha_cumplida && (
                         <div className='text-green-600'>
-                          Completada {formatRelativeTime(stage.fecha_completada)}
+                          Completado {formatRelativeTime(stage.fecha_cumplida)}
                         </div>
                       )}
                     </div>
 
                     {canManageStages && (
                       <div className='flex items-center gap-2'>
-                        {stage.estado !== 'completada' && (
+                        {stage.estado !== 'completado' && (
                           <Button
                             size='sm'
                             variant='outline'
@@ -468,7 +484,8 @@ export function TimelinePanel({
                 </Card>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {filteredStages.length === 0 && (
@@ -480,6 +497,27 @@ export function TimelinePanel({
                 Haz clic en "Nueva Etapa" para agregar la primera etapa
               </p>
             )}
+          </div>
+        )}
+
+        {stageTemplates.length > 0 && (
+          <div className='border-t pt-4 mt-2'>
+            <h3 className='text-sm font-semibold text-gray-700'>Plan estimado de referencia para materia {caseMateria || 'Civil'}</h3>
+            <p className='text-xs text-gray-500 mt-1'>Duraciones aproximadas en días a partir del inicio del caso.</p>
+            <ul className='mt-3 space-y-2 text-sm text-gray-600'>
+              {stageTemplates.map((template, idx) => (
+                <li key={`${template.etapa}-${idx}`} className='flex items-start gap-2'>
+                  <span className='mt-1 h-2 w-2 rounded-full bg-blue-500 flex-shrink-0' />
+                  <span>
+                    <span className='font-medium text-gray-800'>{template.etapa}</span>
+                    <span className='block text-gray-500'>
+                      {template.descripcion}
+                      {template.diasEstimados ? ` · ≈ ${template.diasEstimados} días` : ''}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </CardContent>

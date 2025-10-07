@@ -1,7 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { getCurrentProfile } from '@/lib/auth/roles';
 import type { AuditLogInsert } from '@/lib/supabase/types';
 
@@ -23,23 +23,25 @@ export async function logAuditAction(input: LogAuditActionInput) {
       return;
     }
 
-    const supabase = createClient();
-    const headersList = headers();
-    
+    const supabase = await createServerClient();
+    // Tu TS dice que headers() devuelve Promise<ReadonlyHeaders> -> usar await
+    const headersList = await headers();
+
     const auditData: AuditLogInsert = {
-      actor_id: profile.id,
       action: input.action,
+      actor_id: profile.id,
       entity_type: input.entity_type,
-      entity_id: input.entity_id,
-      diff_json: input.diff_json,
-      ip_address: headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown',
-      user_agent: headersList.get('user-agent') || 'unknown',
+      entity_id: input.entity_id ?? null, // <- null, no undefined
+      diff_json: input.diff_json as any, // si tu tipo es Json en supabase, castea
+      ip_address:
+        (headersList.get('x-forwarded-for') ??
+          headersList.get('x-real-ip') ??
+          'unknown') as unknown, // la columna es unknown en tus types
+      user_agent: headersList.get('user-agent') ?? 'unknown',
+      // created_at lo pone la DB si es default
     };
 
-    const { error } = await supabase
-      .from('audit_log')
-      .insert(auditData);
-
+    const { error } = await supabase.from('audit_log').insert(auditData);
     if (error) {
       console.error('Error logging audit action:', error);
     }
@@ -58,14 +60,16 @@ export async function getAuditHistory(entityType: string, entityId: string) {
       throw new Error('Sin permisos para ver auditoría');
     }
 
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     const { data: auditLogs, error } = await supabase
       .from('audit_log')
-      .select(`
+      .select(
+        `
         *,
         actor:profiles(nombre)
-      `)
+      `
+      )
       .eq('entity_type', entityType)
       .eq('entity_id', entityId)
       .order('created_at', { ascending: false });
@@ -78,8 +82,8 @@ export async function getAuditHistory(entityType: string, entityId: string) {
     return { success: true, logs: auditLogs || [] };
   } catch (error) {
     console.error('Error in getAuditHistory:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Error desconocido',
       logs: [],
     };
@@ -96,7 +100,7 @@ export async function getAuditStats(days: number = 30) {
       throw new Error('Sin permisos para ver estadísticas de auditoría');
     }
 
-    const supabase = createClient();
+    const supabase = await createServerClient();
     const fromDate = new Date();
     fromDate.setDate(fromDate.getDate() - days);
 
@@ -115,16 +119,25 @@ export async function getAuditStats(days: number = 30) {
     const entityCounts: Record<string, number> = {};
     const dailyActivity: Record<string, number> = {};
 
-    stats?.forEach(log => {
+    (stats ?? []).forEach((log: any) => {
       // Contar acciones
-      actionCounts[log.action] = (actionCounts[log.action] || 0) + 1;
-      
+      if (log.action) {
+        actionCounts[log.action] = (actionCounts[log.action] || 0) + 1;
+      }
+
       // Contar entidades
-      entityCounts[log.entity_type] = (entityCounts[log.entity_type] || 0) + 1;
-      
-      // Actividad diaria
-      const date = new Date(log.created_at).toISOString().split('T')[0];
-      dailyActivity[date] = (dailyActivity[date] || 0) + 1;
+      if (log.entity_type) {
+        entityCounts[log.entity_type] = (entityCounts[log.entity_type] || 0) + 1;
+      }
+
+      // Actividad diaria: created_at puede ser null -> guard clause
+      if (log.created_at) {
+        const d = new Date(log.created_at);
+        const dayKey = isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+        if (dayKey) {
+          dailyActivity[dayKey] = (dailyActivity[dayKey] || 0) + 1;
+        }
+      }
     });
 
     return {
@@ -138,8 +151,8 @@ export async function getAuditStats(days: number = 30) {
     };
   } catch (error) {
     console.error('Error in getAuditStats:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Error desconocido',
       stats: null,
     };

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { notificationClient } from '@/lib/notifications/client';
-import { formatRelativeTime, formatDateTime } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/utils';
 import { 
   Bell, 
   Mail, 
@@ -16,9 +16,7 @@ import {
   Clock, 
   AlertTriangle,
   Filter,
-  Download,
   Loader2,
-  BarChart3,
   TrendingUp,
   Send
 } from 'lucide-react';
@@ -27,12 +25,12 @@ interface NotificationLog {
   id: string;
   type: string;
   recipient: string;
-  subject?: string;
+  subject?: string | null;
   template: string;
   data: any;
   status: string;
-  error_message?: string;
-  sent_at?: string;
+  error_message?: string | null;
+  sent_at?: string | null;
   created_at: string;
 }
 
@@ -47,6 +45,23 @@ interface NotificationStats {
 interface NotificationManagerProps {
   canManage?: boolean;
 }
+
+/** Type guard para convertir unknown -> NotificationLog de forma segura */
+function isNotificationLog(v: unknown): v is NotificationLog {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.id === 'string' &&
+    typeof o.type === 'string' &&
+    typeof o.recipient === 'string' &&
+    typeof o.template === 'string' &&
+    typeof o.status === 'string' &&
+    typeof o.created_at === 'string'
+  );
+}
+
+/** Normaliza claves string (evita undefined/null en UI) */
+const s = (v: string | null | undefined): string => (typeof v === 'string' ? v : '');
 
 export function NotificationManager({ canManage = false }: NotificationManagerProps) {
   const [logs, setLogs] = useState<NotificationLog[]>([]);
@@ -73,24 +88,30 @@ export function NotificationManager({ canManage = false }: NotificationManagerPr
         notificationClient.getNotificationStats(selectedPeriod),
       ]);
 
+      // Logs
       if (logsResult.success) {
-        setLogs(logsResult.logs);
+        const raw = Array.isArray(logsResult.logs) ? logsResult.logs : [];
+        const safe = raw.filter(isNotificationLog);
+        setLogs(safe);
       } else {
         toast({
           title: 'Error',
           description: logsResult.error || 'Error al cargar logs',
           variant: 'destructive',
         });
+        setLogs([]); // aseguremos un estado consistente
       }
 
+      // Stats
       if (statsResult.success) {
-        setStats(statsResult.stats);
+        setStats(statsResult.stats ?? null);
       } else {
         toast({
           title: 'Error',
           description: statsResult.error || 'Error al cargar estadísticas',
           variant: 'destructive',
         });
+        setStats(null);
       }
     } catch (error) {
       console.error('Error loading notification data:', error);
@@ -108,9 +129,10 @@ export function NotificationManager({ canManage = false }: NotificationManagerPr
     if (canManage) {
       loadData();
     }
-  }, [canManage, filters, selectedPeriod]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManage, filters.type, filters.status, filters.template, filters.recipient, selectedPeriod]);
 
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = (key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
@@ -234,7 +256,7 @@ export function NotificationManager({ canManage = false }: NotificationManagerPr
                   <p className='text-sm font-medium text-gray-600'>Tasa de Éxito</p>
                   <p className='text-3xl font-bold text-gray-900'>{stats.successRate}%</p>
                   <p className='text-sm text-gray-500 mt-1'>
-                    {stats.byStatus.sent || 0} exitosas
+                    {(stats.byStatus.sent || 0)} exitosas
                   </p>
                 </div>
                 <div className='h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center'>
@@ -251,7 +273,7 @@ export function NotificationManager({ canManage = false }: NotificationManagerPr
                   <p className='text-sm font-medium text-gray-600'>Emails</p>
                   <p className='text-3xl font-bold text-gray-900'>{stats.byType.email || 0}</p>
                   <p className='text-sm text-gray-500 mt-1'>
-                    {Math.round(((stats.byType.email || 0) / stats.total) * 100)}% del total
+                    {stats.total > 0 ? Math.round(((stats.byType.email || 0) / stats.total) * 100) : 0}% del total
                   </p>
                 </div>
                 <div className='h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center'>
@@ -268,7 +290,7 @@ export function NotificationManager({ canManage = false }: NotificationManagerPr
                   <p className='text-sm font-medium text-gray-600'>Fallidas</p>
                   <p className='text-3xl font-bold text-gray-900'>{stats.byStatus.failed || 0}</p>
                   <p className='text-sm text-gray-500 mt-1'>
-                    {Math.round(((stats.byStatus.failed || 0) / stats.total) * 100)}% del total
+                    {stats.total > 0 ? Math.round(((stats.byStatus.failed || 0) / stats.total) * 100) : 0}% del total
                   </p>
                 </div>
                 <div className='h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center'>
@@ -394,11 +416,11 @@ export function NotificationManager({ canManage = false }: NotificationManagerPr
                           {getTemplateLabel(log.template)}
                         </h4>
                         <p className='text-sm text-gray-600'>
-                          Para: {log.recipient}
+                          Para: {s(log.recipient)}
                         </p>
-                        {log.subject && (
+                        {s(log.subject) && (
                           <p className='text-sm text-gray-500'>
-                            Asunto: {log.subject}
+                            Asunto: {s(log.subject)}
                           </p>
                         )}
                       </div>
@@ -421,10 +443,10 @@ export function NotificationManager({ canManage = false }: NotificationManagerPr
                     </Badge>
                   </div>
 
-                  {log.error_message && (
+                  {s(log.error_message) && (
                     <div className='mt-3 p-3 bg-red-50 border border-red-200 rounded-lg'>
                       <p className='text-sm text-red-700'>
-                        <strong>Error:</strong> {log.error_message}
+                        <strong>Error:</strong> {s(log.error_message)}
                       </p>
                     </div>
                   )}

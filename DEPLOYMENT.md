@@ -1,6 +1,6 @@
-# LEXCHILE - Guía de Deployment
+# LEXSER - Guía de Deployment
 
-Esta guía explica cómo desplegar LEXCHILE en diferentes entornos de producción.
+Esta guía explica cómo desplegar LEXSER en diferentes entornos de producción.
 
 ## Opciones de Deployment
 
@@ -112,7 +112,7 @@ CMD ["node", "server.js"]
 ```yaml
 version: '3.8'
 services:
-  lexchile:
+  lexser:
     build: .
     ports:
       - "3000:3000"

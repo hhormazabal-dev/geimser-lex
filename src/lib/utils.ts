@@ -1,245 +1,193 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+/* ───────────────── helpers internos ───────────────── */
+
+function s(val: string | null | undefined): string {
+  return val ?? ''
 }
 
-/**
- * Formatea un número como moneda chilena
- */
+function toDate(input: string | Date | null | undefined): Date {
+  if (!input) return new Date('Invalid Date')
+  const d = typeof input === 'string' ? new Date(input) : input
+  return isNaN(d.getTime()) ? new Date('Invalid Date') : d
+}
+
+/* ───────────────── utilidad tailwind ───────────────── */
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+/* ───────────────── formatos de dinero/fecha ───────────────── */
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('es-CL', {
     style: 'currency',
     currency: 'CLP',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(amount)
 }
 
-/**
- * Formatea una fecha en formato chileno
- */
-export function formatDate(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
+export function formatDate(date?: string | Date | null): string {
+  const d = toDate(date ?? null)
+  if (isNaN(d.getTime())) return ''
   return new Intl.DateTimeFormat('es-CL', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  }).format(dateObj);
+  }).format(d)
 }
 
-/**
- * Formatea una fecha en formato corto
- */
-export function formatDateShort(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
+export function formatDateShort(date?: string | Date | null): string {
+  const d = toDate(date ?? null)
+  if (isNaN(d.getTime())) return ''
   return new Intl.DateTimeFormat('es-CL', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(dateObj);
+  }).format(d)
 }
 
-/**
- * Formatea una fecha y hora
- */
-export function formatDateTime(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
+export function formatDateTime(date?: string | Date | null): string {
+  const d = toDate(date ?? null)
+  if (isNaN(d.getTime())) return ''
   return new Intl.DateTimeFormat('es-CL', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(dateObj);
+  }).format(d)
 }
 
-/**
- * Calcula el tiempo relativo (ej: "hace 2 días")
- */
-export function formatRelativeTime(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - dateObj.getTime()) / 1000);
+export function formatRelativeTime(date?: string | Date | null): string {
+  const d = toDate(date ?? null)
+  if (isNaN(d.getTime())) return 'Fecha inválida'
 
-  if (diffInSeconds < 60) {
-    return 'hace unos segundos';
-  }
-
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) {
-    return `hace ${diffInMinutes} minuto${diffInMinutes > 1 ? 's' : ''}`;
-  }
-
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) {
-    return `hace ${diffInHours} hora${diffInHours > 1 ? 's' : ''}`;
-  }
-
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 30) {
-    return `hace ${diffInDays} día${diffInDays > 1 ? 's' : ''}`;
-  }
-
-  const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) {
-    return `hace ${diffInMonths} mes${diffInMonths > 1 ? 'es' : ''}`;
-  }
-
-  const diffInYears = Math.floor(diffInMonths / 12);
-  return `hace ${diffInYears} año${diffInYears > 1 ? 's' : ''}`;
+  const diff = (Date.now() - d.getTime()) / 1000
+  if (diff < 60) return 'hace unos segundos'
+  if (diff < 3600) return `hace ${Math.floor(diff / 60)} minutos`
+  if (diff < 86400) return `hace ${Math.floor(diff / 3600)} horas`
+  if (diff < 2592000) return `hace ${Math.floor(diff / 86400)} días`
+  if (diff < 31104000) return `hace ${Math.floor(diff / 2592000)} meses`
+  return `hace ${Math.floor(diff / 31104000)} años`
 }
 
-/**
- * Valida un RUT chileno
- */
-export function validateRUT(rut: string): boolean {
-  if (!rut) return false;
-  
-  // Limpiar el RUT
-  const cleanRUT = rut.replace(/[^0-9kK]/g, '');
-  
-  if (cleanRUT.length < 8 || cleanRUT.length > 9) {
-    return false;
-  }
+/* ───────────────── RUT ───────────────── */
 
-  const body = cleanRUT.slice(0, -1);
-  const dv = cleanRUT.slice(-1).toUpperCase();
+export function validateRUT(rut?: string | null): boolean {
+  const clean = s(rut).replace(/[^0-9kK]/g, '')
+  if (clean.length < 8 || clean.length > 9) return false
 
-  // Calcular dígito verificador
-  let sum = 0;
-  let multiplier = 2;
+  const body = clean.slice(0, -1)
+  const dv = clean.slice(-1).toUpperCase()
 
+  let sum = 0
+  let mul = 2
   for (let i = body.length - 1; i >= 0; i--) {
-    sum += parseInt(body[i]) * multiplier;
-    multiplier = multiplier === 7 ? 2 : multiplier + 1;
+    sum += parseInt(body[i]!, 10) * mul
+    mul = mul === 7 ? 2 : mul + 1
   }
-
-  const remainder = sum % 11;
-  const calculatedDV = remainder < 2 ? remainder.toString() : 'K';
-
-  return dv === calculatedDV;
+  const res = 11 - (sum % 11)
+  const calc = res === 11 ? '0' : res === 10 ? 'K' : String(res)
+  return dv === calc
 }
 
-/**
- * Formatea un RUT chileno
- */
-export function formatRUT(rut: string): string {
-  if (!rut) return '';
-  
-  const cleanRUT = rut.replace(/[^0-9kK]/g, '');
-  
-  if (cleanRUT.length < 8) {
-    return cleanRUT;
-  }
-
-  const body = cleanRUT.slice(0, -1);
-  const dv = cleanRUT.slice(-1);
-
-  // Agregar puntos cada 3 dígitos desde la derecha
-  const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  
-  return `${formattedBody}-${dv}`;
+export function formatRUT(rut?: string | null): string {
+  const clean = s(rut).replace(/[^0-9kK]/g, '')
+  if (clean.length < 8) return clean
+  const body = clean.slice(0, -1)
+  const dv = clean.slice(-1)
+  const formatted = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${formatted}-${dv}`
 }
 
-/**
- * Trunca un texto a una longitud específica
- */
-export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '...';
+/* ───────────────── texto ───────────────── */
+
+export function truncateText(text?: string | null, maxLength = 50): string {
+  const t = s(text)
+  return t.length <= maxLength ? t : t.slice(0, maxLength) + '...'
 }
 
-/**
- * Capitaliza la primera letra de cada palabra
- */
-export function capitalizeWords(text: string): string {
-  return text.replace(/\w\S*/g, (txt) =>
-    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
-  );
+export function capitalizeWords(text?: string | null): string {
+  const t = s(text)
+  return t.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
 }
 
-/**
- * Genera un slug a partir de un texto
- */
-export function generateSlug(text: string): string {
-  return text
+export function generateSlug(text?: string | null): string {
+  const t = s(text)
+  return t
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remover acentos
-    .replace(/[^a-z0-9\s-]/g, '') // Remover caracteres especiales
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
     .trim()
-    .replace(/\s+/g, '-') // Reemplazar espacios con guiones
-    .replace(/-+/g, '-'); // Remover guiones duplicados
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
 }
 
-/**
- * Obtiene las iniciales de un nombre
- */
-export function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map(word => word.charAt(0))
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+export function getInitials(name?: string | null): string {
+  const n = s(name).trim()
+  if (!n) return ''
+  return n.split(/\s+/).map(w => w[0]!).join('').toUpperCase().slice(0, 2)
 }
 
-/**
- * Verifica si una fecha está vencida
- */
-export function isOverdue(date: string | Date): boolean {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return dateObj < new Date();
+/* ───────────────── fechas varias ───────────────── */
+
+export function isOverdue(date?: string | Date | null): boolean {
+  const d = toDate(date ?? null)
+  return !isNaN(d.getTime()) && d.getTime() < Date.now()
 }
 
-/**
- * Calcula los días hasta una fecha
- */
-export function daysUntil(date: string | Date): number {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  const now = new Date();
-  const diffInMs = dateObj.getTime() - now.getTime();
-  return Math.ceil(diffInMs / (1000 * 60 * 60 * 24));
+export function isDateInPast(date?: string | Date | null): boolean {
+  const d = toDate(date ?? null)
+  if (isNaN(d.getTime())) return false
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const cmp = new Date(d)
+  cmp.setHours(0, 0, 0, 0)
+
+  return cmp < today
 }
 
-/**
- * Formatea el tamaño de archivo
- */
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+export function daysUntil(date?: string | Date | null): number {
+  const d = toDate(date ?? null)
+  if (isNaN(d.getTime())) return 0
+  const ms = d.getTime() - Date.now()
+  return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }
 
-/**
- * Debounce function
- */
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
+/* ───────────────── archivos ───────────────── */
+
+export function formatFileSize(bytes?: number | null): string {
+  const b = typeof bytes === 'number' && !isNaN(bytes) ? bytes : 0
+  if (b <= 0) return '0 Bytes'
+  const k = 1024
+  const units = ['Bytes', 'KB', 'MB', 'GB'] as const
+  const i = Math.min(Math.floor(Math.log(b) / Math.log(k)), units.length - 1)
+  const val = (b / Math.pow(k, i)).toFixed(2)
+  return `${val} ${units[i]}`
 }
 
-/**
- * Genera un color basado en un string
- */
-export function stringToColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+/* ───────────────── otros ───────────────── */
+
+export function debounce<T extends (...args: any[]) => void>(fn: T, wait: number) {
+  let t: ReturnType<typeof setTimeout>
+  return (...args: Parameters<T>): void => {
+    clearTimeout(t)
+    t = setTimeout(() => fn(...args), wait)
   }
-  
-  const hue = hash % 360;
-  return `hsl(${hue}, 70%, 50%)`;
+}
+
+export function stringToColor(str?: string | null): string {
+  const txt = s(str)
+  let hash = 0
+  for (let i = 0; i < txt.length; i++) {
+    hash = txt.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue = ((hash % 360) + 360) % 360
+  return `hsl(${hue}, 70%, 50%)`
 }

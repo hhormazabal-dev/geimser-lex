@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createCase, updateCase, deleteCase, getCases, getCaseById } from '@/lib/actions/cases';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import type { CreateCaseInput, UpdateCaseInput } from '@/lib/validators/case';
 
 // Mock Supabase client
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
+  createServiceClient: vi.fn(),
 }));
 
 // Mock auth functions
@@ -16,7 +17,12 @@ vi.mock('@/lib/auth/roles', () => ({
 
 // Mock audit logging
 vi.mock('@/lib/audit/log', () => ({
-  logAuditEvent: vi.fn(),
+  logAuditAction: vi.fn(),
+}));
+
+// Mock notifications
+vi.mock('@/lib/notifications/hooks', () => ({
+  onCaseCreated: vi.fn(),
 }));
 
 describe('Cases Server Actions', () => {
@@ -34,13 +40,15 @@ describe('Cases Server Actions', () => {
     email: 'lawyer@test.com',
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    (createClient as any).mockReturnValue(mockSupabaseClient);
+    (createClient as any).mockResolvedValue(mockSupabaseClient);
+    (createServiceClient as any).mockReturnValue(mockSupabaseClient);
     
     // Mock requireAuth to return test profile
-    const { requireAuth } = require('@/lib/auth/roles');
-    requireAuth.mockResolvedValue(mockProfile);
+    const rolesModule = await import('@/lib/auth/roles');
+    vi.mocked(rolesModule.requireAuth).mockResolvedValue(mockProfile as any);
+    vi.mocked(rolesModule.getCurrentProfile).mockResolvedValue(mockProfile as any);
   });
 
   afterEach(() => {
@@ -55,36 +63,55 @@ describe('Cases Server Actions', () => {
         materia: 'Civil',
         tribunal: 'Juzgado Civil de Santiago',
         nombre_cliente: 'Juan Pérez',
-        rut_cliente: '12345678-9',
         fecha_inicio: '2024-01-15',
         prioridad: 'media',
         estado: 'activo',
         valor_estimado: 1000000,
         observaciones: 'Caso de prueba',
+        descripcion_inicial: 'Los hechos relevantes del caso se describen en este resumen inicial.',
       };
 
       const mockInsertResponse = {
-        data: [{ id: 'case-123', ...mockCaseData }],
+        data: [{ id: 'case-123', ...mockCaseData, workflow_state: 'preparacion' }],
         error: null,
       };
 
-      const mockQuery = {
+      const mockCasesQuery = {
         insert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue(mockInsertResponse),
       };
 
-      mockSupabaseClient.from.mockReturnValue(mockQuery);
+      const mockStagesQuery = {
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'cases') {
+          return mockCasesQuery;
+        }
+
+        if (table === 'case_stages') {
+          return mockStagesQuery;
+        }
+
+        return {
+          upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        };
+      });
 
       const result = await createCase(mockCaseData);
 
       expect(result.success).toBe(true);
       expect(result.case).toEqual(mockInsertResponse.data[0]);
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('cases');
-      expect(mockQuery.insert).toHaveBeenCalledWith({
-        ...mockCaseData,
-        abogado_responsable: mockProfile.id,
-      });
+      expect(mockCasesQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
+        caratulado: mockCaseData.caratulado,
+        workflow_state: 'preparacion',
+      }));
+      expect(mockStagesQuery.insert).toHaveBeenCalled();
     });
 
     it('should handle validation errors', async () => {
@@ -92,6 +119,7 @@ describe('Cases Server Actions', () => {
         caratulado: '', // Required field empty
         numero_causa: 'C-2024-001',
         materia: 'Civil',
+        descripcion_inicial: '',
       } as CreateCaseInput;
 
       const result = await createCase(invalidCaseData);
@@ -107,10 +135,10 @@ describe('Cases Server Actions', () => {
         materia: 'Civil',
         tribunal: 'Test Court',
         nombre_cliente: 'Test Client',
-        rut_cliente: '12345678-9',
         fecha_inicio: '2024-01-15',
         prioridad: 'media',
         estado: 'activo',
+        descripcion_inicial: 'Resumen detallado del caso para evaluar la estrategia.',
       };
 
       const mockQuery = {
@@ -141,6 +169,7 @@ describe('Cases Server Actions', () => {
         fecha_inicio: '2024-01-15',
         prioridad: 'media',
         estado: 'activo',
+        descripcion_inicial: 'Resumen detallado del caso para evaluar la estrategia.',
       };
 
       const result = await createCase(mockCaseData);
@@ -159,26 +188,49 @@ describe('Cases Server Actions', () => {
         observaciones: 'Updated observations',
       };
 
+      const existingCase = {
+        id: caseId,
+        abogado_responsable: mockProfile.id,
+        analista_id: null,
+        workflow_state: 'preparacion',
+      };
+
       const mockUpdateResponse = {
         data: [{ id: caseId, ...updateData }],
         error: null,
       };
 
-      const mockQuery = {
+      const selectQuery = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: existingCase, error: null }),
+      };
+
+      const updateQuery = {
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue(mockUpdateResponse),
       };
 
-      mockSupabaseClient.from.mockReturnValue(mockQuery);
+      let casesCallCount = 0;
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'cases') {
+          casesCallCount += 1;
+          return casesCallCount === 1 ? selectQuery : updateQuery;
+        }
+
+        return {
+          upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        };
+      });
 
       const result = await updateCase(caseId, updateData);
 
       expect(result.success).toBe(true);
       expect(result.case).toEqual(mockUpdateResponse.data[0]);
-      expect(mockQuery.update).toHaveBeenCalledWith(updateData);
-      expect(mockQuery.eq).toHaveBeenCalledWith('id', caseId);
+      expect(updateQuery.update).toHaveBeenCalledWith(expect.objectContaining(updateData));
+      expect(updateQuery.eq).toHaveBeenCalledWith('id', caseId);
     });
 
     it('should handle non-existent case', async () => {
@@ -188,16 +240,23 @@ describe('Cases Server Actions', () => {
       };
 
       const mockQuery = {
+        select: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({
           data: null,
           error: { message: 'No rows found' },
         }),
       };
 
-      mockSupabaseClient.from.mockReturnValue(mockQuery);
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'cases') {
+          return mockQuery;
+        }
+        return {
+          upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        };
+      });
 
       const result = await updateCase(caseId, updateData);
 

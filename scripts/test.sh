@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# LEXCHILE Test Runner Script
-# This script runs the complete test suite for the LEXCHILE application
+# LEXSER Test Runner Script
+# This script runs the complete test suite for the LEXSER application
 
 set -e  # Exit on any error
 
-echo "🚀 Starting LEXCHILE Test Suite"
+echo "🚀 Starting LEXSER Test Suite"
 echo "================================"
 
 # Colors for output

@@ -1,26 +1,31 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { getCurrentProfile, requireAuth } from '@/lib/auth/roles';
+import { createServerClient } from '@/lib/supabase/server';
+import { requireAuth } from '@/lib/auth/roles';
+import type { Json } from '@/lib/supabase/types';
 
+/* =======================
+   Tipos
+======================= */
 export interface AuditLog {
   id: string;
-  table_name: string;
-  record_id: string;
-  action: string;
-  old_values?: any;
-  new_values?: any;
-  changed_fields?: string[];
-  user_id?: string;
-  user_role?: string;
-  user_email?: string;
-  ip_address?: string;
-  user_agent?: string;
-  session_id?: string;
-  severity: string;
-  category: string;
-  description?: string;
-  metadata?: any;
+  table_name: string | null;
+  record_id: string | null;
+  action: string | null;
+  old_values?: Json | null;
+  new_values?: Json | null;
+  changed_fields?: string[] | null;
+  actor_id?: string | null;
+  user_id?: string | null;
+  user_role?: string | null;
+  user_email?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  session_id?: string | null;
+  severity: string | null;
+  category: string | null;
+  description?: string | null;
+  metadata?: Json | null;
   created_at: string;
 }
 
@@ -39,36 +44,85 @@ export interface UserSession {
   id: string;
   user_id: string;
   session_token: string;
-  ip_address?: string;
-  user_agent?: string;
-  location_country?: string;
-  location_city?: string;
-  device_type?: string;
-  browser?: string;
-  os?: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  location_country?: string | null;
+  location_city?: string | null;
+  device_type?: string | null;
+  browser?: string | null;
+  os?: string | null;
   is_active: boolean;
   last_activity: string;
   expires_at: string;
   created_at: string;
-  ended_at?: string;
+  ended_at?: string | null;
 }
 
 export interface LoginAttempt {
   id: string;
   email: string;
   ip_address: string;
-  user_agent?: string;
+  user_agent?: string | null;
   success: boolean;
-  failure_reason?: string;
-  user_id?: string;
-  session_id?: string;
-  metadata?: any;
+  failure_reason?: string | null;
+  user_id?: string | null;
+  session_id?: string | null;
+  metadata?: Json | null;
   created_at: string;
 }
 
-/**
- * Obtiene logs de auditoría con filtros
- */
+/* =======================
+   Normalizador
+======================= */
+type RawAuditRow = {
+  id: string;
+  table_name?: string | null;
+  record_id?: string | null;
+  action?: string | null;
+  old_values?: Json | null;
+  new_values?: Json | null;
+  changed_fields?: string[] | null;
+  actor_id?: string | null;
+  user_id?: string | null;
+  user_role?: string | null;
+  user_email?: string | null;
+  ip_address?: unknown;           // <-- puede venir como unknown en tipos generados
+  user_agent?: string | null;
+  session_id?: string | null;
+  severity?: string | null;
+  category?: string | null;
+  description?: string | null;
+  metadata?: Json | null;
+  created_at?: string | null;
+};
+
+function normalizeAuditRow(row: RawAuditRow): AuditLog {
+  return {
+    id: row.id,
+    table_name: row.table_name ?? null,
+    record_id: row.record_id ?? null,
+    action: row.action ?? null,
+    old_values: row.old_values ?? null,
+    new_values: row.new_values ?? null,
+    changed_fields: row.changed_fields ?? null,
+    actor_id: row.actor_id ?? row.user_id ?? null,
+    user_id: row.user_id ?? null,
+    user_role: row.user_role ?? null,
+    user_email: row.user_email ?? null,
+    ip_address: row.ip_address == null ? null : String(row.ip_address), // <-- conversión segura
+    user_agent: row.user_agent ?? null,
+    session_id: row.session_id ?? null,
+    severity: row.severity ?? null,
+    category: row.category ?? null,
+    description: row.description ?? null,
+    metadata: row.metadata ?? null,
+    created_at: row.created_at ?? new Date().toISOString(),
+  };
+}
+
+/* =======================
+   AUDIT LOGS
+======================= */
 export async function getAuditLogs(filters?: {
   table_name?: string;
   action?: string;
@@ -81,112 +135,73 @@ export async function getAuditLogs(filters?: {
 }): Promise<{ success: boolean; logs?: AuditLog[]; total?: number; error?: string }> {
   try {
     const profile = await requireAuth();
-    
-    // Solo admin puede ver todos los logs
-    if (profile.role !== 'admin_firma') {
-      throw new Error('Sin permisos para ver logs de auditoría');
-    }
+    if (profile.role !== 'admin_firma') throw new Error('Sin permisos para ver logs de auditoría');
 
-    const supabase = createClient();
-    
+    const supabase = await createServerClient();
+
     let query = supabase
-      .from('audit_logs')
+      .from('audit_log')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
 
-    // Aplicar filtros
-    if (filters?.table_name) {
-      query = query.eq('table_name', filters.table_name);
-    }
-
-    if (filters?.action) {
-      query = query.eq('action', filters.action);
-    }
-
-    if (filters?.user_id) {
-      query = query.eq('user_id', filters.user_id);
-    }
-
-    if (filters?.severity) {
-      query = query.eq('severity', filters.severity);
-    }
-
-    if (filters?.start_date) {
-      query = query.gte('created_at', filters.start_date);
-    }
-
-    if (filters?.end_date) {
-      query = query.lte('created_at', filters.end_date);
-    }
-
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-
-    if (filters?.offset) {
-      query = query.range(filters.offset, (filters.offset + (filters.limit || 50)) - 1);
+    if (filters?.table_name) query = query.eq('table_name', filters.table_name);
+    if (filters?.action) query = query.eq('action', filters.action);
+    if (filters?.user_id) query = query.eq('actor_id', filters.user_id);
+    if (filters?.severity) query = query.eq('severity', filters.severity);
+    if (filters?.start_date) query = query.gte('created_at', filters.start_date);
+    if (filters?.end_date) query = query.lte('created_at', filters.end_date);
+    if (typeof filters?.limit === 'number') query = query.limit(filters.limit);
+    if (typeof filters?.offset === 'number') {
+      const from = filters.offset;
+      const to = from + (filters.limit ?? 50) - 1;
+      query = query.range(from, to);
     }
 
     const { data, error, count } = await query;
-
     if (error) throw error;
 
-    return {
-      success: true,
-      logs: data || [],
-      total: count || 0,
-    };
+    const normalized: AuditLog[] = (data as unknown as RawAuditRow[]).map(normalizeAuditRow);
+    return { success: true, logs: normalized, total: count ?? 0 };
   } catch (error) {
-    console.error('Error getting audit logs:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
+    console.error('getAuditLogs', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
 
-/**
- * Obtiene alertas de seguridad
- */
+/* =======================
+   SECURITY ALERTS (RPC)
+======================= */
 export async function getSecurityAlerts(): Promise<{ success: boolean; alerts?: SecurityAlert[]; error?: string }> {
   try {
     const profile = await requireAuth();
-    
-    if (profile.role !== 'admin_firma') {
-      throw new Error('Sin permisos para ver alertas de seguridad');
-    }
+    if (profile.role !== 'admin_firma') throw new Error('Sin permisos para ver alertas de seguridad');
 
-    const supabase = createClient();
-
-    const { data, error } = await supabase.rpc('detect_suspicious_activity');
-
+    const supabase = await createServerClient();
+    const { data, error } = await (supabase as any).rpc('detect_suspicious_activity');
     if (error) throw error;
 
-    return {
-      success: true,
-      alerts: data || [],
-    };
+    const alerts: SecurityAlert[] = Array.isArray(data)
+      ? (data as SecurityAlert[])
+      : data
+      ? [data as SecurityAlert]
+      : [];
+
+    return { success: true, alerts };
   } catch (error) {
-    console.error('Error getting security alerts:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
+    console.error('getSecurityAlerts', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
 
-/**
- * Obtiene sesiones de usuario activas
- */
+/* =======================
+   USER SESSIONS
+======================= */
 export async function getUserSessions(userId?: string): Promise<{ success: boolean; sessions?: UserSession[]; error?: string }> {
   try {
     const profile = await requireAuth();
-    
-    // Admin puede ver todas las sesiones, usuarios solo las suyas
     const targetUserId = profile.role === 'admin_firma' ? (userId || profile.id) : profile.id;
 
-    const supabase = createClient();
-
+    const supabase = await createServerClient();
     const { data, error } = await supabase
       .from('user_sessions')
       .select('*')
@@ -195,404 +210,205 @@ export async function getUserSessions(userId?: string): Promise<{ success: boole
       .order('last_activity', { ascending: false });
 
     if (error) throw error;
-
-    return {
-      success: true,
-      sessions: data || [],
-    };
+    return { success: true, sessions: (data as UserSession[]) ?? [] };
   } catch (error) {
-    console.error('Error getting user sessions:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
+    console.error('getUserSessions', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
 
-/**
- * Termina una sesión de usuario
- */
 export async function endUserSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const profile = await requireAuth();
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
-    // Verificar que el usuario puede terminar esta sesión
-    const { data: session, error: sessionError } = await supabase
+    const { data: session, error: sErr } = await supabase
       .from('user_sessions')
       .select('user_id')
       .eq('id', sessionId)
       .single();
 
-    if (sessionError) throw sessionError;
-
-    // Solo admin o el propio usuario pueden terminar la sesión
-    if (profile.role !== 'admin_firma' && session.user_id !== profile.id) {
-      throw new Error('Sin permisos para terminar esta sesión');
-    }
+    if (sErr) throw sErr;
+    if (!session) throw new Error('Sesión no encontrada');
+    if (profile.role !== 'admin_firma' && session.user_id !== profile.id) throw new Error('Sin permisos');
 
     const { error } = await supabase
       .from('user_sessions')
-      .update({
-        is_active: false,
-        ended_at: new Date().toISOString(),
-      })
+      .update({ is_active: false, ended_at: new Date().toISOString() })
       .eq('id', sessionId);
 
     if (error) throw error;
-
     return { success: true };
   } catch (error) {
-    console.error('Error ending user session:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
+    console.error('endUserSession', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
 
-/**
- * Obtiene intentos de login recientes
- */
-export async function getLoginAttempts(filters?: {
-  email?: string;
-  success?: boolean;
-  start_date?: string;
-  end_date?: string;
+/* =======================
+   LOGIN ATTEMPTS
+======================= */
+export async function getLoginAttempts(params?: {
   limit?: number;
-}): Promise<{ success: boolean; attempts?: LoginAttempt[]; error?: string }> {
+  offset?: number;
+}): Promise<{ success: boolean; attempts?: LoginAttempt[]; total?: number; error?: string }> {
   try {
     const profile = await requireAuth();
-    
-    if (profile.role !== 'admin_firma') {
-      throw new Error('Sin permisos para ver intentos de login');
-    }
+    if (profile.role !== 'admin_firma') throw new Error('Sin permisos para ver intentos de login');
 
-    const supabase = createClient();
-    
-    let query = supabase
+    const supabase = await createServerClient();
+
+    let q = supabase
       .from('login_attempts')
-      .select('*')
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
 
-    if (filters?.email) {
-      query = query.ilike('email', `%${filters.email}%`);
+    if (typeof params?.limit === 'number') q = q.limit(params.limit);
+    if (typeof params?.offset === 'number') {
+      const from = params.offset;
+      const to = from + (params?.limit ?? 50) - 1;
+      q = q.range(from, to);
     }
 
-    if (filters?.success !== undefined) {
-      query = query.eq('success', filters.success);
-    }
-
-    if (filters?.start_date) {
-      query = query.gte('created_at', filters.start_date);
-    }
-
-    if (filters?.end_date) {
-      query = query.lte('created_at', filters.end_date);
-    }
-
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-
-    const { data, error } = await query;
-
+    const { data, error, count } = await q;
     if (error) throw error;
 
     return {
       success: true,
-      attempts: data || [],
+      attempts: (data as LoginAttempt[]) ?? [],
+      total: count ?? 0,
     };
-  } catch (error) {
-    console.error('Error getting login attempts:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
+  } catch (err) {
+    console.error('getLoginAttempts', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Error desconocido' };
   }
 }
 
-/**
- * Registra un intento de login
- */
-export async function logLoginAttempt(data: {
-  email: string;
-  ip_address: string;
-  user_agent?: string;
+/* =======================
+   AUDIT STATS
+======================= */
+type StatsPeriod = 'day' | 'week' | 'month';
+
+export async function getAuditStats(
+  period: StatsPeriod = 'week'
+): Promise<{
   success: boolean;
-  failure_reason?: string;
-  user_id?: string;
-  session_id?: string;
-  metadata?: any;
-}): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = createClient();
-
-    const { error } = await supabase
-      .from('login_attempts')
-      .insert({
-        email: data.email,
-        ip_address: data.ip_address,
-        user_agent: data.user_agent,
-        success: data.success,
-        failure_reason: data.failure_reason,
-        user_id: data.user_id,
-        session_id: data.session_id,
-        metadata: data.metadata,
-      });
-
-    if (error) throw error;
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error logging login attempt:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
-  }
-}
-
-/**
- * Crea una nueva sesión de usuario
- */
-export async function createUserSession(data: {
-  user_id: string;
-  session_token: string;
-  ip_address?: string;
-  user_agent?: string;
-  expires_at: string;
-  metadata?: any;
-}): Promise<{ success: boolean; session_id?: string; error?: string }> {
-  try {
-    const supabase = createClient();
-
-    // Parsear user agent para extraer información del dispositivo
-    const deviceInfo = parseUserAgent(data.user_agent || '');
-
-    const { data: session, error } = await supabase
-      .from('user_sessions')
-      .insert({
-        user_id: data.user_id,
-        session_token: data.session_token,
-        ip_address: data.ip_address,
-        user_agent: data.user_agent,
-        device_type: deviceInfo.device_type,
-        browser: deviceInfo.browser,
-        os: deviceInfo.os,
-        expires_at: data.expires_at,
-      })
-      .select('id')
-      .single();
-
-    if (error) throw error;
-
-    return {
-      success: true,
-      session_id: session.id,
-    };
-  } catch (error) {
-    console.error('Error creating user session:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
-  }
-}
-
-/**
- * Actualiza la actividad de una sesión
- */
-export async function updateSessionActivity(sessionId: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = createClient();
-
-    const { error } = await supabase
-      .from('user_sessions')
-      .update({
-        last_activity: new Date().toISOString(),
-      })
-      .eq('id', sessionId);
-
-    if (error) throw error;
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error updating session activity:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
-  }
-}
-
-/**
- * Obtiene estadísticas de auditoría
- */
-export async function getAuditStats(period: 'day' | 'week' | 'month' = 'week'): Promise<{ 
-  success: boolean; 
   stats?: {
     total_events: number;
     by_action: Record<string, number>;
-    by_table: Record<string, number>;
-    by_severity: Record<string, number>;
-    by_user: Array<{ user_email: string; count: number }>;
+    by_user: Array<{ user_email: string | null; count: number }>;
     timeline: Array<{ date: string; count: number }>;
-  }; 
-  error?: string 
+  };
+  error?: string;
 }> {
   try {
     const profile = await requireAuth();
-    
-    if (profile.role !== 'admin_firma') {
-      throw new Error('Sin permisos para ver estadísticas de auditoría');
-    }
+    if (profile.role !== 'admin_firma') throw new Error('Sin permisos para ver estadísticas');
 
-    const supabase = createClient();
-    
-    const startDate = new Date();
-    switch (period) {
-      case 'day':
-        startDate.setDate(startDate.getDate() - 1);
-        break;
-      case 'week':
-        startDate.setDate(startDate.getDate() - 7);
-        break;
-      case 'month':
-        startDate.setMonth(startDate.getMonth() - 1);
-        break;
-    }
+    const supabase = await createServerClient();
 
-    const { data: logs, error } = await supabase
-      .from('audit_logs')
-      .select('action, table_name, severity, user_email, created_at')
-      .gte('created_at', startDate.toISOString());
+    // Rango de fechas
+    const now = new Date();
+    const from = new Date(now);
+    if (period === 'day') from.setDate(now.getDate() - 1);
+    else if (period === 'week') from.setDate(now.getDate() - 7);
+    else from.setDate(now.getDate() - 30);
+
+    const { data, error } = await supabase
+      .from('audit_log')
+      .select('action, actor_id, created_at')
+      .gte('created_at', from.toISOString())
+      .lte('created_at', now.toISOString());
 
     if (error) throw error;
 
-    const stats = {
-      total_events: logs?.length || 0,
-      by_action: {} as Record<string, number>,
-      by_table: {} as Record<string, number>,
-      by_severity: {} as Record<string, number>,
-      by_user: [] as Array<{ user_email: string; count: number }>,
-      timeline: [] as Array<{ date: string; count: number }>,
-    };
+    const rows = (data ?? []) as Array<{
+      action: string | null;
+      actor_id: string | null;
+      created_at: string | null;
+    }>;
 
-    // Procesar estadísticas
-    const userCounts: Record<string, number> = {};
-    const dailyCounts: Record<string, number> = {};
+    const by_action: Record<string, number> = {};
+    const by_actor: Record<string, number> = {};
+    const timelineMap: Record<string, number> = {};
 
-    (logs || []).forEach(log => {
-      // Por acción
-      stats.by_action[log.action] = (stats.by_action[log.action] || 0) + 1;
-      
-      // Por tabla
-      stats.by_table[log.table_name] = (stats.by_table[log.table_name] || 0) + 1;
-      
-      // Por severidad
-      stats.by_severity[log.severity] = (stats.by_severity[log.severity] || 0) + 1;
-      
-      // Por usuario
-      if (log.user_email) {
-        userCounts[log.user_email] = (userCounts[log.user_email] || 0) + 1;
+    for (const r of rows) {
+      const actionKey = (r.action ?? 'UNKNOWN').toUpperCase();
+      by_action[actionKey] = (by_action[actionKey] || 0) + 1;
+
+      const actorKey = typeof r.actor_id === 'string' && r.actor_id.length > 0 ? r.actor_id : 'unknown';
+      by_actor[actorKey] = (by_actor[actorKey] || 0) + 1;
+
+      const d = r.created_at ? new Date(r.created_at) : null;
+      const dayKey = d ? d.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+      timelineMap[dayKey] = (timelineMap[dayKey] || 0) + 1;
+    }
+
+    const actorIds: string[] = Object.keys(by_actor).filter((id) => id !== 'unknown');
+
+    let emailMap: Record<string, string | null> = {};
+
+    if (actorIds.length > 0) {
+      const { data: profilesData, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', actorIds);
+
+      if (!pErr && Array.isArray(profilesData)) {
+        emailMap = (profilesData as Array<{ id: string | null; email: string | null }>).reduce((acc, p) => {
+          if (p && typeof p.id === 'string') acc[p.id] = p.email ?? null;
+          return acc;
+        }, {} as Record<string, string | null>);
       }
-      
-      // Timeline diario
-      const date = log.created_at.split('T')[0];
-      dailyCounts[date] = (dailyCounts[date] || 0) + 1;
-    });
+    }
 
-    // Convertir a arrays ordenados
-    stats.by_user = Object.entries(userCounts)
-      .map(([user_email, count]) => ({ user_email, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+    const by_user = Object.entries(by_actor)
+      .map(([actorId, count]) => {
+        const email = actorId === 'unknown' ? null : (emailMap[actorId] ?? null);
+        return { user_email: email, count };
+      })
+      .sort((a, b) => b.count - a.count);
 
-    stats.timeline = Object.entries(dailyCounts)
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const timeline = Object.entries(timelineMap)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([date, count]) => ({ date, count }));
 
     return {
       success: true,
-      stats,
+      stats: {
+        total_events: rows.length,
+        by_action,
+        by_user,
+        timeline,
+      },
     };
-  } catch (error) {
-    console.error('Error getting audit stats:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
+  } catch (err) {
+    console.error('getAuditStats', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Error desconocido' };
   }
 }
 
-/**
- * Ejecuta limpieza de logs antiguos
- */
-export async function cleanupOldLogs(): Promise<{ success: boolean; error?: string }> {
+/* =======================
+   CLEANUP OLD LOGS
+======================= */
+export async function cleanupOldLogs(days: number = 90): Promise<{ success: boolean; removed?: number; error?: string }> {
   try {
     const profile = await requireAuth();
-    
-    if (profile.role !== 'admin_firma') {
-      throw new Error('Sin permisos para ejecutar limpieza');
-    }
+    if (profile.role !== 'admin_firma') throw new Error('Sin permisos');
 
-    const supabase = createClient();
+    const supabase = await createServerClient();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
 
-    const { error } = await supabase.rpc('cleanup_old_audit_logs');
+    const { error, count } = await supabase
+      .from('audit_log')
+      .delete({ count: 'exact' })
+      .lt('created_at', cutoff.toISOString());
 
     if (error) throw error;
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error cleaning up old logs:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Error desconocido',
-    };
+    return { success: true, removed: count ?? 0 };
+  } catch (err) {
+    console.error('cleanupOldLogs', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Error desconocido' };
   }
-}
-
-/**
- * Función auxiliar para parsear user agent
- */
-function parseUserAgent(userAgent: string) {
-  const result = {
-    device_type: 'desktop',
-    browser: 'unknown',
-    os: 'unknown',
-  };
-
-  // Detectar dispositivo
-  if (/Mobile|Android|iPhone|iPad/.test(userAgent)) {
-    result.device_type = 'mobile';
-  } else if (/Tablet|iPad/.test(userAgent)) {
-    result.device_type = 'tablet';
-  }
-
-  // Detectar navegador
-  if (/Chrome/.test(userAgent)) {
-    result.browser = 'Chrome';
-  } else if (/Firefox/.test(userAgent)) {
-    result.browser = 'Firefox';
-  } else if (/Safari/.test(userAgent)) {
-    result.browser = 'Safari';
-  } else if (/Edge/.test(userAgent)) {
-    result.browser = 'Edge';
-  }
-
-  // Detectar OS
-  if (/Windows/.test(userAgent)) {
-    result.os = 'Windows';
-  } else if (/Mac/.test(userAgent)) {
-    result.os = 'macOS';
-  } else if (/Linux/.test(userAgent)) {
-    result.os = 'Linux';
-  } else if (/Android/.test(userAgent)) {
-    result.os = 'Android';
-  } else if (/iOS/.test(userAgent)) {
-    result.os = 'iOS';
-  }
-
-  return result;
 }

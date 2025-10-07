@@ -1,6 +1,6 @@
-# LEXCHILE - Guía de Instalación Rápida
+# LEXSER - Guía de Instalación Rápida
 
-Esta guía te permitirá tener LEXCHILE funcionando en menos de 10 minutos.
+Esta guía te permitirá tener LEXSER funcionando en menos de 10 minutos.
 
 ## Requisitos Previos
 
@@ -12,8 +12,8 @@ Esta guía te permitirá tener LEXCHILE funcionando en menos de 10 minutos.
 
 ### 1. Clonar e Instalar
 ```bash
-git clone https://github.com/lexchile/lexchile-platform.git
-cd lexchile-platform
+git clone https://github.com/lexser/lexser-platform.git
+cd lexser-platform
 npm install
 ```
 
@@ -46,8 +46,10 @@ npm run dev
 
 ## Credenciales de Prueba
 
-- **Admin**: admin@lexchile.com / admin123
-- **Abogado**: abogado@lexchile.com / password123
+- **Admin**: admin@lexser.com / admin123
+- **Analista**: analista@lexser.com / analista123
+- **Abogado**: abogado@lexser.com / password123
+- **Cliente**: cliente@lexser.com / client123
 
 ## Comandos Útiles
 
@@ -74,7 +76,7 @@ npm run build
 ## Estructura de Archivos Importantes
 
 ```
-/lexchile
+/lexser
 ├── src/app/                # Rutas de la aplicación
 ├── src/components/         # Componentes React
 ├── src/lib/               # Lógica de negocio

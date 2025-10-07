@@ -34,21 +34,21 @@ async function globalSetup(config: FullConfig) {
     
     const testUsers = [
       {
-        email: 'admin@lexchile.com',
+        email: 'admin@lexser.com',
         password: 'admin123',
         role: 'admin_firma',
         nombre: 'Admin Test',
         telefono: '+56912345678',
       },
       {
-        email: 'abogado@lexchile.com',
+        email: 'abogado@lexser.com',
         password: 'password123',
         role: 'abogado',
         nombre: 'Abogado Test',
         telefono: '+56912345679',
       },
       {
-        email: 'cliente@lexchile.com',
+        email: 'cliente@lexser.com',
         password: 'client123',
         role: 'cliente',
         nombre: 'Cliente Test',
@@ -94,7 +94,7 @@ async function globalSetup(config: FullConfig) {
     const { data: lawyerProfile } = await supabase
       .from('profiles')
       .select('id')
-      .eq('email', 'abogado@lexchile.com')
+      .eq('email', 'abogado@lexser.com')
       .single();
 
     if (lawyerProfile) {
@@ -203,7 +203,7 @@ async function globalSetup(config: FullConfig) {
     // Login as lawyer and save state
     await page.goto(process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000');
     await page.goto('/login');
-    await page.fill('[data-testid="email-input"]', 'abogado@lexchile.com');
+    await page.fill('[data-testid="email-input"]', 'abogado@lexser.com');
     await page.fill('[data-testid="password-input"]', 'password123');
     await page.click('[data-testid="login-button"]');
     await page.waitForURL('/dashboard');
@@ -213,7 +213,7 @@ async function globalSetup(config: FullConfig) {
 
     // Login as admin and save state
     await page.goto('/login');
-    await page.fill('[data-testid="email-input"]', 'admin@lexchile.com');
+    await page.fill('[data-testid="email-input"]', 'admin@lexser.com');
     await page.fill('[data-testid="password-input"]', 'admin123');
     await page.click('[data-testid="login-button"]');
     await page.waitForURL('/dashboard');

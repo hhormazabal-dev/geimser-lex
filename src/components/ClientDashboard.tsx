@@ -8,6 +8,7 @@ import { NotesPanel } from '@/components/NotesPanel';
 import { DocumentsPanel } from '@/components/DocumentsPanel';
 import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
+import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { 
   Scale, 
@@ -23,15 +24,27 @@ import {
   Eye
 } from 'lucide-react';
 import type { Profile, Case } from '@/lib/supabase/types';
+import type { CaseMessageDTO } from '@/lib/actions/messages';
+import LogoutButton from '@/components/LogoutButton';
 
 interface ClientDashboardProps {
-  profile: Profile;
+  profile: Profile & { email?: string | null };
   cases: Case[];
 }
 
 export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
   const [selectedCase, setSelectedCase] = useState<Case | null>(cases[0] || null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'documents' | 'notes' | 'requests'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'documents' | 'notes' | 'messages' | 'requests'>('overview');
+  const lawyerData =
+    selectedCase &&
+    typeof (selectedCase as any).abogado_responsable === 'object' &&
+    (selectedCase as any).abogado_responsable !== null
+      ? ((selectedCase as any).abogado_responsable as {
+          nombre?: string | null;
+          telefono?: string | null;
+          email?: string | null;
+        })
+      : null;
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -73,6 +86,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
     { id: 'timeline', label: 'Progreso', icon: Clock },
     { id: 'documents', label: 'Documentos', icon: FileText },
     { id: 'notes', label: 'Notas', icon: MessageCircle },
+    { id: 'messages', label: 'Mensajes', icon: MessageCircle },
     { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
   ] as const;
 
@@ -86,14 +100,14 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
               <Scale className='h-8 w-8 text-blue-600' />
               <div>
                 <h1 className='text-xl font-semibold text-gray-900'>Portal Cliente</h1>
-                <p className='text-sm text-gray-500'>LEXCHILE</p>
+                <p className='text-sm text-gray-500'>LEXSER</p>
               </div>
             </div>
             
             <div className='flex items-center space-x-4'>
               <div className='text-right'>
                 <p className='text-sm font-medium text-gray-900'>{profile.nombre}</p>
-                <p className='text-xs text-gray-500'>{profile.email}</p>
+                <p className='text-xs text-gray-500'>{profile.email ?? 'Sin correo registrado'}</p>
               </div>
               <div 
                 className='h-10 w-10 rounded-full flex items-center justify-center text-white font-medium'
@@ -101,6 +115,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
               >
                 {getInitials(profile.nombre)}
               </div>
+              <LogoutButton />
             </div>
           </div>
         </div>
@@ -187,18 +202,24 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                     </div>
 
                     {/* Información del abogado */}
-                    {selectedCase.abogado_responsable && (
+                    {lawyerData && (
                       <div className='bg-gray-50 rounded-lg p-4'>
                         <h3 className='font-medium text-gray-900 mb-2 flex items-center'>
                           <User className='h-4 w-4 mr-2' />
                           Abogado Responsable
                         </h3>
                         <div className='space-y-1 text-sm text-gray-600'>
-                          <p>{selectedCase.abogado_responsable.nombre}</p>
-                          {selectedCase.abogado_responsable.telefono && (
+                          <p>{lawyerData.nombre ?? 'Por confirmar'}</p>
+                          {lawyerData.telefono && (
                             <p className='flex items-center'>
                               <Phone className='h-3 w-3 mr-1' />
-                              {selectedCase.abogado_responsable.telefono}
+                              {lawyerData.telefono}
+                            </p>
+                          )}
+                          {lawyerData.email && (
+                            <p className='flex items-center'>
+                              <Mail className='h-3 w-3 mr-1' />
+                              {lawyerData.email}
                             </p>
                           )}
                         </div>
@@ -288,7 +309,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                           <CardContent>
                             <TimelinePanel 
                               caseId={selectedCase.id}
-                              caseMateria={selectedCase.materia}
+                              caseMateria={selectedCase.materia ?? 'General'}
                               canManageStages={false}
                               showPrivateStages={false}
                             />
@@ -316,7 +337,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                   {activeTab === 'timeline' && (
                     <TimelinePanel 
                       caseId={selectedCase.id}
-                      caseMateria={selectedCase.materia}
+                      caseMateria={selectedCase.materia ?? 'General'}
                       canManageStages={false}
                       showPrivateStages={false}
                     />
@@ -338,6 +359,15 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                       canCreateNotes={false}
                       canEditNotes={false}
                       showPrivateNotes={false}
+                    />
+                  )}
+
+                  {activeTab === 'messages' && (
+                    <CaseMessagesPanel
+                      caseId={selectedCase.id}
+                      initialMessages={[] as CaseMessageDTO[]}
+                      currentProfileId={profile.id}
+                      allowSend={true}
                     />
                   )}
 

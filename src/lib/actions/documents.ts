@@ -1,9 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { getCurrentProfile, requireAuth, canAccessCase } from '@/lib/auth/roles';
 import { logAuditAction } from '@/lib/audit/log';
+
 import {
   uploadDocumentSchema,
   updateDocumentSchema,
@@ -14,7 +15,8 @@ import {
   ALLOWED_FILE_TYPES,
   MAX_FILE_SIZE,
 } from '@/lib/validators/documents';
-import type { Document, DocumentInsert } from '@/lib/supabase/types';
+
+import type { DocumentInsert } from '@/lib/supabase/types';
 
 /**
  * Sube un documento al storage y guarda metadatos
@@ -22,52 +24,46 @@ import type { Document, DocumentInsert } from '@/lib/supabase/types';
 export async function uploadDocument(formData: FormData) {
   try {
     const profile = await requireAuth();
-    
+
     const caseId = formData.get('case_id') as string;
-    const nombre = formData.get('nombre') as string;
-    const visibilidad = formData.get('visibilidad') as 'privado' | 'cliente';
+    const nombre = formData.get('nombre') as string | null;
+    const visibilidad = formData.get('visibilidad') as ('privado' | 'cliente') | null;
     const file = formData.get('file') as File;
 
-    if (!file) {
-      throw new Error('No se ha seleccionado ningún archivo');
-    }
+    if (!file) throw new Error('No se ha seleccionado ningún archivo');
 
     // Validar entrada
     const validatedInput = uploadDocumentSchema.parse({
       case_id: caseId,
-      nombre: nombre || file.name,
-      visibilidad: visibilidad || 'privado',
+      nombre: (nombre && nombre.trim()) || file.name,
+      visibilidad: (visibilidad as 'privado' | 'cliente') || 'privado',
     });
 
     // Verificar acceso al caso
     const hasAccess = await canAccessCase(validatedInput.case_id);
-    if (!hasAccess) {
-      throw new Error('Sin permisos para acceder a este caso');
-    }
+    if (!hasAccess) throw new Error('Sin permisos para acceder a este caso');
 
     // Validar archivo
     if (file.size > MAX_FILE_SIZE) {
-      throw new Error(`El archivo es demasiado grande. Máximo ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+      throw new Error(`El archivo es demasiado grande. Máximo ${Math.floor(MAX_FILE_SIZE / 1024 / 1024)}MB`);
     }
-
-    if (!Object.keys(ALLOWED_FILE_TYPES).includes(file.type)) {
+    if (!Object.prototype.hasOwnProperty.call(ALLOWED_FILE_TYPES, file.type)) {
       throw new Error('Tipo de archivo no permitido');
     }
 
-    const supabase = createServiceClient();
+    // ⚠️ await al service client
+    const supabase = await createServiceClient();
 
     // Generar nombre único para el archivo
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+    const fileExtension = file.name.includes('.') ? file.name.split('.').pop() : '';
+    const rand = Math.random().toString(36).slice(2, 9);
+    const fileName = `${Date.now()}-${rand}${fileExtension ? '.' + fileExtension : ''}`;
     const filePath = `cases/${validatedInput.case_id}/${fileName}`;
 
     // Subir archivo a Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('documents')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+      .upload(filePath, file, { cacheControl: '3600', upsert: false });
 
     if (uploadError) {
       console.error('Error uploading file:', uploadError);
@@ -75,9 +71,7 @@ export async function uploadDocument(formData: FormData) {
     }
 
     // Obtener URL pública
-    const { data: urlData } = supabase.storage
-      .from('documents')
-      .getPublicUrl(filePath);
+    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
 
     // Guardar metadatos en la base de datos
     const documentData: DocumentInsert = {
@@ -103,7 +97,7 @@ export async function uploadDocument(formData: FormData) {
     if (dbError) {
       console.error('Error saving document metadata:', dbError);
       // Intentar eliminar el archivo subido
-      await supabase.storage.from('documents').remove([filePath]);
+      await supabase.storage.from('documents').remove([filePath]).catch(() => {});
       throw new Error('Error al guardar los metadatos del documento');
     }
 
@@ -120,9 +114,9 @@ export async function uploadDocument(formData: FormData) {
     return { success: true, document: newDocument };
   } catch (error) {
     console.error('Error in uploadDocument:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }
@@ -134,7 +128,7 @@ export async function updateDocument(documentId: string, input: UpdateDocumentIn
   try {
     const profile = await requireAuth();
     const validatedInput = updateDocumentSchema.parse(input);
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     // Obtener el documento existente
     const { data: existingDocument, error: fetchError } = await supabase
@@ -149,20 +143,23 @@ export async function updateDocument(documentId: string, input: UpdateDocumentIn
 
     // Verificar permisos
     if (profile.role !== 'admin_firma' && existingDocument.uploader_id !== profile.id) {
-      // Los abogados pueden editar documentos de sus casos
       if (profile.role === 'abogado') {
         const hasAccess = await canAccessCase(existingDocument.case_id);
-        if (!hasAccess) {
-          throw new Error('Sin permisos para editar este documento');
-        }
+        if (!hasAccess) throw new Error('Sin permisos para editar este documento');
       } else {
         throw new Error('Sin permisos para editar este documento');
       }
     }
 
+    // ⚠️ Respeta exactOptionalPropertyTypes: incluir sólo si viene definido
+    const payload: Partial<DocumentInsert> = {
+      ...(validatedInput.nombre !== undefined && { nombre: validatedInput.nombre }),
+      ...(validatedInput.visibilidad !== undefined && { visibilidad: validatedInput.visibilidad }),
+    };
+
     const { data: updatedDocument, error } = await supabase
       .from('documents')
-      .update(validatedInput)
+      .update(payload)
       .eq('id', documentId)
       .select(`
         *,
@@ -181,9 +178,9 @@ export async function updateDocument(documentId: string, input: UpdateDocumentIn
       action: 'UPDATE',
       entity_type: 'document',
       entity_id: documentId,
-      diff_json: { 
-        from: existingDocument, 
-        to: updatedDocument 
+      diff_json: {
+        from: existingDocument,
+        to: updatedDocument,
       },
     });
 
@@ -192,9 +189,9 @@ export async function updateDocument(documentId: string, input: UpdateDocumentIn
     return { success: true, document: updatedDocument };
   } catch (error) {
     console.error('Error in updateDocument:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }
@@ -205,7 +202,7 @@ export async function updateDocument(documentId: string, input: UpdateDocumentIn
 export async function deleteDocument(documentId: string) {
   try {
     const profile = await requireAuth();
-    const supabase = createServiceClient();
+    const supabase = await createServiceClient();
 
     // Obtener el documento existente
     const { data: existingDocument, error: fetchError } = await supabase
@@ -220,42 +217,35 @@ export async function deleteDocument(documentId: string) {
 
     // Verificar permisos
     if (profile.role !== 'admin_firma' && existingDocument.uploader_id !== profile.id) {
-      // Los abogados pueden eliminar documentos de sus casos
       if (profile.role === 'abogado') {
         const hasAccess = await canAccessCase(existingDocument.case_id);
-        if (!hasAccess) {
-          throw new Error('Sin permisos para eliminar este documento');
-        }
+        if (!hasAccess) throw new Error('Sin permisos para eliminar este documento');
       } else {
         throw new Error('Sin permisos para eliminar este documento');
       }
     }
 
     // Eliminar archivo del storage
+    // La URL pública es algo como: https://.../object/public/documents/cases/{case_id}/{filename}
     const urlParts = existingDocument.url.split('/');
     const filePath = urlParts.slice(-2).join('/'); // cases/{case_id}/{filename}
-    
+
     const { error: storageError } = await supabase.storage
       .from('documents')
       .remove([filePath]);
 
     if (storageError) {
       console.error('Error deleting file from storage:', storageError);
-      // Continuar con la eliminación de metadatos aunque falle el storage
+      // seguimos con metadatos aunque falle storage
     }
 
     // Eliminar metadatos de la base de datos
-    const { error: dbError } = await supabase
-      .from('documents')
-      .delete()
-      .eq('id', documentId);
-
+    const { error: dbError } = await supabase.from('documents').delete().eq('id', documentId);
     if (dbError) {
       console.error('Error deleting document metadata:', dbError);
       throw new Error('Error al eliminar el documento');
     }
 
-    // Log de auditoría
     await logAuditAction({
       action: 'DELETE',
       entity_type: 'document',
@@ -264,13 +254,12 @@ export async function deleteDocument(documentId: string) {
     });
 
     revalidatePath(`/cases/${existingDocument.case_id}`);
-
     return { success: true };
   } catch (error) {
     console.error('Error in deleteDocument:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }
@@ -278,81 +267,68 @@ export async function deleteDocument(documentId: string) {
 /**
  * Obtiene documentos con filtros
  */
-export async function getDocuments(filters: DocumentFiltersInput = {}) {
+export async function getDocuments(filters: DocumentFiltersInput = {} as DocumentFiltersInput) {
   try {
     const profile = await getCurrentProfile();
-    if (!profile) {
-      throw new Error('No autenticado');
-    }
+    if (!profile) throw new Error('No autenticado');
 
-    const validatedFilters = documentFiltersSchema.parse(filters);
-    const supabase = createClient();
+    // Normalizar defaults ANTES de validar (evita error de page/limit)
+    const f: any = { ...(filters ?? {}) };
+    if (f.page == null) f.page = 1;
+    if (f.limit == null) f.limit = 10;
+
+    const validatedFilters = documentFiltersSchema.parse(f);
+
+    const supabase = await createServerClient();
 
     let query = supabase
       .from('documents')
-      .select(`
+      .select(
+        `
         *,
         uploader:profiles(id, nombre),
         case:cases(id, caratulado)
-      `);
+      `,
+        { count: 'exact' }
+      );
 
-    // Aplicar filtros de acceso según rol
+    // Acceso según rol
     if (profile.role === 'cliente') {
-      // Los clientes solo ven documentos con visibilidad 'cliente' de sus casos
       query = query.eq('visibilidad', 'cliente');
-      
-      // Obtener casos del cliente
+
       const { data: clientCases } = await supabase
         .from('case_clients')
         .select('case_id')
         .eq('client_profile_id', profile.id);
-      
-      const caseIds = clientCases?.map(cc => cc.case_id) || [];
+
+      const caseIds = clientCases?.map((cc: { case_id: string }) => cc.case_id) || [];
       if (caseIds.length === 0) {
-        return { success: true, documents: [], total: 0 };
+        return { success: true, documents: [], total: 0, page: validatedFilters.page, limit: validatedFilters.limit };
       }
-      
       query = query.in('case_id', caseIds);
     } else if (profile.role === 'abogado') {
-      // Los abogados ven documentos de sus casos
       const { data: abogadoCases } = await supabase
         .from('cases')
         .select('id')
         .eq('abogado_responsable', profile.id);
-      
-      const caseIds = abogadoCases?.map(c => c.id) || [];
+
+      const caseIds = abogadoCases?.map((c: { id: string }) => c.id) || [];
       if (caseIds.length === 0) {
-        return { success: true, documents: [], total: 0 };
+        return { success: true, documents: [], total: 0, page: validatedFilters.page, limit: validatedFilters.limit };
       }
-      
       query = query.in('case_id', caseIds);
     }
 
-    // Aplicar filtros adicionales
+    // Filtros extra
     if (validatedFilters.case_id) {
-      // Verificar acceso al caso específico
       const hasAccess = await canAccessCase(validatedFilters.case_id);
-      if (!hasAccess) {
-        throw new Error('Sin permisos para acceder a este caso');
-      }
+      if (!hasAccess) throw new Error('Sin permisos para acceder a este caso');
       query = query.eq('case_id', validatedFilters.case_id);
     }
-
-    if (validatedFilters.visibilidad) {
-      query = query.eq('visibilidad', validatedFilters.visibilidad);
-    }
-
-    if (validatedFilters.uploader_id) {
-      query = query.eq('uploader_id', validatedFilters.uploader_id);
-    }
-
-    if (validatedFilters.tipo_mime) {
-      query = query.eq('tipo_mime', validatedFilters.tipo_mime);
-    }
-
-    if (validatedFilters.search) {
-      query = query.ilike('nombre', `%${validatedFilters.search}%`);
-    }
+    if (validatedFilters.visibilidad) query = query.eq('visibilidad', validatedFilters.visibilidad);
+    if (validatedFilters.uploader_id) query = query.eq('uploader_id', validatedFilters.uploader_id);
+    if (validatedFilters.tipo_mime) query = query.eq('tipo_mime', validatedFilters.tipo_mime);
+    if (validatedFilters.search) query = query.ilike('nombre', `%${validatedFilters.search}%`);
 
     // Paginación
     const from = (validatedFilters.page - 1) * validatedFilters.limit;
@@ -367,17 +343,17 @@ export async function getDocuments(filters: DocumentFiltersInput = {}) {
       throw new Error('Error al obtener documentos');
     }
 
-    return { 
-      success: true, 
-      documents: documents || [], 
+    return {
+      success: true,
+      documents: documents || [],
       total: count || 0,
       page: validatedFilters.page,
       limit: validatedFilters.limit,
     };
   } catch (error) {
     console.error('Error in getDocuments:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Error desconocido',
       documents: [],
       total: 0,
@@ -391,11 +367,9 @@ export async function getDocuments(filters: DocumentFiltersInput = {}) {
 export async function getDocumentById(documentId: string) {
   try {
     const profile = await getCurrentProfile();
-    if (!profile) {
-      throw new Error('No autenticado');
-    }
+    if (!profile) throw new Error('No autenticado');
 
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     const { data: document, error } = await supabase
       .from('documents')
@@ -407,17 +381,12 @@ export async function getDocumentById(documentId: string) {
       .eq('id', documentId)
       .single();
 
-    if (error || !document) {
-      throw new Error('Documento no encontrado');
-    }
+    if (error || !document) throw new Error('Documento no encontrado');
 
     // Verificar acceso
     const hasAccess = await canAccessCase(document.case_id);
-    if (!hasAccess) {
-      throw new Error('Sin permisos para ver este documento');
-    }
+    if (!hasAccess) throw new Error('Sin permisos para ver este documento');
 
-    // Los clientes solo pueden ver documentos con visibilidad 'cliente'
     if (profile.role === 'cliente' && document.visibilidad === 'privado') {
       throw new Error('Sin permisos para ver este documento');
     }
@@ -425,9 +394,9 @@ export async function getDocumentById(documentId: string) {
     return { success: true, document };
   } catch (error) {
     console.error('Error in getDocumentById:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }
@@ -438,11 +407,9 @@ export async function getDocumentById(documentId: string) {
 export async function getDocumentDownloadUrl(documentId: string) {
   try {
     const profile = await getCurrentProfile();
-    if (!profile) {
-      throw new Error('No autenticado');
-    }
+    if (!profile) throw new Error('No autenticado');
 
-    const supabase = createServiceClient();
+    const supabase = await createServiceClient();
 
     // Obtener el documento
     const { data: document, error } = await supabase
@@ -451,26 +418,21 @@ export async function getDocumentDownloadUrl(documentId: string) {
       .eq('id', documentId)
       .single();
 
-    if (error || !document) {
-      throw new Error('Documento no encontrado');
-    }
+    if (error || !document) throw new Error('Documento no encontrado');
 
     // Verificar acceso
     const hasAccess = await canAccessCase(document.case_id);
-    if (!hasAccess) {
-      throw new Error('Sin permisos para descargar este documento');
-    }
+    if (!hasAccess) throw new Error('Sin permisos para descargar este documento');
 
-    // Los clientes solo pueden descargar documentos con visibilidad 'cliente'
     if (profile.role === 'cliente' && document.visibilidad === 'privado') {
       throw new Error('Sin permisos para descargar este documento');
     }
 
-    // Extraer el path del archivo de la URL
+    // Extraer path del archivo desde URL pública
     const urlParts = document.url.split('/');
     const filePath = urlParts.slice(-2).join('/'); // cases/{case_id}/{filename}
 
-    // Generar URL firmada (válida por 1 hora)
+    // Generar URL firmada (1 hora)
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('documents')
       .createSignedUrl(filePath, 3600);
@@ -480,7 +442,6 @@ export async function getDocumentDownloadUrl(documentId: string) {
       throw new Error('Error al generar URL de descarga');
     }
 
-    // Log de auditoría
     await logAuditAction({
       action: 'DOWNLOAD',
       entity_type: 'document',
@@ -491,9 +452,9 @@ export async function getDocumentDownloadUrl(documentId: string) {
     return { success: true, url: signedUrlData.signedUrl };
   } catch (error) {
     console.error('Error in getDocumentDownloadUrl:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }

@@ -1,16 +1,16 @@
-# Contributing to LEXCHILE
+# Contributing to LEXSER
 
-First off, thank you for considering contributing to LEXCHILE! It's people like you that make LEXCHILE such a great tool.
+First off, thank you for considering contributing to LEXSER! It's people like you that make LEXSER such a great tool.
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by the [LEXCHILE Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [contact@lexchile.com](mailto:contact@lexchile.com).
+This project and everyone participating in it is governed by the [LEXSER Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [contact@lexser.com](mailto:contact@lexser.com).
 
 ## How Can I Contribute?
 
 ### Reporting Bugs
 
-This is one of the simplest ways to contribute. If you find a bug, please open an issue on our [GitHub repository](https://github.com/lexchile/lexchile-platform/issues).
+This is one of the simplest ways to contribute. If you find a bug, please open an issue on our [GitHub repository](https://github.com/lexser/lexser-platform/issues).
 
 ### Suggesting Enhancements
 

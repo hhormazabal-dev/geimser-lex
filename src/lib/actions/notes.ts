@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { getCurrentProfile, requireAuth, canAccessCase } from '@/lib/auth/roles';
 import { logAuditAction } from '@/lib/audit/log';
 import {
@@ -21,7 +21,7 @@ export async function createNote(input: CreateNoteInput) {
   try {
     const profile = await requireAuth();
     const validatedInput = createNoteSchema.parse(input);
-    
+
     // Verificar acceso al caso
     const hasAccess = await canAccessCase(validatedInput.case_id);
     if (!hasAccess) {
@@ -33,7 +33,7 @@ export async function createNote(input: CreateNoteInput) {
       throw new Error('Sin permisos para crear notas');
     }
 
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     const noteData: NoteInsert = {
       ...validatedInput,
@@ -43,11 +43,13 @@ export async function createNote(input: CreateNoteInput) {
     const { data: newNote, error } = await supabase
       .from('notes')
       .insert(noteData)
-      .select(`
+      .select(
+        `
         *,
         author:profiles(nombre),
         case:cases(caratulado)
-      `)
+      `
+      )
       .single();
 
     if (error) {
@@ -73,9 +75,9 @@ export async function createNote(input: CreateNoteInput) {
     return { success: true, note: newNote };
   } catch (error) {
     console.error('Error in createNote:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }
@@ -87,7 +89,7 @@ export async function updateNote(noteId: string, input: UpdateNoteInput) {
   try {
     const profile = await requireAuth();
     const validatedInput = updateNoteSchema.parse(input);
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     // Obtener la nota existente
     const { data: existingNote, error: fetchError } = await supabase
@@ -111,15 +113,22 @@ export async function updateNote(noteId: string, input: UpdateNoteInput) {
       throw new Error('Sin permisos para acceder a este caso');
     }
 
+    // Construir payload sin propiedades undefined (exactOptionalPropertyTypes)
+    const updatePayload: Partial<Pick<Note, 'contenido' | 'tipo'>> = {};
+    if (validatedInput.contenido !== undefined) updatePayload.contenido = validatedInput.contenido;
+    if (validatedInput.tipo !== undefined) updatePayload.tipo = validatedInput.tipo;
+
     const { data: updatedNote, error } = await supabase
       .from('notes')
-      .update(validatedInput)
+      .update(updatePayload)
       .eq('id', noteId)
-      .select(`
+      .select(
+        `
         *,
         author:profiles(nombre),
         case:cases(caratulado)
-      `)
+      `
+      )
       .single();
 
     if (error) {
@@ -132,9 +141,9 @@ export async function updateNote(noteId: string, input: UpdateNoteInput) {
       action: 'UPDATE',
       entity_type: 'note',
       entity_id: noteId,
-      diff_json: { 
-        from: existingNote, 
-        to: updatedNote 
+      diff_json: {
+        from: existingNote,
+        to: updatedNote,
       },
     });
 
@@ -143,9 +152,9 @@ export async function updateNote(noteId: string, input: UpdateNoteInput) {
     return { success: true, note: updatedNote };
   } catch (error) {
     console.error('Error in updateNote:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }
@@ -156,7 +165,7 @@ export async function updateNote(noteId: string, input: UpdateNoteInput) {
 export async function deleteNote(noteId: string) {
   try {
     const profile = await requireAuth();
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     // Obtener la nota existente
     const { data: existingNote, error: fetchError } = await supabase
@@ -180,10 +189,7 @@ export async function deleteNote(noteId: string) {
       throw new Error('Sin permisos para acceder a este caso');
     }
 
-    const { error } = await supabase
-      .from('notes')
-      .delete()
-      .eq('id', noteId);
+    const { error } = await supabase.from('notes').delete().eq('id', noteId);
 
     if (error) {
       console.error('Error deleting note:', error);
@@ -203,9 +209,9 @@ export async function deleteNote(noteId: string) {
     return { success: true };
   } catch (error) {
     console.error('Error in deleteNote:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }
@@ -213,40 +219,50 @@ export async function deleteNote(noteId: string) {
 /**
  * Obtiene notas con filtros
  */
-export async function getNotes(filters: NoteFiltersInput = {}) {
+export async function getNotes(filters?: Partial<NoteFiltersInput>) {
   try {
     const profile = await getCurrentProfile();
     if (!profile) {
       throw new Error('No autenticado');
     }
 
-    const validatedFilters = noteFiltersSchema.parse(filters);
-    const supabase = createClient();
+    // Defaults sólidos para evitar TS2739
+    const input = {
+      page: 1,
+      limit: 20,
+      ...(filters ?? {}),
+    };
+
+    const validatedFilters = noteFiltersSchema.parse(input);
+    const supabase = await createServerClient();
 
     let query = supabase
       .from('notes')
-      .select(`
+      .select(
+        `
         *,
         author:profiles(id, nombre),
         case:cases(id, caratulado)
-      `);
+      `,
+        { count: 'exact' }
+      );
 
     // Aplicar filtros de acceso según rol
     if (profile.role === 'cliente') {
       // Los clientes solo ven notas públicas de sus casos
       query = query.eq('tipo', 'publica');
-      
+
       // Obtener casos del cliente
       const { data: clientCases } = await supabase
         .from('case_clients')
         .select('case_id')
         .eq('client_profile_id', profile.id);
-      
-      const caseIds = clientCases?.map(cc => cc.case_id) || [];
+
+      const caseIds = clientCases?.map((cc: { case_id: string }) => cc.case_id) || [];
       if (caseIds.length === 0) {
-        return { success: true, notes: [], total: 0 };
+        return { success: true, notes: [], total: 0, page: validatedFilters.page, limit: validatedFilters.limit };
       }
-      
+
       query = query.in('case_id', caseIds);
     } else if (profile.role === 'abogado') {
       // Los abogados ven notas de sus casos
@@ -254,12 +270,12 @@ export async function getNotes(filters: NoteFiltersInput = {}) {
         .from('cases')
         .select('id')
         .eq('abogado_responsable', profile.id);
-      
-      const caseIds = abogadoCases?.map(c => c.id) || [];
+
+      const caseIds = abogadoCases?.map((c: { id: string }) => c.id) || [];
       if (caseIds.length === 0) {
-        return { success: true, notes: [], total: 0 };
+        return { success: true, notes: [], total: 0, page: validatedFilters.page, limit: validatedFilters.limit };
       }
-      
+
       query = query.in('case_id', caseIds);
     }
 
@@ -298,17 +314,17 @@ export async function getNotes(filters: NoteFiltersInput = {}) {
       throw new Error('Error al obtener notas');
     }
 
-    return { 
-      success: true, 
-      notes: notes || [], 
+    return {
+      success: true,
+      notes: notes || [],
       total: count || 0,
       page: validatedFilters.page,
       limit: validatedFilters.limit,
     };
   } catch (error) {
     console.error('Error in getNotes:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Error desconocido',
       notes: [],
       total: 0,
@@ -326,15 +342,17 @@ export async function getNoteById(noteId: string) {
       throw new Error('No autenticado');
     }
 
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     const { data: note, error } = await supabase
       .from('notes')
-      .select(`
+      .select(
+        `
         *,
         author:profiles(id, nombre),
         case:cases(id, caratulado)
-      `)
+      `
+      )
       .eq('id', noteId)
       .single();
 
@@ -356,9 +374,9 @@ export async function getNoteById(noteId: string) {
     return { success: true, note };
   } catch (error) {
     console.error('Error in getNoteById:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error desconocido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
     };
   }
 }

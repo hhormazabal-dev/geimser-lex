@@ -69,7 +69,7 @@ export function InfoRequestsPanel({
   const loadRequests = async () => {
     setIsLoading(true);
     try {
-      const result = await getInfoRequests({ case_id: caseId, limit: 50 });
+      const result = await getInfoRequests({ case_id: caseId, page: 1, limit: 50 });
       
       if (result.success) {
         setRequests(result.requests);
@@ -581,7 +581,7 @@ function RequestItem({
                 Respuesta de {request.respondido_por_profile?.nombre || 'Abogado'}
               </span>
               <span className='text-xs text-gray-500'>
-                {request.fecha_respuesta && formatRelativeTime(request.fecha_respuesta)}
+                {request.respondido_at && formatRelativeTime(request.respondido_at)}
               </span>
             </div>
             <p className='text-sm text-gray-700'>

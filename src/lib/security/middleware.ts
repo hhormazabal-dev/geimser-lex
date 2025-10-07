@@ -1,6 +1,7 @@
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { logLoginAttempt, createUserSession } from '@/lib/actions/audit';
+import { createServerClient } from '@/lib/supabase/server';
 
 interface SecurityConfig {
   maxLoginAttempts: number;
@@ -11,57 +12,40 @@ interface SecurityConfig {
   allowedFileTypes: string[];
 }
 
-/**
- * Obtiene la configuración de seguridad
- */
-async function getSecurityConfig(): Promise<SecurityConfig> {
+/** Util: convierte Json | null a string | null */
+function toStringOrNull(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   try {
-    const supabase = createClient();
-    
-    const { data: settings, error } = await supabase
-      .from('security_settings')
-      .select('setting_key, setting_value')
-      .eq('is_active', true);
-
-    if (error) {
-      console.error('Error fetching security settings:', error);
-      return getDefaultSecurityConfig();
-    }
-
-    const config: Partial<SecurityConfig> = {};
-    
-    settings?.forEach(setting => {
-      switch (setting.setting_key) {
-        case 'max_login_attempts':
-          config.maxLoginAttempts = parseInt(setting.setting_value);
-          break;
-        case 'lockout_duration_minutes':
-          config.lockoutDurationMinutes = parseInt(setting.setting_value);
-          break;
-        case 'session_timeout_hours':
-          config.sessionTimeoutHours = parseInt(setting.setting_value);
-          break;
-        case 'max_concurrent_sessions':
-          config.maxConcurrentSessions = parseInt(setting.setting_value);
-          break;
-        case 'enable_ip_whitelist':
-          config.enableIpWhitelist = setting.setting_value === 'true';
-          break;
-        case 'allowed_file_types':
-          config.allowedFileTypes = JSON.parse(setting.setting_value);
-          break;
-      }
-    });
-
-    return { ...getDefaultSecurityConfig(), ...config };
-  } catch (error) {
-    console.error('Error in getSecurityConfig:', error);
-    return getDefaultSecurityConfig();
+    return JSON.stringify(v);
+  } catch {
+    return null;
   }
 }
 
+/** Util: parsea array de strings desde Json | null o string JSONificado */
+function toStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v.filter((x) => typeof x === 'string') as string[];
+  }
+  if (typeof v === 'string') {
+    try {
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((x) => typeof x === 'string') as string[];
+      }
+      // también aceptamos lista separada por comas
+      return v.split(',').map((s) => s.trim()).filter(Boolean);
+    } catch {
+      return v.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 /**
- * Configuración de seguridad por defecto
+ * Config por defecto
  */
 function getDefaultSecurityConfig(): SecurityConfig {
   return {
@@ -75,21 +59,88 @@ function getDefaultSecurityConfig(): SecurityConfig {
 }
 
 /**
+ * Obtiene la configuración de seguridad
+ */
+async function getSecurityConfig(): Promise<SecurityConfig> {
+  try {
+    const supabase = await createServerClient();
+
+    const { data: settings, error } = await supabase
+      .from('security_settings')
+      .select('setting_key, setting_value')
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error fetching security settings:', error);
+      return getDefaultSecurityConfig();
+    }
+
+    const config: Partial<SecurityConfig> = {};
+    (settings ?? []).forEach((setting: any) => {
+      const raw = setting.setting_value as unknown;
+      switch (setting.setting_key) {
+        case 'max_login_attempts': {
+          const s = toStringOrNull(raw);
+          const n = s ? parseInt(s, 10) : NaN;
+          if (!Number.isNaN(n)) config.maxLoginAttempts = n;
+          break;
+        }
+        case 'lockout_duration_minutes': {
+          const s = toStringOrNull(raw);
+          const n = s ? parseInt(s, 10) : NaN;
+          if (!Number.isNaN(n)) config.lockoutDurationMinutes = n;
+          break;
+        }
+        case 'session_timeout_hours': {
+          const s = toStringOrNull(raw);
+          const n = s ? parseInt(s, 10) : NaN;
+          if (!Number.isNaN(n)) config.sessionTimeoutHours = n;
+          break;
+        }
+        case 'max_concurrent_sessions': {
+          const s = toStringOrNull(raw);
+          const n = s ? parseInt(s, 10) : NaN;
+          if (!Number.isNaN(n)) config.maxConcurrentSessions = n;
+          break;
+        }
+        case 'enable_ip_whitelist': {
+          if (typeof raw === 'boolean') {
+            config.enableIpWhitelist = raw;
+          } else {
+            const s = toStringOrNull(raw);
+            config.enableIpWhitelist = s === 'true';
+          }
+          break;
+        }
+        case 'allowed_file_types': {
+          config.allowedFileTypes = toStringArray(raw);
+          break;
+        }
+      }
+    });
+
+    return { ...getDefaultSecurityConfig(), ...config };
+  } catch (error) {
+    console.error('Error in getSecurityConfig:', error);
+    return getDefaultSecurityConfig();
+  }
+}
+
+/**
  * Obtiene la IP real del cliente
  */
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
   const realIP = request.headers.get('x-real-ip');
-  
+
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    const first = forwarded.split(',')[0]?.trim();
+    if (first) return first;
   }
-  
-  if (realIP) {
-    return realIP;
-  }
-  
-  return request.ip || 'unknown';
+  if (realIP) return realIP;
+
+  // NextRequest no expone .ip tipado; evitamos usarla
+  return 'unknown';
 }
 
 /**
@@ -97,24 +148,30 @@ function getClientIP(request: NextRequest): string {
  */
 async function isIPWhitelisted(ip: string): Promise<boolean> {
   try {
-    const supabase = createClient();
-    
+    const supabase = await createServerClient();
+
     const { data: whitelist, error } = await supabase
       .from('security_settings')
       .select('setting_value')
       .eq('setting_key', 'ip_whitelist')
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
-    if (error || !whitelist) {
-      return true; // Si no hay lista blanca, permitir acceso
+    if (error) {
+      console.error('Error reading IP whitelist:', error);
+      return true;
+    }
+    if (!whitelist) {
+      return true; // si no hay config, permitir
     }
 
-    const allowedIPs: string[] = JSON.parse(whitelist.setting_value);
+    const allowedIPs = toStringArray((whitelist as any).setting_value);
+    if (allowedIPs.length === 0) return true;
+
     return allowedIPs.includes(ip) || allowedIPs.includes('*');
   } catch (error) {
     console.error('Error checking IP whitelist:', error);
-    return true; // En caso de error, permitir acceso
+    return true; // en caso de error, permitir
   }
 }
 
@@ -123,11 +180,11 @@ async function isIPWhitelisted(ip: string): Promise<boolean> {
  */
 async function isIPBlocked(ip: string, config: SecurityConfig): Promise<boolean> {
   try {
-    const supabase = createClient();
-    
+    const supabase = await createServerClient();
+
     const lockoutTime = new Date();
     lockoutTime.setMinutes(lockoutTime.getMinutes() - config.lockoutDurationMinutes);
-    
+
     const { data: attempts, error } = await supabase
       .from('login_attempts')
       .select('id')
@@ -140,7 +197,7 @@ async function isIPBlocked(ip: string, config: SecurityConfig): Promise<boolean>
       return false;
     }
 
-    return (attempts?.length || 0) >= config.maxLoginAttempts;
+    return (attempts?.length ?? 0) >= config.maxLoginAttempts;
   } catch (error) {
     console.error('Error in isIPBlocked:', error);
     return false;
@@ -152,8 +209,8 @@ async function isIPBlocked(ip: string, config: SecurityConfig): Promise<boolean>
  */
 async function checkConcurrentSessions(userId: string, config: SecurityConfig): Promise<boolean> {
   try {
-    const supabase = createClient();
-    
+    const supabase = await createServerClient();
+
     const { data: sessions, error } = await supabase
       .from('user_sessions')
       .select('id')
@@ -163,10 +220,10 @@ async function checkConcurrentSessions(userId: string, config: SecurityConfig): 
 
     if (error) {
       console.error('Error checking concurrent sessions:', error);
-      return true; // En caso de error, permitir
+      return true; // en caso de error, no bloquear
     }
 
-    return (sessions?.length || 0) < config.maxConcurrentSessions;
+    return (sessions?.length ?? 0) < config.maxConcurrentSessions;
   } catch (error) {
     console.error('Error in checkConcurrentSessions:', error);
     return true;
@@ -187,47 +244,50 @@ function validateFileType(filename: string, config: SecurityConfig): boolean {
 function detectAttackPatterns(request: NextRequest): string[] {
   const threats: string[] = [];
   const url = request.url.toLowerCase();
-  const userAgent = request.headers.get('user-agent')?.toLowerCase() || '';
-  
-  // SQL Injection patterns
+  const userAgent = request.headers.get('user-agent')?.toLowerCase() ?? '';
+
+  // SQL Injection
   const sqlPatterns = [
-    'union select', 'drop table', 'insert into', 'delete from',
-    'update set', 'exec(', 'execute(', 'sp_', 'xp_'
+    'union select',
+    'drop table',
+    'insert into',
+    'delete from',
+    'update set',
+    'exec(',
+    'execute(',
+    'sp_',
+    'xp_',
   ];
-  
-  sqlPatterns.forEach(pattern => {
-    if (url.includes(pattern)) {
+  for (const p of sqlPatterns) {
+    if (url.includes(p)) {
       threats.push('sql_injection');
+      break;
     }
-  });
-  
-  // XSS patterns
-  const xssPatterns = [
-    '<script', 'javascript:', 'onerror=', 'onload=', 'onclick='
-  ];
-  
-  xssPatterns.forEach(pattern => {
-    if (url.includes(pattern)) {
+  }
+
+  // XSS
+  const xssPatterns = ['<script', 'javascript:', 'onerror=', 'onload=', 'onclick='];
+  for (const p of xssPatterns) {
+    if (url.includes(p)) {
       threats.push('xss_attempt');
+      break;
     }
-  });
-  
+  }
+
   // Path traversal
   if (url.includes('../') || url.includes('..\\')) {
     threats.push('path_traversal');
   }
-  
+
   // Bot detection
-  const botPatterns = [
-    'bot', 'crawler', 'spider', 'scraper', 'curl', 'wget'
-  ];
-  
-  botPatterns.forEach(pattern => {
-    if (userAgent.includes(pattern)) {
+  const botPatterns = ['bot', 'crawler', 'spider', 'scraper', 'curl', 'wget'];
+  for (const p of botPatterns) {
+    if (userAgent.includes(p)) {
       threats.push('bot_access');
+      break;
     }
-  });
-  
+  }
+
   return threats;
 }
 
@@ -243,27 +303,25 @@ async function logSecurityEvent(
   metadata?: any
 ) {
   try {
-    const supabase = createClient();
-    
-    await supabase
-      .from('audit_logs')
-      .insert({
-        table_name: 'security_events',
-        record_id: crypto.randomUUID(),
-        action: 'SECURITY_EVENT',
-        new_values: {
-          type,
-          description,
-          ip_address: ip,
-          user_agent: userAgent,
-          metadata
-        },
+    const supabase = await createServerClient();
+
+    await supabase.from('audit_logs').insert({
+      table_name: 'security_events',
+      record_id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined,
+      action: 'SECURITY_EVENT',
+      new_values: {
+        type,
+        description,
         ip_address: ip,
         user_agent: userAgent,
-        severity,
-        category: 'security',
-        description
-      });
+        metadata,
+      },
+      ip_address: ip as unknown as string, // según tus types podría ser unknown
+      user_agent: userAgent,
+      severity,
+      category: 'security',
+      description,
+    } as any);
   } catch (error) {
     console.error('Error logging security event:', error);
   }
@@ -274,10 +332,10 @@ async function logSecurityEvent(
  */
 export async function securityMiddleware(request: NextRequest): Promise<NextResponse | null> {
   const ip = getClientIP(request);
-  const userAgent = request.headers.get('user-agent') || '';
+  const userAgent = request.headers.get('user-agent') ?? '';
   const config = await getSecurityConfig();
-  
-  // Verificar lista blanca de IPs
+
+  // Lista blanca
   if (config.enableIpWhitelist) {
     const isWhitelisted = await isIPWhitelisted(ip);
     if (!isWhitelisted) {
@@ -288,12 +346,11 @@ export async function securityMiddleware(request: NextRequest): Promise<NextResp
         userAgent,
         'warning'
       );
-      
       return new NextResponse('Access Denied', { status: 403 });
     }
   }
-  
-  // Verificar si la IP está bloqueada
+
+  // IP bloqueada
   const isBlocked = await isIPBlocked(ip, config);
   if (isBlocked) {
     await logSecurityEvent(
@@ -303,11 +360,10 @@ export async function securityMiddleware(request: NextRequest): Promise<NextResp
       userAgent,
       'high'
     );
-    
     return new NextResponse('Too Many Attempts', { status: 429 });
   }
-  
-  // Detectar patrones de ataque
+
+  // Patrones de ataque
   const threats = detectAttackPatterns(request);
   if (threats.length > 0) {
     await logSecurityEvent(
@@ -318,36 +374,27 @@ export async function securityMiddleware(request: NextRequest): Promise<NextResp
       'critical',
       { threats, url: request.url }
     );
-    
-    // Bloquear ataques críticos
+
     if (threats.includes('sql_injection') || threats.includes('xss_attempt')) {
       return new NextResponse('Forbidden', { status: 403 });
     }
   }
-  
-  // Validar uploads de archivos
+
+  // Uploads (solo audit)
   if (request.method === 'POST' && request.url.includes('/upload')) {
-    const contentType = request.headers.get('content-type') || '';
-    
+    const contentType = request.headers.get('content-type') ?? '';
     if (contentType.includes('multipart/form-data')) {
-      // Aquí se podría implementar validación adicional de archivos
-      // Por ahora, registramos el evento
-      await logSecurityEvent(
-        'file_upload',
-        'Intento de subida de archivo',
-        ip,
-        userAgent,
-        'info',
-        { content_type: contentType }
-      );
+      await logSecurityEvent('file_upload', 'Intento de subida de archivo', ip, userAgent, 'info', {
+        content_type: contentType,
+      });
+      // Aquí podrías validar partes del form-data si lo deseas
     }
   }
-  
-  // Rate limiting básico (se podría implementar con Redis en producción)
-  const rateLimitKey = `rate_limit:${ip}`;
-  // Implementar rate limiting aquí si es necesario
-  
-  return null; // Continuar con el request
+
+  // Rate limiting: placeholder (usa Redis en prod)
+  // const rateLimitKey = `rate_limit:${ip}`;
+
+  return null; // continuar con el request
 }
 
 /**
@@ -355,75 +402,66 @@ export async function securityMiddleware(request: NextRequest): Promise<NextResp
  */
 export async function sessionValidationMiddleware(request: NextRequest): Promise<NextResponse | null> {
   const sessionToken = request.cookies.get('session-token')?.value;
-  
-  if (!sessionToken) {
-    return null; // No hay sesión, continuar
-  }
-  
+  if (!sessionToken) return null;
+
   try {
-    const supabase = createClient();
-    
+    const supabase = await createServerClient();
+
     const { data: session, error } = await supabase
       .from('user_sessions')
       .select('*')
       .eq('session_token', sessionToken)
       .eq('is_active', true)
-      .single();
-    
+      .maybeSingle();
+
     if (error || !session) {
-      // Sesión inválida, limpiar cookie
       const response = NextResponse.next();
       response.cookies.delete('session-token');
       return response;
     }
-    
-    // Verificar expiración
-    if (new Date(session.expires_at) < new Date()) {
-      // Sesión expirada
+
+    // expires_at puede ser null
+    const exp = session.expires_at ? new Date(session.expires_at) : null;
+    if (!exp || exp < new Date()) {
       await supabase
         .from('user_sessions')
         .update({ is_active: false, ended_at: new Date().toISOString() })
         .eq('id', session.id);
-      
+
       const response = NextResponse.next();
       response.cookies.delete('session-token');
       return response;
     }
-    
-    // Actualizar última actividad
+
+    // Actualizar última actividad (best-effort)
     await supabase
       .from('user_sessions')
       .update({ last_activity: new Date().toISOString() })
       .eq('id', session.id);
-    
   } catch (error) {
     console.error('Error in session validation:', error);
   }
-  
-  return null; // Continuar
+
+  return null; // continuar
 }
 
 /**
  * Headers de seguridad
  */
 export function addSecurityHeaders(response: NextResponse): NextResponse {
-  // Content Security Policy
   response.headers.set(
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';"
   );
-  
-  // Otros headers de seguridad
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   response.headers.set('X-XSS-Protection', '1; mode=block');
-  
-  // HSTS (solo en HTTPS)
+
   if (process.env.NODE_ENV === 'production') {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
-  
+
   return response;
 }

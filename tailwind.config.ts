@@ -51,8 +51,8 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // Colores corporativos para LEXCHILE
-        lexchile: {
+        // Colores corporativos para LEXSER
+        lexser: {
           blue: {
             50: '#eff6ff',
             100: '#dbeafe',
