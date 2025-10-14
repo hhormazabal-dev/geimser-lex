@@ -34,7 +34,7 @@ export const documentFiltersSchema = z.object({
 
 // Schema para configuración de upload
 export const uploadConfigSchema = z.object({
-  maxFileSize: z.number().default(10 * 1024 * 1024), // 10MB por defecto
+  maxFileSize: z.number().default(20 * 1024 * 1024), // 20MB por defecto
   allowedTypes: z.array(z.string()).default([
     'application/pdf',
     'application/msword',
@@ -70,5 +70,5 @@ export const ALLOWED_FILE_TYPES = {
   'text/plain': { extension: 'txt', icon: '📄', name: 'Texto' },
 } as const;
 
-export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 export const MAX_FILES_PER_CASE = 100;

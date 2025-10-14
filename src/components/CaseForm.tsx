@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { createCase, updateCase } from '@/lib/actions/cases';
+import { uploadDocument } from '@/lib/actions/documents';
 import {
   createCaseSchema,
   type CreateCaseInput,
@@ -21,7 +22,7 @@ import {
   REGIONES_CHILE,
 } from '@/lib/validators/case';
 import { formatRUT } from '@/lib/utils';
-import { Loader2, Save, X } from 'lucide-react';
+import { Loader2, Save, X, Trash2, Paperclip, UploadCloud } from 'lucide-react';
 import type { Case, Profile } from '@/lib/supabase/types';
 
 type LightweightProfile = Pick<Profile, 'id' | 'nombre' | 'role'>;
@@ -37,6 +38,18 @@ interface CaseFormProps {
   currentProfile: Pick<Profile, 'id' | 'role' | 'nombre'>;
 }
 
+const MAX_ATTACHMENT_SIZE_BYTES = 20 * 1024 * 1024;
+
+const formatFileSize = (bytes: number) => {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${bytes} B`;
+};
+
 export function CaseForm({
   case: existingCase,
   onCancel,
@@ -45,6 +58,8 @@ export function CaseForm({
   currentProfile,
 }: CaseFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -131,6 +146,55 @@ export function CaseForm({
     }
   }, [marcarValidado, existingCase, setValue]);
 
+  const resetFileSelection = () => {
+    setSelectedFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+
+    const oversized = files.filter(file => file.size > MAX_ATTACHMENT_SIZE_BYTES);
+    if (oversized.length > 0) {
+      toast({
+        title: 'Archivo demasiado grande',
+        description: `Los siguientes archivos superan el límite de 20 MB: ${oversized
+          .map(file => file.name)
+          .join(', ')}`,
+        variant: 'destructive',
+      });
+    }
+
+    const validFiles = files.filter(file => file.size <= MAX_ATTACHMENT_SIZE_BYTES);
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => {
+        const existingKeys = new Set(prev.map(file => `${file.name}-${file.size}-${file.lastModified}`));
+        const deduped = validFiles.filter(file => {
+          const key = `${file.name}-${file.size}-${file.lastModified}`;
+          if (existingKeys.has(key)) return false;
+          existingKeys.add(key);
+          return true;
+        });
+        if (deduped.length === 0) {
+          return prev;
+        }
+        return [...prev, ...deduped];
+      });
+    }
+
+    event.target.value = '';
+  };
+
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, fileIndex) => fileIndex !== index));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const onSubmit = async (data: CreateCaseInput) => {
     setIsLoading(true);
 
@@ -161,12 +225,61 @@ export function CaseForm({
       if (result.success) {
         toast({
           title: existingCase ? 'Caso actualizado' : 'Caso creado',
-          description: existingCase 
+          description: existingCase
             ? 'El caso ha sido actualizado exitosamente'
             : 'El nuevo caso ha sido creado exitosamente',
         });
 
         const createdCaseId = (result as { case?: { id: string } }).case?.id;
+
+        if (!existingCase && selectedFiles.length > 0) {
+          if (createdCaseId) {
+            let successfulUploads = 0;
+            const failedUploads: Array<{ fileName: string; message?: string }> = [];
+
+            for (const file of selectedFiles) {
+              const formData = new FormData();
+              formData.append('case_id', createdCaseId);
+              formData.append('file', file);
+              formData.append('nombre', file.name);
+              formData.append('visibilidad', 'privado');
+
+              const uploadResult = await uploadDocument(formData);
+              if (uploadResult.success) {
+                successfulUploads += 1;
+              } else {
+                failedUploads.push({
+                  fileName: file.name,
+                  ...(uploadResult.error ? { message: uploadResult.error } : {}),
+                });
+              }
+            }
+
+            if (failedUploads.length > 0) {
+              toast({
+                title: 'Algunos documentos no se cargaron',
+                description: failedUploads
+                  .map(failure => `${failure.fileName}: ${failure.message ?? 'Error desconocido'}`)
+                  .join(', '),
+                variant: 'destructive',
+              });
+            } else if (successfulUploads > 0) {
+              toast({
+                title: 'Documentos cargados',
+                description: `Se cargaron ${successfulUploads} documento${successfulUploads > 1 ? 's' : ''} correctamente.`,
+              });
+            }
+          } else {
+            toast({
+              title: 'Documentos no cargados',
+              description: 'No se pudo obtener el ID del caso recién creado para adjuntar los documentos.',
+              variant: 'destructive',
+            });
+          }
+
+          resetFileSelection();
+        }
+
         router.push(createdCaseId ? `/cases/${createdCaseId}` : '/cases');
       } else {
         toast({
@@ -536,6 +649,83 @@ export function CaseForm({
               )}
             </div>
           </section>
+
+          {!existingCase && (
+            <section className='space-y-4'>
+              <div>
+                <h2 className='text-lg font-semibold text-gray-900'>Documentos de respaldo</h2>
+                <p className='text-sm text-gray-500'>
+                  Adjunta antecedentes relevantes para el equipo. Tamaño máximo de 20 MB por archivo.
+                </p>
+              </div>
+
+              <div className='space-y-3'>
+                <div className='space-y-2'>
+                  <Label htmlFor='case_documents'>Archivos</Label>
+                  <div className='space-y-3 rounded-md border border-dashed border-muted-foreground/40 p-4'>
+                    <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                      <div className='flex items-center gap-2 text-sm text-gray-600'>
+                        <UploadCloud className='h-4 w-4 text-gray-500' />
+                        <span>Selecciona uno o más archivos de hasta 20 MB cada uno.</span>
+                      </div>
+                      {selectedFiles.length > 0 && (
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          onClick={resetFileSelection}
+                          disabled={isLoading}
+                        >
+                          <X className='mr-2 h-4 w-4' />
+                          Limpiar selección
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      id='case_documents'
+                      type='file'
+                      multiple
+                      onChange={handleFilesSelected}
+                      disabled={isLoading}
+                      ref={fileInputRef}
+                    />
+                    <p className='text-xs text-gray-500'>
+                      Se aceptan archivos PDF, Word, imágenes y texto. Máximo 20 MB por archivo.
+                    </p>
+                  </div>
+                </div>
+
+                {selectedFiles.length > 0 && (
+                  <ul className='space-y-2'>
+                    {selectedFiles.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.lastModified}-${index}`}
+                        className='flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm'
+                      >
+                        <div className='flex items-center gap-2'>
+                          <Paperclip className='h-4 w-4 text-gray-500' />
+                          <div>
+                            <p className='font-medium text-gray-900'>{file.name}</p>
+                            <p className='text-xs text-gray-500'>{formatFileSize(file.size)}</p>
+                          </div>
+                        </div>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          onClick={() => removeSelectedFile(index)}
+                          disabled={isLoading}
+                          aria-label={`Quitar ${file.name}`}
+                        >
+                          <Trash2 className='h-4 w-4 text-gray-500' />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+          )}
 
           <section className='space-y-4'>
             <div>

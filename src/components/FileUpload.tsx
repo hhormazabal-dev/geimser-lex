@@ -99,7 +99,7 @@ export function FileUpload({ caseId, defaultVisibility = 'privado', onUploaded }
 export function FileUploadHint() {
   return (
     <div className='rounded-md border border-dashed border-muted-foreground/40 p-4 text-sm text-muted-foreground'>
-      Solo se aceptan archivos PDF, DOCX, imágenes y formatos autorizados. Tamaño máximo 10 MB.
+      Solo se aceptan archivos PDF, DOCX, imágenes y formatos autorizados. Tamaño máximo 20 MB.
       <div className='mt-2 flex flex-wrap gap-2'>
         {['PDF', 'DOCX', 'JPG', 'PNG'].map((label) => (
           <Badge key={label} variant='outline'>
