@@ -12,6 +12,7 @@ import {
   deleteStage, 
   getStages 
 } from '@/lib/actions/stages';
+import { requestCaseAdvance } from '@/lib/actions/cases';
 import { formatDate, formatRelativeTime, isDateInPast } from '@/lib/utils';
 import { 
   Clock, 
@@ -39,13 +40,23 @@ interface TimelinePanelProps {
   caseMateria?: string;
   canManageStages?: boolean;
   showPrivateStages?: boolean;
+  clientContext?: {
+    role: 'admin_firma' | 'analista' | 'abogado' | 'cliente';
+    alcanceAutorizado: number;
+    alcanceSolicitado: number;
+  };
+  onClientProgressChange?: (progress: Partial<{ solicitado: number; autorizado: number }>) => void;
+  onStagesLoaded?: (stages: CaseStage[]) => void;
 }
 
-export function TimelinePanel({ 
-  caseId, 
+export function TimelinePanel({
+  caseId,
   caseMateria = 'Civil',
   canManageStages = false,
-  showPrivateStages = true 
+  showPrivateStages = true,
+  clientContext,
+  onClientProgressChange,
+  onStagesLoaded,
 }: TimelinePanelProps) {
   const [stages, setStages] = useState<CaseStage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +81,15 @@ export function TimelinePanel({
   const { toast } = useToast();
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [paymentActionStage, setPaymentActionStage] = useState<string | null>(null);
+  const alcanceAutorizado = clientContext?.alcanceAutorizado ?? 0;
+  const alcanceSolicitado = clientContext?.alcanceSolicitado ?? 0;
+  const viewerRole = clientContext?.role ?? 'guest';
+  const clientMode = viewerRole === 'cliente';
+  const [clientProgress, setClientProgress] = useState({
+    solicitado: alcanceSolicitado,
+    autorizado: alcanceAutorizado,
+  });
+  const [isRequestingStage, setIsRequestingStage] = useState<string | null>(null);
 
   const loadStages = async () => {
     setIsLoading(true);
@@ -78,6 +98,7 @@ export function TimelinePanel({
       
       if (result.success) {
         setStages(result.stages);
+        onStagesLoaded?.(result.stages);
       } else {
         toast({
           title: 'Error',
@@ -100,6 +121,19 @@ export function TimelinePanel({
   useEffect(() => {
     loadStages();
   }, [caseId]);
+
+  useEffect(() => {
+    setClientProgress({
+      solicitado: alcanceSolicitado,
+      autorizado: alcanceAutorizado,
+    });
+  }, [alcanceSolicitado, alcanceAutorizado]);
+
+  useEffect(() => {
+    if (onClientProgressChange) {
+      onClientProgressChange(clientProgress);
+    }
+  }, [clientProgress, onClientProgressChange]);
 
   const handleCreateStage = async () => {
     if (!newStage.etapa.trim()) {
@@ -355,6 +389,41 @@ export function TimelinePanel({
     return <Badge className={color} variant="outline">{status.label}</Badge>;
   };
 
+  const handleRequestAdvance = async (stage: CaseStage) => {
+    if (!clientMode || !stage.id) return;
+
+    setIsRequestingStage(stage.id);
+    try {
+      const result = await requestCaseAdvance(caseId, stage.id);
+      if (result.success) {
+        setClientProgress((prev) => ({
+          autorizado: prev.autorizado,
+          solicitado: result.requestedOrder ?? prev.solicitado,
+        }));
+        toast({
+          title: 'Solicitud enviada',
+          description: `Solicitaste avanzar hasta la etapa "${stage.etapa}".`,
+        });
+        await loadStages();
+      } else {
+        toast({
+          title: 'No se pudo solicitar el avance',
+          description: result.error ?? 'Intenta nuevamente en unos minutos.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error requesting case advance:', error);
+      toast({
+        title: 'Error inesperado',
+        description: 'No pudimos registrar tu solicitud, intenta nuevamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRequestingStage(null);
+    }
+  };
+
   const handleAssignPaymentLink = async (stage: CaseStage) => {
     const current = stage.enlace_pago ?? '';
     const input = prompt('Ingresa el enlace de pago de Payku para esta etapa', current);
@@ -509,6 +578,16 @@ export function TimelinePanel({
   const etapasPendientesPago = etapasRequierenPago.filter(
     (stage) => stage.estado_pago !== 'pagado'
   ).length;
+  const etapasSolicitadas = etapasRequierenPago.filter((stage) => stage.estado_pago === 'solicitado').length;
+
+  const findStageLabelByOrder = (order: number) => {
+    if (!order) return null;
+    const match = stages.find((stage) => (stage.orden ?? 0) === order);
+    return match?.etapa ?? null;
+  };
+
+  const requestedStageLabel = clientMode ? findStageLabelByOrder(clientProgress.solicitado) : null;
+  const authorizedStageLabel = clientMode ? findStageLabelByOrder(clientProgress.autorizado) : null;
 
   useEffect(() => {
     if (showAddForm && etapasRequierenPago.length > 0) {
@@ -556,7 +635,9 @@ export function TimelinePanel({
       </CardHeader>
       <CardContent className='space-y-6'>
         {etapasRequierenPago.length > 0 && (
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900'>
+          <div
+            className={`grid grid-cols-1 ${clientMode ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900`}
+          >
             <div>
               <p className='text-xs uppercase tracking-wide text-blue-600'>Honorario distribuido</p>
               <p className='text-lg font-semibold'>{formatUf(totalCostoEtapas)}</p>
@@ -572,6 +653,46 @@ export function TimelinePanel({
                 <p className='text-xs text-blue-700 mt-1'>Faltan {etapasPendientesPago} pago(s) para completar el plan.</p>
               )}
             </div>
+            {clientMode && (
+              <div>
+                <p className='text-xs uppercase tracking-wide text-blue-600'>Solicitadas por el cliente</p>
+                <p className='text-lg font-semibold'>{etapasSolicitadas}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {clientMode && (
+          <div className='rounded-xl border border-slate-200 bg-white/80 px-4 py-4 text-sm text-slate-600 shadow-sm'>
+            <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+              <div>
+                <p className='text-xs uppercase tracking-wide text-slate-500'>Alcance solicitado</p>
+                <p className='text-base font-semibold text-slate-900'>
+                  {clientProgress.solicitado > 0
+                    ? requestedStageLabel ?? `Etapa ${clientProgress.solicitado}`
+                    : 'Aún no definido'}
+                </p>
+              </div>
+              <div>
+                <p className='text-xs uppercase tracking-wide text-slate-500'>Autorizado por el estudio</p>
+                <p className='text-base font-semibold text-slate-900'>
+                  {clientProgress.autorizado > 0
+                    ? authorizedStageLabel ?? `Etapa ${clientProgress.autorizado}`
+                    : 'Pendiente'}
+                </p>
+              </div>
+              <div>
+                <p className='text-xs uppercase tracking-wide text-slate-500'>Etapas solicitadas</p>
+                <p className='text-base font-semibold text-slate-900'>
+                  {etapasSolicitadas} / {etapasRequierenPago.length}
+                </p>
+              </div>
+            </div>
+            {clientProgress.solicitado > clientProgress.autorizado && (
+              <p className='mt-3 text-xs text-slate-500'>
+                Estamos revisando tu solicitud para avanzar. Te notificaremos cuando esté aprobada.
+              </p>
+            )}
           </div>
         )}
 
@@ -823,6 +944,23 @@ export function TimelinePanel({
         <div className='relative'>
           {filteredStages.map((stage, index) => {
             const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
+            const stageOrder = stage.orden ?? index + 1;
+            const isAuthorizedStage = clientMode && stageOrder <= clientProgress.autorizado;
+            const isRequestedStage = clientMode && stageOrder <= clientProgress.solicitado && stageOrder > clientProgress.autorizado;
+            const cardStateClasses = [
+              stage.estado === 'completado' ? 'bg-green-50' : '',
+              isAuthorizedStage ? 'border-green-200 bg-green-50/70' : '',
+              !isAuthorizedStage && isRequestedStage ? 'border-blue-200 bg-blue-50/70' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
+            const isStageCompleted = stage.estado === 'completado';
+            const requestDisabled =
+              isAuthorizedStage ||
+              isStageCompleted ||
+              (stage.estado_pago ?? 'pendiente') === 'pagado' ||
+              stageOrder <= clientProgress.solicitado ||
+              isRequestingStage === stage.id;
 
             return (
               <div key={stage.id} className='relative flex items-start space-x-4 pb-8'>
@@ -838,7 +976,7 @@ export function TimelinePanel({
 
               {/* Contenido de la etapa */}
               <div className='flex-1 min-w-0'>
-                <Card className={`${stage.estado === 'completado' ? 'bg-green-50' : ''}`}>
+                <Card className={cardStateClasses}>
                   <CardContent className='pt-4'>
                     <div className='flex items-start justify-between mb-3'>
                       <div className='flex-1'>
@@ -916,6 +1054,14 @@ export function TimelinePanel({
                           </p>
                         )}
 
+                        {stage.estado_pago === 'solicitado' && (
+                          <p className='flex items-center gap-2 text-xs text-amber-700'>
+                            <AlertCircle className='h-3 w-3' />
+                            Solicitud enviada{' '}
+                            {stage.solicitado_at ? formatRelativeTime(stage.solicitado_at) : 'recientemente'}.
+                          </p>
+                        )}
+
                         <div className='flex flex-wrap items-center gap-2'>
                           {stage.enlace_pago && (
                             <Button size='sm' variant='outline' asChild>
@@ -944,9 +1090,9 @@ export function TimelinePanel({
                                 {stage.enlace_pago ? 'Editar enlace' : 'Asignar enlace'}
                               </>
                             )}
-                          </Button>
-                          <Button
-                            size='sm'
+                            </Button>
+                            <Button
+                              size='sm'
                             variant='ghost'
                             onClick={() => handleRegisterPartialPayment(stage)}
                             disabled={paymentActionStage === stage.id}
@@ -982,6 +1128,26 @@ export function TimelinePanel({
                             )}
                           </Button>
                             </>
+                          )}
+                          {clientMode && !canManageStages && (
+                            <Button
+                              size='sm'
+                              variant='outline'
+                              onClick={() => handleRequestAdvance(stage)}
+                              disabled={requestDisabled}
+                            >
+                              {isRequestingStage === stage.id ? (
+                                <>
+                                  <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                                  Enviando…
+                                </>
+                              ) : (
+                                <>
+                                  <DollarSign className='h-4 w-4 mr-2' />
+                                  Solicitar prepago
+                                </>
+                              )}
+                            </Button>
                           )}
                         </div>
 

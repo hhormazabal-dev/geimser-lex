@@ -272,6 +272,8 @@ export type Database = {
           payku_payment_id: string | null
           requiere_pago: boolean
           responsable_id: string | null
+          solicitado_at: string | null
+          solicitado_por: string | null
           updated_at: string | null
         }
         Insert: {
@@ -296,6 +298,8 @@ export type Database = {
           payku_payment_id?: string | null
           requiere_pago?: boolean
           responsable_id?: string | null
+          solicitado_at?: string | null
+          solicitado_por?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -320,6 +324,8 @@ export type Database = {
           payku_payment_id?: string | null
           requiere_pago?: boolean
           responsable_id?: string | null
+          solicitado_at?: string | null
+          solicitado_por?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -337,12 +343,21 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "case_stages_solicitado_por_fkey"
+            columns: ["solicitado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       cases: {
         Row: {
           abogado_responsable: string | null
           analista_id: string | null
+          alcance_cliente_autorizado: number | null
+          alcance_cliente_solicitado: number | null
           caratulado: string
           cliente_principal_id: string | null
           comuna: string | null
@@ -379,6 +394,8 @@ export type Database = {
         Insert: {
           abogado_responsable?: string | null
           analista_id?: string | null
+          alcance_cliente_autorizado?: number | null
+          alcance_cliente_solicitado?: number | null
           caratulado: string
           cliente_principal_id?: string | null
           comuna?: string | null
@@ -415,6 +432,8 @@ export type Database = {
         Update: {
           abogado_responsable?: string | null
           analista_id?: string | null
+          alcance_cliente_autorizado?: number | null
+          alcance_cliente_solicitado?: number | null
           caratulado?: string
           cliente_principal_id?: string | null
           comuna?: string | null
@@ -1174,7 +1193,7 @@ export type Database = {
         | "informacion"
         | "reunion"
       stage_status: "pendiente" | "en_proceso" | "completado"
-      stage_payment_status: "pendiente" | "en_proceso" | "parcial" | "pagado" | "vencido"
+      stage_payment_status: "pendiente" | "solicitado" | "en_proceso" | "parcial" | "pagado" | "vencido"
       user_role: "admin_firma" | "abogado" | "cliente" | "analista"
     }
     CompositeTypes: {

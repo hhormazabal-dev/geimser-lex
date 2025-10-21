@@ -114,6 +114,14 @@ export async function createCase(input: CreateCaseInput) {
           ? Number(caseInput.honorario_pagado_uf)
           : 0,
       observaciones: sOrNull(caseInput.observaciones),
+      alcance_cliente_autorizado:
+        typeof caseInput.alcance_cliente_autorizado === 'number'
+          ? caseInput.alcance_cliente_autorizado
+          : 0,
+      alcance_cliente_solicitado:
+        typeof caseInput.alcance_cliente_solicitado === 'number'
+          ? caseInput.alcance_cliente_solicitado
+          : 0,
 
       cliente_principal_id: sOrNull((caseInput as any).cliente_principal_id),
       descripcion_inicial: sOrNull(caseInput.descripcion_inicial),
@@ -225,6 +233,12 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
         (overrides as any)?.honorario_variable_base ?? base.honorario_variable_base,
       honorario_notas: (overrides as any)?.honorario_notas ?? base.honorario_notas,
       tarifa_referencia: (overrides as any)?.tarifa_referencia ?? base.tarifa_referencia,
+      alcance_cliente_autorizado:
+        (overrides as any)?.alcance_cliente_autorizado ??
+        (base.alcance_cliente_autorizado as number | undefined),
+      alcance_cliente_solicitado:
+        (overrides as any)?.alcance_cliente_solicitado ??
+        (base.alcance_cliente_solicitado as number | undefined),
     };
 
     return await createCase(caseData);
@@ -295,6 +309,18 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       ...(rest.cliente_principal_id !== undefined && { cliente_principal_id: sOrNull(rest.cliente_principal_id) }),
       ...(rest.abogado_responsable !== undefined && { abogado_responsable: sOrNull(rest.abogado_responsable) }),
       ...(rest.analista_id !== undefined && { analista_id: sOrNull(rest.analista_id) }),
+      ...(rest.alcance_cliente_solicitado !== undefined && {
+        alcance_cliente_solicitado:
+          rest.alcance_cliente_solicitado === null
+            ? 0
+            : Number(rest.alcance_cliente_solicitado),
+      }),
+      ...(rest.alcance_cliente_autorizado !== undefined && {
+        alcance_cliente_autorizado:
+          rest.alcance_cliente_autorizado === null
+            ? 0
+            : Number(rest.alcance_cliente_autorizado),
+      }),
     };
 
     if (rest.estado !== undefined) updatePayload.estado = rest.estado;
@@ -338,6 +364,178 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
     return { success: true, case: updatedCase };
   } catch (error) {
     console.error('Error in updateCase:', error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+export async function requestCaseAdvance(caseId: string, stageId: string) {
+  try {
+    const profile = await requireAuth('cliente');
+    const supabase = await getSB();
+
+    const { data: caseRow, error: caseError } = await supabase
+      .from('cases')
+      .select('id, cliente_principal_id, alcance_cliente_autorizado, alcance_cliente_solicitado')
+      .eq('id', caseId)
+      .maybeSingle();
+    if (caseError || !caseRow) throw new Error('Caso no encontrado');
+
+    let hasAccess = caseRow.cliente_principal_id === profile.id;
+    if (!hasAccess) {
+      const { data: link } = await supabase
+        .from('case_clients')
+        .select('id')
+        .eq('case_id', caseId)
+        .eq('client_profile_id', profile.id)
+        .maybeSingle();
+      hasAccess = Boolean(link);
+    }
+    if (!hasAccess) throw new Error('Sin permisos para solicitar avances en este caso');
+
+    const { data: stageRow, error: stageError } = await supabase
+      .from('case_stages')
+      .select('id, case_id, orden, requiere_pago, es_publica, estado, estado_pago')
+      .eq('id', stageId)
+      .maybeSingle();
+    if (stageError || !stageRow) throw new Error('Etapa no encontrada');
+    if (stageRow.case_id !== caseId) throw new Error('La etapa seleccionada no pertenece al caso');
+    if (stageRow.es_publica === false) throw new Error('No puedes solicitar una etapa privada');
+    if (stageRow.estado === 'completado') throw new Error('La etapa ya se encuentra completada');
+
+    const targetOrder = stageRow.orden ?? 0;
+    if (targetOrder <= 0) throw new Error('La etapa seleccionada no tiene un orden válido');
+
+    const authorizedOrder = caseRow.alcance_cliente_autorizado ?? 0;
+    const requestedOrder = caseRow.alcance_cliente_solicitado ?? 0;
+
+    if (targetOrder <= authorizedOrder) {
+      return {
+        success: false,
+        error: 'Esa etapa ya está autorizada para ejecución.',
+      };
+    }
+
+    const effectiveRequested = Math.max(targetOrder, requestedOrder ?? 0);
+    const nowIso = new Date().toISOString();
+
+    const { error: updateCaseError } = await supabase
+      .from('cases')
+      .update({
+        alcance_cliente_solicitado: effectiveRequested,
+        updated_at: nowIso,
+      })
+      .eq('id', caseId);
+    if (updateCaseError) throw updateCaseError;
+
+    const { error: updateStagesError } = await supabase
+      .from('case_stages')
+      .update({
+        estado_pago: 'solicitado',
+        solicitado_por: profile.id,
+        solicitado_at: nowIso,
+      })
+      .eq('case_id', caseId)
+      .lte('orden', targetOrder)
+      .eq('requiere_pago', true)
+      .in('estado_pago', ['pendiente', 'vencido']);
+    if (updateStagesError) throw updateStagesError;
+
+    await logAuditAction({
+      action: 'REQUEST_ADVANCE',
+      entity_type: 'case',
+      entity_id: caseId,
+      diff_json: {
+        requested_order: effectiveRequested,
+        requested_stage_id: stageId,
+        requested_by: profile.id,
+      },
+    });
+
+    revalidatePath(`/cases/${caseId}`);
+    revalidatePath('/dashboard');
+
+    return { success: true, requestedOrder: effectiveRequested };
+  } catch (error) {
+    console.error('Error in requestCaseAdvance:', error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+export async function authorizeCaseAdvance(caseId: string, targetOrder: number) {
+  try {
+    const profile = await requireAuth(['admin_firma', 'analista']);
+    const supabase = await getSB();
+
+    if (!Number.isInteger(targetOrder) || targetOrder <= 0) {
+      throw new Error('Debes seleccionar una etapa válida para autorizar.');
+    }
+
+    const { data: caseRow, error: caseError } = await supabase
+      .from('cases')
+      .select('id, alcance_cliente_autorizado, alcance_cliente_solicitado')
+      .eq('id', caseId)
+      .maybeSingle();
+    if (caseError || !caseRow) throw new Error('Caso no encontrado');
+
+    const currentAuthorized = caseRow.alcance_cliente_autorizado ?? 0;
+    const currentRequested = caseRow.alcance_cliente_solicitado ?? 0;
+
+    if (targetOrder <= currentAuthorized) {
+      return {
+        success: false,
+        error: 'Ya existe un alcance igual o superior autorizado.',
+      };
+    }
+
+    const cappedOrder = currentRequested > 0 ? Math.min(targetOrder, currentRequested) : targetOrder;
+
+    const { data: stageExists } = await supabase
+      .from('case_stages')
+      .select('id')
+      .eq('case_id', caseId)
+      .eq('orden', cappedOrder)
+      .maybeSingle();
+    if (!stageExists) throw new Error('La etapa seleccionada no existe en el caso');
+
+    const nowIso = new Date().toISOString();
+
+    const { error: updateCaseError } = await supabase
+      .from('cases')
+      .update({
+        alcance_cliente_autorizado: cappedOrder,
+        alcance_cliente_solicitado: Math.max(currentRequested ?? 0, cappedOrder),
+        updated_at: nowIso,
+      })
+      .eq('id', caseId);
+    if (updateCaseError) throw updateCaseError;
+
+    const { error: stageUpdateError } = await supabase
+      .from('case_stages')
+      .update({
+        estado_pago: 'en_proceso',
+      })
+      .eq('case_id', caseId)
+      .lte('orden', cappedOrder)
+      .eq('requiere_pago', true)
+      .in('estado_pago', ['solicitado']);
+    if (stageUpdateError) throw stageUpdateError;
+
+    await logAuditAction({
+      action: 'AUTHORIZE_ADVANCE',
+      entity_type: 'case',
+      entity_id: caseId,
+      diff_json: {
+        authorized_order: cappedOrder,
+        authorized_by: profile.id,
+      },
+    });
+
+    revalidatePath(`/cases/${caseId}`);
+    revalidatePath('/dashboard');
+
+    return { success: true, authorizedOrder: cappedOrder };
+  } catch (error) {
+    console.error('Error in authorizeCaseAdvance:', error);
     return { success: false, error: (error as Error).message };
   }
 }

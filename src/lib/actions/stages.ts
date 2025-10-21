@@ -36,6 +36,8 @@ type CreateStageDB = Pick<
   | 'notas_pago'
   | 'monto_variable_base'
   | 'monto_pagado_uf'
+  | 'solicitado_por'
+  | 'solicitado_at'
 >;
 type UpdateStageDB = Partial<
   Pick<
@@ -52,10 +54,12 @@ type UpdateStageDB = Partial<
     | 'costo_uf'
     | 'porcentaje_variable'
     | 'estado_pago'
-    | 'enlace_pago'
-    | 'notas_pago'
-    | 'monto_variable_base'
-    | 'monto_pagado_uf'
+  | 'enlace_pago'
+  | 'notas_pago'
+  | 'monto_variable_base'
+  | 'monto_pagado_uf'
+  | 'solicitado_por'
+  | 'solicitado_at'
   >
 >;
 type CompleteStageDB = Partial<Pick<CaseStage, 'estado' | 'fecha_cumplida' | 'descripcion'>>;
@@ -107,6 +111,8 @@ export async function createStage(input: CreateStageInput) {
       notas_pago: vi.notas_pago ?? null,
       monto_variable_base: vi.monto_variable_base ?? null,
       monto_pagado_uf: vi.monto_pagado_uf ?? 0,
+      solicitado_por: null,
+      solicitado_at: null,
     };
 
     const { data: newStage, error } = await supabase
@@ -179,6 +185,8 @@ export async function updateStage(stageId: string, input: UpdateStageInput) {
     copyIfPresent(validatedInput, updatePayload, 'notas_pago', 'notas_pago', (v) => (v ?? null));
     copyIfPresent(validatedInput, updatePayload, 'monto_variable_base', 'monto_variable_base', (v) => (v ?? null));
     copyIfPresent(validatedInput, updatePayload, 'monto_pagado_uf', 'monto_pagado_uf', (v) => (v ?? null));
+    copyIfPresent(validatedInput, updatePayload, 'solicitado_por', 'solicitado_por');
+    copyIfPresent(validatedInput, updatePayload, 'solicitado_at', 'solicitado_at', (v) => (v ?? null));
 
     const { data: updatedStage, error } = await supabase
       .from('case_stages')

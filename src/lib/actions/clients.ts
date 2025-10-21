@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { randomBytes } from 'crypto';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient, createServerClient } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth/roles';
 import { createClientSchema, type CreateClientInput } from '@/lib/validators/clients';
 
@@ -70,6 +70,7 @@ export async function createClientProfile(input: CreateClientInput): Promise<Cre
 
     revalidatePath('/cases/new');
     revalidatePath('/dashboard/analista');
+    revalidatePath('/clients');
 
     return {
       success: true,
@@ -86,6 +87,61 @@ export async function createClientProfile(input: CreateClientInput): Promise<Cre
     return {
       success: false,
       error: error instanceof Error ? error.message : DEFAULT_ERROR_MESSAGE,
+    };
+  }
+}
+
+export type ListClientsResult =
+  | {
+      success: true;
+      clients: Array<{
+        id: string;
+        nombre: string;
+        email: string;
+        telefono: string | null;
+        rut: string | null;
+        created_at: string | null;
+      }>;
+    }
+  | { success: false; error: string };
+
+function resolveClientSupabase() {
+  if (process.env.SUPABASE_SERVICE_KEY) {
+    return createServiceClient();
+  }
+  return createServerClient();
+}
+
+export async function listClients(params: { search?: string } = {}): Promise<ListClientsResult> {
+  try {
+    await requireAuth(['analista', 'admin_firma']);
+    const supabase = await resolveClientSupabase();
+
+    let query = supabase
+      .from('profiles')
+      .select('id, nombre, email, telefono, rut, created_at')
+      .eq('role', 'cliente')
+      .order('nombre', { ascending: true });
+
+    const search = params.search?.trim();
+    if (search) {
+      query = query.or(
+        `nombre.ilike.%${search}%,email.ilike.%${search}%,rut.ilike.%${search}%`
+      );
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return {
+      success: true,
+      clients: data ?? [],
+    };
+  } catch (error) {
+    console.error('Error in listClients:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'No se pudieron obtener los clientes',
     };
   }
 }

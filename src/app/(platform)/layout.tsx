@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldAlert,
   Users,
+  UserPlus,
   Briefcase,
   ClipboardList,
   FilePlus2,
@@ -35,6 +36,12 @@ function buildSidebarItems(role: Role): SidebarItem[] {
         label: 'Casos de la firma',
         description: 'Visión global de expedientes activos',
         icon: <FolderOpen className="h-4 w-4" />,
+      },
+      {
+        href: '/clients',
+        label: 'Clientes',
+        description: 'Crea perfiles antes de asignar casos',
+        icon: <UserPlus className="h-4 w-4" />,
       },
       {
         href: '/dashboard/admin/users',
@@ -100,6 +107,12 @@ function buildSidebarItems(role: Role): SidebarItem[] {
         label: 'Nuevo caso',
         description: 'Inicia la recopilación y asignación',
         icon: <FilePlus2 className="h-4 w-4" />,
+      },
+      {
+        href: '/clients',
+        label: 'Clientes',
+        description: 'Registra personas y empresas',
+        icon: <UserPlus className="h-4 w-4" />,
       },
     ];
   }

@@ -146,6 +146,7 @@ export const STAGE_STATUSES = [
 
 export const STAGE_PAYMENT_STATUSES = [
   { value: 'pendiente', label: 'Pendiente', color: 'gray' },
+  { value: 'solicitado', label: 'Solicitado por cliente', color: 'blue' },
   { value: 'en_proceso', label: 'En proceso', color: 'amber' },
   { value: 'parcial', label: 'Pago parcial', color: 'blue' },
   { value: 'pagado', label: 'Pagado', color: 'green' },

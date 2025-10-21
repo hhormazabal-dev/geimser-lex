@@ -70,6 +70,18 @@ const baseCaseSchema = z.object({
   modalidad_cobro: z.enum(['prepago', 'postpago', 'mixto']).default('prepago'),
   honorario_notas: z.string().max(2000, 'Las notas no pueden exceder 2000 caracteres').optional(),
   tarifa_referencia: z.string().max(200, 'El identificador de tarifa no puede exceder 200 caracteres').optional(),
+  alcance_cliente_solicitado: z
+    .number()
+    .int('El alcance solicitado debe ser un número entero')
+    .min(0, 'El alcance solicitado no puede ser negativo')
+    .max(100, 'El alcance solicitado no puede exceder 100 etapas')
+    .optional(),
+  alcance_cliente_autorizado: z
+    .number()
+    .int('El alcance autorizado debe ser un número entero')
+    .min(0, 'El alcance autorizado no puede ser negativo')
+    .max(100, 'El alcance autorizado no puede exceder 100 etapas')
+    .optional(),
   observaciones: z.string().optional(),
   descripcion_inicial: z
     .string()
@@ -121,6 +133,18 @@ export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
       path: ['honorario_pagado_uf'],
     });
   }
+
+  if (
+    data.alcance_cliente_autorizado !== undefined &&
+    data.alcance_cliente_solicitado !== undefined &&
+    data.alcance_cliente_autorizado > data.alcance_cliente_solicitado
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'El alcance autorizado no puede superar al alcance solicitado por el cliente.',
+      path: ['alcance_cliente_autorizado'],
+    });
+  }
 });
 
 export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx) => {
@@ -135,6 +159,18 @@ export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx)
       code: z.ZodIssueCode.custom,
       message: 'El monto pagado no puede superar el honorario total.',
       path: ['honorario_pagado_uf'],
+    });
+  }
+
+  if (
+    data.alcance_cliente_autorizado !== undefined &&
+    data.alcance_cliente_solicitado !== undefined &&
+    data.alcance_cliente_autorizado > (data.alcance_cliente_solicitado ?? 0)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'El alcance autorizado no puede superar al alcance solicitado por el cliente.',
+      path: ['alcance_cliente_autorizado'],
     });
   }
 });

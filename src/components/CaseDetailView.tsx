@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,8 @@ import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { authorizeCaseAdvance } from '@/lib/actions/cases';
 import {
   ArrowLeft,
   Scale,
@@ -26,8 +28,9 @@ import {
   Edit,
   Users,
   Wallet,
+  Loader2,
 } from 'lucide-react';
-import type { Profile, Case } from '@/lib/supabase/types';
+import type { Profile, Case, CaseStage } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
 
 interface CaseDetailViewProps {
@@ -45,6 +48,7 @@ interface CaseDetailViewProps {
       email: string;
       telefono?: string;
     }>;
+    case_stages?: CaseStage[];
   };
   profile: Profile;
   messages: CaseMessageDTO[];
@@ -55,6 +59,36 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     'overview' | 'timeline' | 'documents' | 'notes' | 'messages' | 'requests' | 'clients'
   >('overview');
   const router = useRouter();
+  const { toast } = useToast();
+  const [stageCatalog, setStageCatalog] = useState<CaseStage[]>(caseData.case_stages ?? []);
+  const [clientAdvance, setClientAdvance] = useState({
+    solicitado: caseData.alcance_cliente_solicitado ?? 0,
+    autorizado: caseData.alcance_cliente_autorizado ?? 0,
+  });
+  const stageNamesByOrder = useMemo(() => {
+    const map = new Map<number, string>();
+    stageCatalog.forEach((stage) => {
+      const order = stage.orden ?? 0;
+      if (order > 0 && !map.has(order)) {
+        map.set(order, stage.etapa);
+      }
+    });
+    return map;
+  }, [stageCatalog]);
+  const requestedStageName = clientAdvance.solicitado > 0 ? stageNamesByOrder.get(clientAdvance.solicitado) ?? null : null;
+  const authorizedStageName = clientAdvance.autorizado > 0 ? stageNamesByOrder.get(clientAdvance.autorizado) ?? null : null;
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+
+  useEffect(() => {
+    setStageCatalog(caseData.case_stages ?? []);
+  }, [caseData.case_stages]);
+
+  useEffect(() => {
+    setClientAdvance({
+      solicitado: caseData.alcance_cliente_solicitado ?? 0,
+      autorizado: caseData.alcance_cliente_autorizado ?? 0,
+    });
+  }, [caseData.alcance_cliente_solicitado, caseData.alcance_cliente_autorizado]);
 
   const canEdit =
     profile.role === 'admin_firma' ||
@@ -118,6 +152,40 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   const honorarioPagado = caseData.honorario_pagado_uf ?? 0;
   const honorarioPendiente =
     honorarioTotal !== null ? Math.max(honorarioTotal - honorarioPagado, 0) : null;
+
+  const handleAuthorizeAdvance = async (targetOrder: number) => {
+    if (!targetOrder || targetOrder <= 0) return;
+    setIsAuthorizing(true);
+    try {
+      const result = await authorizeCaseAdvance(caseData.id, targetOrder);
+      if (result.success) {
+        const authorizedOrder = result.authorizedOrder ?? targetOrder;
+        setClientAdvance((prev) => ({ ...prev, autorizado: authorizedOrder }));
+        toast({
+          title: 'Avance autorizado',
+          description: `Se autorizó avanzar hasta ${
+            stageNamesByOrder.get(authorizedOrder) ?? `la etapa ${authorizedOrder}`
+          }.`,
+        });
+        router.refresh();
+      } else {
+        toast({
+          title: 'No se pudo autorizar',
+          description: result.error ?? 'Intenta nuevamente en unos minutos.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error authorizing advance', error);
+      toast({
+        title: 'Error inesperado',
+        description: 'No fue posible autorizar el avance solicitado.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAuthorizing(false);
+    }
+  };
 
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: Scale },
@@ -270,6 +338,43 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                 </div>
               )}
 
+              {(clientAdvance.solicitado > 0 || clientAdvance.autorizado > 0) && (
+                <div className="bg-sky-50 rounded-lg p-4">
+                  <h3 className="font-medium text-sky-900 mb-2 flex items-center">
+                    <Clock className="h-4 w-4 mr-2" />
+                    Alcance del cliente
+                  </h3>
+                  <p className="text-sm text-sky-700">
+                    {clientAdvance.solicitado > 0
+                      ? `Solicitado: ${requestedStageName ?? `Etapa ${clientAdvance.solicitado}`}`
+                      : 'Sin solicitudes vigentes'}
+                  </p>
+                  <p className="text-sm text-sky-700">
+                    {clientAdvance.autorizado > 0
+                      ? `Autorizado: ${authorizedStageName ?? `Etapa ${clientAdvance.autorizado}`}`
+                      : 'Aprobación pendiente'}
+                  </p>
+                  {(profile.role === 'admin_firma' || profile.role === 'analista') &&
+                    clientAdvance.solicitado > clientAdvance.autorizado && (
+                    <Button
+                      size="sm"
+                      className="mt-3 inline-flex items-center gap-2 rounded-full bg-sky-600 text-white hover:bg-sky-700"
+                      onClick={() => handleAuthorizeAdvance(clientAdvance.solicitado)}
+                      disabled={isAuthorizing}
+                    >
+                      {isAuthorizing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Autorizando…
+                        </>
+                      ) : (
+                        'Autorizar solicitud'
+                      )}
+                    </Button>
+                    )}
+                </div>
+              )}
+
               {(honorarioTotal !== null || caseData.tarifa_referencia) && (
                 <div className="bg-indigo-50 rounded-lg p-4">
                   <h3 className="font-medium text-indigo-900 mb-2 flex items-center">
@@ -365,6 +470,18 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                   caseMateria={caseData.materia ?? 'General'}
                   canManageStages={canManageStages}
                   showPrivateStages={showPrivateContent}
+                  clientContext={{
+                    role: profile.role,
+                    alcanceAutorizado: clientAdvance.autorizado,
+                    alcanceSolicitado: clientAdvance.solicitado,
+                  }}
+                  onClientProgressChange={(progress) =>
+                    setClientAdvance((prev) => ({
+                      solicitado: progress.solicitado ?? prev.solicitado,
+                      autorizado: progress.autorizado ?? prev.autorizado,
+                    }))
+                  }
+                  onStagesLoaded={setStageCatalog}
                 />
               </div>
               <div className="space-y-6">
@@ -391,6 +508,18 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               caseMateria={caseData.materia ?? 'General'}
               canManageStages={canManageStages}
               showPrivateStages={showPrivateContent}
+              clientContext={{
+                role: profile.role,
+                alcanceAutorizado: clientAdvance.autorizado,
+                alcanceSolicitado: clientAdvance.solicitado,
+              }}
+              onClientProgressChange={(progress) =>
+                setClientAdvance((prev) => ({
+                  solicitado: progress.solicitado ?? prev.solicitado,
+                  autorizado: progress.autorizado ?? prev.autorizado,
+                }))
+              }
+              onStagesLoaded={setStageCatalog}
             />
           )}
 
