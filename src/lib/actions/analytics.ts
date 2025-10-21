@@ -14,6 +14,40 @@ export interface DashboardStats {
   overdueStages: number;
 }
 
+export interface DashboardHighlights {
+  recentCases: Array<{
+    id: string;
+    caratulado: string;
+    estado: string | null;
+    prioridad: string | null;
+    fecha_inicio: string | null;
+    abogado_responsable?: string | null;
+    valor_estimado: number | null;
+  }>;
+  clients: Array<{
+    id: string;
+    nombre: string | null;
+    email: string | null;
+    telefono: string | null;
+    created_at: string | null;
+  }>;
+  documents: Array<{
+    id: string;
+    nombre: string;
+    case_id: string | null;
+    created_at: string | null;
+  }>;
+  pending: Array<{
+    id: string;
+    tipo: 'solicitud' | 'etapa';
+    titulo: string;
+    descripcion?: string | null;
+    fecha?: string | null;
+    case_id?: string | null;
+    estado?: string | null;
+  }>;
+}
+
 export interface CasesByStatus {
   status: string;
   count: number;
@@ -48,6 +82,48 @@ export interface AbogadoWorkload {
   avgCaseValue: number;
 }
 
+export interface LawyerCaseSummary {
+  id: string;
+  caratulado: string;
+  estado: string | null;
+  etapa_actual: string | null;
+  prioridad: string | null;
+  valor_estimado: number | null;
+  fecha_inicio: string | null;
+  workflow_state: string | null;
+  nombre_cliente: string | null;
+  nextStage: {
+    etapa: string;
+    fecha_programada: string | null;
+    estado: string;
+    orden: number | null;
+    isOverdue: boolean;
+  } | null;
+  pendingStages: number;
+  completedStages: number;
+  totalStages: number;
+  overdueStages: number;
+}
+
+export interface LawyerDetailData {
+  lawyer: {
+    id: string;
+    nombre: string;
+    email: string | null;
+    telefono: string | null;
+    role: string | null;
+  };
+  stats: {
+    activeCases: number;
+    completedCases: number;
+    totalCases: number;
+    totalValue: number;
+    avgCaseValue: number;
+    overdueStages: number;
+  };
+  cases: LawyerCaseSummary[];
+}
+
 /* --------------------------------- Helpers -------------------------------- */
 
 const normalizeRole = (r: string | null) => (r ?? '').trim().toLowerCase();
@@ -67,7 +143,14 @@ const EMPTY_STATS: DashboardStats = {
 /**
  * Obtiene estadísticas generales del dashboard
  */
-export async function getDashboardStats(): Promise<{ success: boolean; stats?: DashboardStats; error?: string }> {
+type DashboardStatsResponse = {
+  success: boolean;
+  stats?: DashboardStats;
+  highlights?: DashboardHighlights;
+  error?: string;
+};
+
+export async function getDashboardStats(): Promise<DashboardStatsResponse> {
   try {
     const profile = await requireAuth();
     const role = normalizeRole(profile.role);
@@ -75,7 +158,11 @@ export async function getDashboardStats(): Promise<{ success: boolean; stats?: D
     if (!canSeeStats(role)) {
       console.warn('⚠️ Rol sin permisos (getDashboardStats):', profile.role);
       // Devolver datos vacíos para no romper el dashboard si entra un cliente
-      return { success: true, stats: { ...EMPTY_STATS } };
+      return {
+        success: true,
+        stats: { ...EMPTY_STATS },
+        highlights: { recentCases: [], clients: [], documents: [], pending: [] },
+      };
     }
 
     const supabase = await createServerClient();
@@ -150,7 +237,60 @@ export async function getDashboardStats(): Promise<{ success: boolean; stats?: D
       overdueStages: stagesResult.data?.length || 0,
     };
 
-    return { success: true, stats };
+    const highlights: DashboardHighlights = {
+      recentCases: cases
+        .sort((a, b) => new Date(b.updated_at ?? b.created_at ?? '').getTime() - new Date(a.updated_at ?? a.created_at ?? '').getTime())
+        .slice(0, 6)
+        .map((caseItem) => ({
+          id: caseItem.id as string,
+          caratulado: (caseItem.caratulado as string) ?? 'Sin caratulado',
+          estado: (caseItem.estado as string | null) ?? null,
+          prioridad: (caseItem.prioridad as string | null) ?? null,
+          fecha_inicio: (caseItem.fecha_inicio as string | null) ?? null,
+          abogado_responsable: (caseItem.abogado_responsable as string | null) ?? null,
+          valor_estimado: (caseItem.valor_estimado as number | null) ?? null,
+        })),
+      clients: ((clientsResult.data as Array<Record<string, any>> | null) ?? [])
+        .slice(0, 6)
+        .map((client) => ({
+          id: client.id as string,
+          nombre: (client.nombre as string | null) ?? null,
+          email: (client.email as string | null) ?? null,
+          telefono: (client.telefono as string | null) ?? null,
+          created_at: (client.created_at as string | null) ?? null,
+        })),
+      documents: ((documentsResult.data as Array<Record<string, any>> | null) ?? [])
+        .sort((a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime())
+        .slice(0, 6)
+        .map((doc) => ({
+          id: doc.id as string,
+          nombre: (doc.nombre as string) ?? 'Documento',
+          case_id: (doc.case_id as string | null) ?? null,
+          created_at: (doc.created_at as string | null) ?? null,
+        })),
+      pending: [
+        ...(((requestsResult.data as Array<Record<string, any>> | null) ?? []).map((req) => ({
+          id: req.id as string,
+          tipo: 'solicitud' as const,
+          titulo: (req.titulo as string) ?? 'Solicitud',
+          descripcion: (req.descripcion as string | null) ?? null,
+          fecha: (req.fecha_limite as string | null) ?? null,
+          case_id: (req.case_id as string | null) ?? null,
+          estado: (req.estado as string | null) ?? null,
+        }))),
+        ...(((stagesResult.data as Array<Record<string, any>> | null) ?? []).map((stage) => ({
+          id: stage.id as string,
+          tipo: 'etapa' as const,
+          titulo: (stage.etapa as string) ?? 'Etapa',
+          descripcion: null,
+          fecha: (stage.fecha_programada as string | null) ?? null,
+          case_id: (stage.case_id as string | null) ?? null,
+          estado: (stage.estado as string | null) ?? null,
+        }))),
+      ].slice(0, 8),
+    };
+
+    return { success: true, stats, highlights };
   } catch (error) {
     console.error('Error getting dashboard stats:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
@@ -458,6 +598,135 @@ export async function getAbogadoWorkload(): Promise<{ success: boolean; data?: A
     return { success: true, data: workloadData };
   } catch (error) {
     console.error('Error getting abogado workload:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Detalle de gestión de un abogado (solo admin)
+ */
+export async function getLawyerDetail(abogadoId: string): Promise<{ success: boolean; data?: LawyerDetailData; error?: string }> {
+  try {
+    const profile = await requireAuth();
+    const role = normalizeRole(profile.role);
+
+    if (role !== 'admin_firma') {
+      return { success: false, error: 'Sin permisos para ver esta información' };
+    }
+
+    const supabase = await createServerClient();
+    const { data: lawyer, error: lawyerError } = await supabase
+      .from('profiles')
+      .select('id, nombre, email, telefono, role')
+      .eq('id', abogadoId)
+      .single();
+
+    if (lawyerError || !lawyer) {
+      return { success: false, error: 'Abogado no encontrado' };
+    }
+
+    const { data: caseRows, error: casesError } = await supabase
+      .from('cases')
+      .select('id, caratulado, estado, etapa_actual, prioridad, valor_estimado, fecha_inicio, workflow_state, nombre_cliente, updated_at')
+      .eq('abogado_responsable', abogadoId)
+      .order('created_at', { ascending: false });
+
+    if (casesError) throw casesError;
+
+    const cases = (caseRows as any[]) ?? [];
+    const caseIds = cases.map((c) => c.id);
+
+    let stageMap = new Map<string, any[]>();
+    if (caseIds.length > 0) {
+      const { data: stageRows, error: stagesError } = await supabase
+        .from('case_stages')
+        .select('case_id, etapa, estado, fecha_programada, orden')
+        .in('case_id', caseIds)
+        .order('orden', { ascending: true });
+
+      if (stagesError) throw stagesError;
+
+      stageMap = (stageRows ?? []).reduce((map, stage) => {
+        const list = map.get(stage.case_id) ?? [];
+        list.push(stage);
+        map.set(stage.case_id, list);
+        return map;
+      }, new Map<string, any[]>());
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const caseSummaries: LawyerCaseSummary[] = cases.map((caseItem) => {
+      const stages = stageMap.get(caseItem.id) ?? [];
+      const completedStages = stages.filter((stage) => stage.estado === 'completado');
+      const pendingStages = stages.filter((stage) => stage.estado !== 'completado');
+
+      const nextStage = pendingStages.length > 0 ? pendingStages[0] : null;
+      const overdueStages = pendingStages.filter((stage) => {
+        if (!stage.fecha_programada) return false;
+        return stage.fecha_programada < today;
+      }).length;
+
+      return {
+        id: caseItem.id,
+        caratulado: caseItem.caratulado,
+        estado: caseItem.estado ?? null,
+        etapa_actual: caseItem.etapa_actual ?? null,
+        prioridad: caseItem.prioridad ?? null,
+        valor_estimado: caseItem.valor_estimado ?? null,
+        fecha_inicio: caseItem.fecha_inicio ?? null,
+        workflow_state: caseItem.workflow_state ?? null,
+        nombre_cliente: caseItem.nombre_cliente ?? null,
+        nextStage: nextStage
+          ? {
+              etapa: nextStage.etapa,
+              fecha_programada: nextStage.fecha_programada ?? null,
+              estado: nextStage.estado ?? 'pendiente',
+              orden: nextStage.orden ?? null,
+              isOverdue:
+                Boolean(nextStage.fecha_programada) && nextStage.fecha_programada < today,
+            }
+          : null,
+        pendingStages: pendingStages.length,
+        completedStages: completedStages.length,
+        totalStages: stages.length,
+        overdueStages,
+      };
+    });
+
+    const activeCases = caseSummaries.filter((c) => c.estado === 'activo');
+    const completedCases = caseSummaries.filter((c) => c.estado === 'terminado');
+    const totalValue = caseSummaries.reduce(
+      (sum, caseItem) => sum + ((caseItem.valor_estimado as number | null) ?? 0),
+      0
+    );
+    const totalCases = caseSummaries.length;
+    const avgCaseValue = totalCases > 0 ? totalValue / totalCases : 0;
+    const totalOverdueStages = caseSummaries.reduce((sum, c) => sum + c.overdueStages, 0);
+
+    return {
+      success: true,
+      data: {
+        lawyer: {
+          id: lawyer.id,
+          nombre: lawyer.nombre ?? 'Sin nombre',
+          email: lawyer.email ?? null,
+          telefono: lawyer.telefono ?? null,
+          role: lawyer.role ?? null,
+        },
+        stats: {
+          activeCases: activeCases.length,
+          completedCases: completedCases.length,
+          totalCases,
+          totalValue,
+          avgCaseValue,
+          overdueStages: totalOverdueStages,
+        },
+        cases: caseSummaries,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting lawyer detail:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }

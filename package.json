@@ -1,5 +1,5 @@
 {
-  "name": "lexser",
+  "name": "xelchile",
   "version": "1.0.0",
   "description": "Plataforma corporativa para estudios jurídicos en Chile",
   "private": true,
@@ -136,14 +136,14 @@
     "supabase",
     "typescript"
   ],
-  "author": "LEXSER Team",
+  "author": "Xel Chile Team",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lexser/lexser-platform.git"
+    "url": "https://github.com/xelchile/xelchile-platform.git"
   },
   "bugs": {
-    "url": "https://github.com/lexser/lexser-platform/issues"
+    "url": "https://github.com/xelchile/xelchile-platform/issues"
   },
-  "homepage": "https://lexser.com"
+  "homepage": "https://xelchile.com"
 }

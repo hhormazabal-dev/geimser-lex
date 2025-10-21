@@ -1,16 +1,16 @@
-# Contributing to LEXSER
+# Contributing to Xel Chile
 
-First off, thank you for considering contributing to LEXSER! It's people like you that make LEXSER such a great tool.
+First off, thank you for considering contributing to Xel Chile! It's people like you that make Xel Chile such a great tool.
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by the [LEXSER Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [contact@lexser.com](mailto:contact@lexser.com).
+This project and everyone participating in it is governed by the [Xel Chile Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [contact@xelchile.com](mailto:contact@xelchile.com).
 
 ## How Can I Contribute?
 
 ### Reporting Bugs
 
-This is one of the simplest ways to contribute. If you find a bug, please open an issue on our [GitHub repository](https://github.com/lexser/lexser-platform/issues).
+This is one of the simplest ways to contribute. If you find a bug, please open an issue on our [GitHub repository](https://github.com/xelchile/xelchile-platform/issues).
 
 ### Suggesting Enhancements
 
@@ -41,4 +41,3 @@ We love pull requests! If you're planning to contribute code, please follow thes
 All TypeScript code must adhere to the [Prettier](https://prettier.io/) configuration in the repository. We also use ESLint to enforce code quality. Please run `npm run lint` and `npm run format` before committing your changes.
 
 Thanks!
-

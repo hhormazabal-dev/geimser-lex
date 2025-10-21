@@ -100,7 +100,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
               <Scale className='h-8 w-8 text-blue-600' />
               <div>
                 <h1 className='text-xl font-semibold text-gray-900'>Portal Cliente</h1>
-                <p className='text-sm text-gray-500'>LEXSER</p>
+                <p className='text-sm text-gray-500'>Xel Chile</p>
               </div>
             </div>
             

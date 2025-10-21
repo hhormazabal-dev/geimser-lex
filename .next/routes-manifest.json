@@ -49,6 +49,14 @@
         "nxtPid": "nxtPid"
       },
       "namedRegex": "^/cases/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/dashboard/admin/lawyers/[lawyerId]",
+      "regex": "^/dashboard/admin/lawyers/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPlawyerId": "nxtPlawyerId"
+      },
+      "namedRegex": "^/dashboard/admin/lawyers/(?<nxtPlawyerId>[^/]+?)(?:/)?$"
     }
   ],
   "staticRoutes": [

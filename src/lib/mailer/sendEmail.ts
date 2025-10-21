@@ -51,7 +51,7 @@ function getTransport() {
 
   await transport.sendMail({
     to: payload.to,
-    subject: 'Acceso al portal cliente - LEXSER',
+    subject: 'Acceso al portal cliente - Xel Chile',
     html: `
       <p>Hola,</p>
       <p>Tu enlace de acceso al portal cliente es:</p>

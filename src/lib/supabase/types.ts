@@ -25,6 +25,7 @@ export type CaseStatus        = DB["public"]["Enums"]["case_status"];
 export type CasePriority      = DB["public"]["Enums"]["case_priority"];
 export type CaseWorkflowState = DB["public"]["Enums"]["case_workflow_state"];
 export type StageStatus       = DB["public"]["Enums"]["stage_status"];
+export type StagePaymentStatus= DB["public"]["Enums"]["stage_payment_status"];
 export type NoteType          = DB["public"]["Enums"]["note_type"];
 export type DocumentVisibility= DB["public"]["Enums"]["document_visibility"];
 export type RequestType       = DB["public"]["Enums"]["request_type"];

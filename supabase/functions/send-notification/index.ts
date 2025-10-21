@@ -22,14 +22,14 @@ interface EmailTemplate {
 
 const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
   magic_link: (data) => ({
-    subject: `Acceso a tu caso en LEXSER - ${data.case_name}`,
+    subject: `Acceso a tu caso en Xel Chile - ${data.case_name}`,
     html: `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Acceso a LEXSER</title>
+          <title>Acceso a Xel Chile</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -50,13 +50,13 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
         <body>
           <div class="container">
             <div class="header">
-              <h1>⚖️ LEXSER</h1>
+              <h1>⚖️ Xel Chile</h1>
               <p>Portal Cliente</p>
             </div>
             <div class="content">
               <h2>Acceso a tu caso: ${data.case_name}</h2>
               <p>Hola,</p>
-              <p>Tu abogado te ha dado acceso al portal cliente de LEXSER para que puedas seguir el progreso de tu caso.</p>
+              <p>Tu abogado te ha dado acceso al portal cliente de Xel Chile para que puedas seguir el progreso de tu caso.</p>
               
               <p><strong>Caso:</strong> ${data.case_name}</p>
               <p><strong>Abogado:</strong> ${data.lawyer_name}</p>
@@ -77,7 +77,7 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
               <p>Si tienes alguna pregunta, no dudes en contactar a tu abogado.</p>
             </div>
             <div class="footer">
-              <p>LEXSER - Sistema de Gestión Legal</p>
+              <p>Xel Chile - Sistema de Gestión Legal</p>
               <p>Este es un mensaje automático, por favor no respondas a este email.</p>
             </div>
           </div>
@@ -85,11 +85,11 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
       </html>
     `,
     text: `
-      LEXSER - Acceso a tu caso
+      Xel Chile - Acceso a tu caso
       
       Hola,
       
-      Tu abogado te ha dado acceso al portal cliente de LEXSER para seguir el progreso de tu caso.
+      Tu abogado te ha dado acceso al portal cliente de Xel Chile para seguir el progreso de tu caso.
       
       Caso: ${data.case_name}
       Abogado: ${data.lawyer_name}
@@ -100,7 +100,7 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
       
       En el portal podrás ver el progreso, descargar documentos y comunicarte con tu abogado.
       
-      LEXSER - Sistema de Gestión Legal
+      Xel Chile - Sistema de Gestión Legal
     `
   }),
 
@@ -125,7 +125,7 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
         <body>
           <div class="container">
             <div class="header">
-              <h1>⚖️ LEXSER</h1>
+              <h1>⚖️ Xel Chile</h1>
               <p>Actualización de Caso</p>
             </div>
             <div class="content">
@@ -143,17 +143,17 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
               
               <p>Puedes ver más detalles accediendo al portal cliente.</p>
               
-              <p>Saludos,<br>Tu equipo legal en LEXSER</p>
+              <p>Saludos,<br>Tu equipo legal en Xel Chile</p>
             </div>
             <div class="footer">
-              <p>LEXSER - Sistema de Gestión Legal</p>
+              <p>Xel Chile - Sistema de Gestión Legal</p>
             </div>
           </div>
         </body>
       </html>
     `,
     text: `
-      LEXSER - Actualización de Caso
+      Xel Chile - Actualización de Caso
       
       Hola,
       
@@ -167,7 +167,7 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
       Puedes ver más detalles en el portal cliente.
       
       Saludos,
-      Tu equipo legal en LEXSER
+      Tu equipo legal en Xel Chile
     `
   }),
 
@@ -192,7 +192,7 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
         <body>
           <div class="container">
             <div class="header">
-              <h1>⚖️ LEXSER</h1>
+              <h1>⚖️ Xel Chile</h1>
               <p>Recordatorio de Vencimiento</p>
             </div>
             <div class="content">
@@ -210,17 +210,17 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
               
               <p>Es importante que estés al tanto de este vencimiento. Si tienes alguna pregunta, contacta a tu abogado.</p>
               
-              <p>Saludos,<br>Tu equipo legal en LEXSER</p>
+              <p>Saludos,<br>Tu equipo legal en Xel Chile</p>
             </div>
             <div class="footer">
-              <p>LEXSER - Sistema de Gestión Legal</p>
+              <p>Xel Chile - Sistema de Gestión Legal</p>
             </div>
           </div>
         </body>
       </html>
     `,
     text: `
-      LEXSER - Recordatorio de Vencimiento
+      Xel Chile - Recordatorio de Vencimiento
       
       Estimado/a,
       
@@ -235,7 +235,7 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
       Contacta a tu abogado si tienes alguna pregunta.
       
       Saludos,
-      Tu equipo legal en LEXSER
+      Tu equipo legal en Xel Chile
     `
   }),
 
@@ -260,7 +260,7 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
         <body>
           <div class="container">
             <div class="header">
-              <h1>⚖️ LEXSER</h1>
+              <h1>⚖️ Xel Chile</h1>
               <p>Respuesta a tu Solicitud</p>
             </div>
             <div class="content">
@@ -280,17 +280,17 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
               
               <p>Puedes ver la respuesta completa en el portal cliente.</p>
               
-              <p>Saludos,<br>Tu equipo legal en LEXSER</p>
+              <p>Saludos,<br>Tu equipo legal en Xel Chile</p>
             </div>
             <div class="footer">
-              <p>LEXSER - Sistema de Gestión Legal</p>
+              <p>Xel Chile - Sistema de Gestión Legal</p>
             </div>
           </div>
         </body>
       </html>
     `,
     text: `
-      LEXSER - Respuesta a tu Solicitud
+      Xel Chile - Respuesta a tu Solicitud
       
       Hola,
       
@@ -306,7 +306,7 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
       Puedes ver la respuesta completa en el portal cliente.
       
       Saludos,
-      Tu equipo legal en LEXSER
+      Tu equipo legal en Xel Chile
     `
   })
 };

@@ -1,11 +1,11 @@
 '''
-# LEXSER - Plataforma Corporativa para Estudios Jurídicos
+# Xel Chile - Plataforma Corporativa para Estudios Jurídicos
 
-![LEXSER Logo](./public/logo.svg)
+![Xel Chile Logo](./public/logo.svg)
 
-**LEXSER** es una plataforma web corporativa de última generación, diseñada específicamente para las necesidades de los estudios jurídicos en Chile. Construida con un stack tecnológico moderno y robusto, ofrece una solución integral para la gestión de casos, clientes, documentos y comunicaciones, todo en un entorno seguro y escalable.
+**Xel Chile** es una plataforma web corporativa de última generación, diseñada específicamente para las necesidades de los estudios jurídicos en Chile. Construida con un stack tecnológico moderno y robusto, ofrece una solución integral para la gestión de casos, clientes, documentos y comunicaciones, todo en un entorno seguro y escalable.
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/lexser/lexser-platform)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/xelchile/xelchile-platform)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-v2-green?logo=supabase)](https://supabase.com/)
@@ -34,7 +34,7 @@
 
 ## Visión General
 
-LEXSER nace de la necesidad de modernizar la gestión legal en Chile, proporcionando a los abogados y administradores una herramienta poderosa y centralizada. La plataforma se enfoca en la eficiencia operativa, la colaboración segura y la transparencia con el cliente, incorporando funcionalidades específicas para el contexto legal y procesal chileno.
+Xel Chile nace de la necesidad de modernizar la gestión legal en Chile, proporcionando a los abogados y administradores una herramienta poderosa y centralizada. La plataforma se enfoca en la eficiencia operativa, la colaboración segura y la transparencia con el cliente, incorporando funcionalidades específicas para el contexto legal y procesal chileno.
 
 El sistema está diseñado como una aplicación de página única (SPA) altamente interactiva y de alto rendimiento, con renderizado del lado del servidor (SSR) y generación de sitios estáticos (SSG) gracias a Next.js 15. La persistencia de datos, autenticación y almacenamiento se gestionan a través de Supabase, una alternativa de código abierto a Firebase que utiliza PostgreSQL.
 
@@ -75,7 +75,7 @@ El sistema está diseñado como una aplicación de página única (SPA) altament
 El proyecto sigue una estructura modular y escalable, optimizada para el App Router de Next.js.
 
 ```
-/lexser
+/xelchile-platform
 ├── /public                 # Archivos estáticos (imágenes, fuentes)
 ├── /scripts                # Scripts de utilidad (ej. test.sh)
 ├── /src
@@ -127,8 +127,8 @@ Sigue estos pasos para configurar y ejecutar el proyecto en tu entorno local.
 
 1.  **Clona el repositorio:**
     ```bash
-    git clone https://github.com/lexser/lexser-platform.git
-    cd lexser-platform
+    git clone https://github.com/xelchile/xelchile-platform.git
+    cd xelchile-platform
     ```
 
 2.  **Instala las dependencias:**
@@ -176,10 +176,10 @@ npm run dev
 La aplicación estará disponible en [http://localhost:3000](http://localhost:3000).
 
 **Credenciales de prueba (definidas para el entorno local):**
-- **Admin:** `admin@lexser.com` / `admin123`
-- **Analista:** `analista@lexser.com` / `analista123`
-- **Abogado:** `abogado@lexser.com` / `password123`
-- **Cliente:** `cliente@lexser.com` / `client123`
+- **Admin:** `admin@xelchile.com` / `admin123`
+- **Analista:** `analista@xelchile.com` / `analista123`
+- **Abogado:** `abogado@xelchile.com` / `password123`
+- **Cliente:** `cliente@xelchile.com` / `client123`
 
 ## Scripts Disponibles
 
@@ -204,7 +204,7 @@ El proyecto tiene una cobertura de testing exhaustiva para garantizar la calidad
 
 ## Seguridad
 
-La seguridad es un pilar fundamental de LEXSER. Se han implementado múltiples capas de protección:
+La seguridad es un pilar fundamental de Xel Chile. Se han implementado múltiples capas de protección:
 
 - **Row Level Security (RLS)**: Todas las consultas a la base de datos están protegidas por políticas de RLS en Supabase, asegurando que los usuarios solo puedan acceder a los datos que les corresponden.
 - **Middleware de Seguridad**: Un middleware en Next.js inspecciona las peticiones entrantes para detectar y bloquear patrones de ataques comunes.

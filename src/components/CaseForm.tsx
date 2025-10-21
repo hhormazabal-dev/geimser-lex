@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { createCase, updateCase } from '@/lib/actions/cases';
 import { uploadDocument } from '@/lib/actions/documents';
+import { createClientProfile } from '@/lib/actions/clients';
 import {
   createCaseSchema,
   type CreateCaseInput,
@@ -21,11 +22,12 @@ import {
   CASE_MATERIAS,
   REGIONES_CHILE,
 } from '@/lib/validators/case';
+import { createClientSchema, type CreateClientInput } from '@/lib/validators/clients';
 import { formatRUT } from '@/lib/utils';
 import { Loader2, Save, X, Trash2, Paperclip, UploadCloud } from 'lucide-react';
 import type { Case, Profile } from '@/lib/supabase/types';
 
-type LightweightProfile = Pick<Profile, 'id' | 'nombre' | 'role'>;
+type LightweightProfile = Pick<Profile, 'id' | 'nombre' | 'role' | 'rut' | 'telefono' | 'email'>;
 
 interface CaseFormProps {
   case?: Omit<Case, 'abogado_responsable'> & {
@@ -60,6 +62,9 @@ export function CaseForm({
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [clientOptions, setClientOptions] = useState<LightweightProfile[]>(clients);
+  const [isAddingClient, setIsAddingClient] = useState(false);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -91,6 +96,14 @@ export function CaseForm({
         cliente_principal_id: existingCase.cliente_principal_id || undefined,
         prioridad: (existingCase.prioridad || 'media') as CreateCaseInput['prioridad'],
         valor_estimado: existingCase.valor_estimado || undefined,
+        honorario_total_uf: (existingCase as any).honorario_total_uf ?? undefined,
+        honorario_pagado_uf: (existingCase as any).honorario_pagado_uf ?? undefined,
+        honorario_variable_porcentaje: (existingCase as any).honorario_variable_porcentaje ?? undefined,
+        honorario_variable_base: (existingCase as any).honorario_variable_base ?? '',
+        honorario_moneda: (existingCase as any).honorario_moneda ?? 'UF',
+        modalidad_cobro: (existingCase as any).modalidad_cobro ?? 'prepago',
+        honorario_notas: (existingCase as any).honorario_notas ?? '',
+        tarifa_referencia: (existingCase as any).tarifa_referencia ?? '',
         observaciones: existingCase.observaciones || '',
         descripcion_inicial: existingCase.descripcion_inicial || '',
         objetivo_cliente: existingCase.objetivo_cliente || '',
@@ -116,6 +129,14 @@ export function CaseForm({
         cliente_principal_id: undefined,
         prioridad: 'media',
         valor_estimado: undefined,
+        honorario_total_uf: undefined,
+        honorario_pagado_uf: 0,
+        honorario_variable_porcentaje: undefined,
+        honorario_variable_base: '',
+        honorario_moneda: 'UF',
+        modalidad_cobro: 'prepago',
+        honorario_notas: '',
+        tarifa_referencia: '',
         observaciones: '',
         descripcion_inicial: '',
         objetivo_cliente: '',
@@ -136,15 +157,54 @@ export function CaseForm({
     defaultValues,
   });
 
+  const {
+    register: registerNewClient,
+    handleSubmit: handleSubmitNewClient,
+    reset: resetNewClientForm,
+    formState: { errors: newClientErrors },
+    setValue: setNewClientValue,
+    watch: watchNewClient,
+  } = useForm<CreateClientInput>({
+    resolver: zodResolver(createClientSchema),
+    defaultValues: {
+      nombre: '',
+      email: '',
+      rut: '',
+      telefono: '',
+    },
+  });
+
   const rutCliente = watch('rut_cliente');
   const marcarValidado = watch('marcar_validado');
   const workflowState = watch('workflow_state');
+  const modalidadCobro = watch('modalidad_cobro');
+  const honorarioMoneda = watch('honorario_moneda');
+  const honorarioTotal = watch('honorario_total_uf');
+  const honorarioPagado = watch('honorario_pagado_uf');
+  const honorarioPendiente =
+    typeof honorarioTotal === 'number' && !Number.isNaN(honorarioTotal)
+      ? Math.max((honorarioTotal ?? 0) - (honorarioPagado ?? 0), 0)
+      : undefined;
+  const newClientRut = watchNewClient('rut');
+  const { ref: newClientRutRef, ...newClientRutField } = registerNewClient('rut');
+
+  const formatUf = (value?: number) => {
+    if (value === undefined || value === null || Number.isNaN(value)) return '—';
+    return `${new Intl.NumberFormat('es-CL', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)} UF`;
+  };
 
   useEffect(() => {
     if (!existingCase) {
       setValue('workflow_state', marcarValidado ? 'en_revision' : 'preparacion');
     }
   }, [marcarValidado, existingCase, setValue]);
+
+  useEffect(() => {
+    setClientOptions(clients);
+  }, [clients]);
 
   const resetFileSelection = () => {
     setSelectedFiles([]);
@@ -305,6 +365,70 @@ export function CaseForm({
     setValue('rut_cliente', formattedRut);
   };
 
+  const handleNewClientRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formattedRut = formatRUT(e.target.value);
+    setNewClientValue('rut', formattedRut, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const onCreateClient = handleSubmitNewClient(async (clientData) => {
+    setIsCreatingClient(true);
+    try {
+      const result = await createClientProfile(clientData);
+      if (result.success) {
+        const newClient = {
+          id: result.client.id,
+          nombre: result.client.nombre,
+          role: 'cliente' as const,
+          rut: result.client.rut,
+          telefono: result.client.telefono,
+          email: result.client.email,
+        };
+
+        setClientOptions((prev) => {
+          const exists = prev.some((client) => client.id === newClient.id);
+          if (exists) {
+            return prev.map((client) => (client.id === newClient.id ? newClient : client));
+          }
+          return [...prev, newClient].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        });
+
+        setValue('cliente_principal_id', newClient.id);
+        setValue('nombre_cliente', newClient.nombre);
+        if (newClient.rut) {
+          setValue('rut_cliente', newClient.rut);
+        }
+
+        toast({
+          title: 'Cliente creado',
+          description: `${newClient.nombre} fue añadido al directorio y seleccionado en el caso.`,
+        });
+
+        resetNewClientForm();
+        setIsAddingClient(false);
+      } else {
+        toast({
+          title: 'No se pudo crear el cliente',
+          description: result.error || 'Revisa los datos e inténtalo nuevamente.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error creating client from CaseForm:', error);
+      toast({
+        title: 'Error inesperado',
+        description: 'Ocurrió un error al crear el cliente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingClient(false);
+    }
+  });
+
+  const cancelNewClientCreation = () => {
+    resetNewClientForm();
+    setIsAddingClient(false);
+  };
+
   return (
     <Card className='w-full max-w-4xl mx-auto'>
       <CardHeader>
@@ -406,7 +530,18 @@ export function CaseForm({
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
               <div className='space-y-2'>
-                <Label htmlFor='cliente_principal_id'>Cliente principal *</Label>
+                <div className='flex items-center justify-between gap-2'>
+                  <Label htmlFor='cliente_principal_id'>Cliente principal *</Label>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    onClick={() => setIsAddingClient((prev) => !prev)}
+                    disabled={isLoading}
+                  >
+                    {isAddingClient ? 'Cerrar' : 'Crear cliente'}
+                  </Button>
+                </div>
                 <Controller
                   control={control}
                   name='cliente_principal_id'
@@ -416,10 +551,10 @@ export function CaseForm({
                       className='form-input'
                       value={field.value || ''}
                       onChange={(event) => field.onChange(event.target.value || undefined)}
-                      disabled={isLoading || clients.length === 0}
+                      disabled={isLoading || clientOptions.length === 0}
                     >
                       <option value=''>Selecciona un cliente</option>
-                      {clients.map(client => (
+                      {clientOptions.map(client => (
                         <option key={client.id} value={client.id}>
                           {client.nombre}
                         </option>
@@ -427,11 +562,93 @@ export function CaseForm({
                     </select>
                   )}
                 />
-                {clients.length === 0 && (
+                {clientOptions.length === 0 && (
                   <p className='text-xs text-gray-500'>No hay clientes registrados. Puedes vincularlo más tarde.</p>
                 )}
                 {errors.cliente_principal_id && (
                   <p className='text-sm text-red-600'>{errors.cliente_principal_id.message}</p>
+                )}
+                {isAddingClient && (
+                  <form
+                    onSubmit={onCreateClient}
+                    className='mt-4 space-y-3 rounded-md border border-gray-200 bg-gray-50 p-4'
+                  >
+                    <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+                      <div className='space-y-2'>
+                        <Label htmlFor='new_client_nombre'>Nombre del cliente</Label>
+                        <Input
+                          id='new_client_nombre'
+                          placeholder='Juana Pérez'
+                          {...registerNewClient('nombre')}
+                          disabled={isCreatingClient}
+                        />
+                        {newClientErrors.nombre && (
+                          <p className='text-xs text-red-600'>{newClientErrors.nombre.message}</p>
+                        )}
+                      </div>
+                      <div className='space-y-2'>
+                        <Label htmlFor='new_client_email'>Correo</Label>
+                        <Input
+                          id='new_client_email'
+                          type='email'
+                          placeholder='cliente@correo.com'
+                          {...registerNewClient('email')}
+                          disabled={isCreatingClient}
+                        />
+                        {newClientErrors.email && (
+                          <p className='text-xs text-red-600'>{newClientErrors.email.message}</p>
+                        )}
+                      </div>
+                      <div className='space-y-2'>
+                        <Label htmlFor='new_client_rut'>RUT</Label>
+                        <Input
+                          id='new_client_rut'
+                          placeholder='12.345.678-9'
+                          name={newClientRutField.name}
+                          ref={newClientRutRef}
+                          onBlur={newClientRutField.onBlur}
+                          value={newClientRut || ''}
+                          onChange={handleNewClientRutChange}
+                          disabled={isCreatingClient}
+                        />
+                        {newClientErrors.rut && (
+                          <p className='text-xs text-red-600'>{newClientErrors.rut.message}</p>
+                        )}
+                      </div>
+                      <div className='space-y-2'>
+                        <Label htmlFor='new_client_telefono'>Teléfono</Label>
+                        <Input
+                          id='new_client_telefono'
+                          placeholder='+56 9 1234 5678'
+                          {...registerNewClient('telefono')}
+                          disabled={isCreatingClient}
+                        />
+                        {newClientErrors.telefono && (
+                          <p className='text-xs text-red-600'>{newClientErrors.telefono.message}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className='flex justify-end gap-2'>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        onClick={cancelNewClientCreation}
+                        disabled={isCreatingClient}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type='submit' disabled={isCreatingClient}>
+                        {isCreatingClient ? (
+                          <>
+                            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                            Guardando...
+                          </>
+                        ) : (
+                          'Guardar cliente'
+                        )}
+                      </Button>
+                    </div>
+                  </form>
                 )}
               </div>
 
@@ -598,6 +815,159 @@ export function CaseForm({
               {errors.observaciones && (
                 <p className='text-sm text-red-600'>{errors.observaciones.message}</p>
               )}
+            </div>
+          </section>
+
+          <section className='space-y-4'>
+            <div>
+              <h2 className='text-lg font-semibold text-gray-900'>Honorarios y cobro prepago</h2>
+              <p className='text-sm text-gray-500'>Define cómo se cobrará este caso. El timeline bloqueará etapas hasta registrar el pago correspondiente.</p>
+            </div>
+
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='modalidad_cobro'>Modalidad de cobro</Label>
+                <select
+                  id='modalidad_cobro'
+                  className='form-input'
+                  {...register('modalidad_cobro')}
+                  disabled={isLoading}
+                >
+                  <option value='prepago'>Prepago por etapas</option>
+                  <option value='postpago'>Postpago</option>
+                  <option value='mixto'>Mixto</option>
+                </select>
+                {errors.modalidad_cobro && (
+                  <p className='text-sm text-red-600'>{errors.modalidad_cobro.message}</p>
+                )}
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='honorario_moneda'>Moneda base</Label>
+                <select
+                  id='honorario_moneda'
+                  className='form-input'
+                  {...register('honorario_moneda')}
+                  disabled={isLoading}
+                >
+                  <option value='UF'>UF</option>
+                  <option value='CLP'>CLP</option>
+                  <option value='USD'>USD</option>
+                </select>
+                {errors.honorario_moneda && (
+                  <p className='text-sm text-red-600'>{errors.honorario_moneda.message}</p>
+                )}
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='tarifa_referencia'>Tarifa de referencia</Label>
+                <Input
+                  id='tarifa_referencia'
+                  placeholder='Ej: civil_juicio_ordinario_mayor_cuantia'
+                  {...register('tarifa_referencia')}
+                  disabled={isLoading}
+                />
+                <p className='text-xs text-gray-500'>Usa el identificador definido en la tabla de tarifas de Xel Chile para asociar el timeline automáticamente.</p>
+                {errors.tarifa_referencia && (
+                  <p className='text-sm text-red-600'>{errors.tarifa_referencia.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='honorario_total_uf'>Honorario total (UF)</Label>
+                <Input
+                  id='honorario_total_uf'
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  placeholder='30'
+                  {...register('honorario_total_uf', { valueAsNumber: true })}
+                  disabled={isLoading || honorarioMoneda !== 'UF'}
+                />
+                {honorarioMoneda !== 'UF' && (
+                  <p className='text-xs text-gray-500'>Para otras monedas detalla el valor en notas.</p>
+                )}
+                {errors.honorario_total_uf && (
+                  <p className='text-sm text-red-600'>{errors.honorario_total_uf.message}</p>
+                )}
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='honorario_pagado_uf'>Monto pagado (UF)</Label>
+                <Input
+                  id='honorario_pagado_uf'
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  placeholder='0'
+                  {...register('honorario_pagado_uf', { valueAsNumber: true })}
+                  disabled={isLoading || honorarioMoneda !== 'UF'}
+                />
+                {errors.honorario_pagado_uf && (
+                  <p className='text-sm text-red-600'>{errors.honorario_pagado_uf.message}</p>
+                )}
+              </div>
+
+              <div className='space-y-2'>
+                <Label>Saldo pendiente (UF)</Label>
+                <div className='h-10 flex items-center rounded-md border border-dashed border-gray-300 px-3 text-sm font-medium text-gray-700 bg-gray-50'>
+                  {honorarioPendiente !== undefined ? formatUf(honorarioPendiente) : '—'}
+                </div>
+              </div>
+            </div>
+
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='honorario_variable_porcentaje'>Componente variable (%)</Label>
+                <Input
+                  id='honorario_variable_porcentaje'
+                  type='number'
+                  min='0'
+                  max='100'
+                  step='0.1'
+                  placeholder='10'
+                  {...register('honorario_variable_porcentaje', { valueAsNumber: true })}
+                  disabled={isLoading}
+                />
+                {errors.honorario_variable_porcentaje && (
+                  <p className='text-sm text-red-600'>{errors.honorario_variable_porcentaje.message}</p>
+                )}
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='honorario_variable_base'>Base del variable</Label>
+                <Textarea
+                  id='honorario_variable_base'
+                  rows={2}
+                  placeholder='Ej: 10% de lo obtenido o de lo ahorrado por la defensa.'
+                  {...register('honorario_variable_base')}
+                  disabled={isLoading}
+                />
+                {errors.honorario_variable_base && (
+                  <p className='text-sm text-red-600'>{errors.honorario_variable_base.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='honorario_notas'>Notas de honorarios</Label>
+              <Textarea
+                id='honorario_notas'
+                rows={3}
+                placeholder='Detalle acuerdos específicos, descuentos, o condiciones especiales.'
+                {...register('honorario_notas')}
+                disabled={isLoading}
+              />
+              {errors.honorario_notas && (
+                <p className='text-sm text-red-600'>{errors.honorario_notas.message}</p>
+              )}
+            </div>
+
+            <div className='rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900'>
+              <p className='font-medium'>Prepago por etapas</p>
+              <p className='mt-1'>El cliente podrá avanzar pagando etapa por etapa. Cada fase del timeline exigirá un pago registrado para habilitar las acciones del equipo jurídico. Puedes copiar y compartir los enlaces de Payku desde el detalle del caso.</p>
             </div>
           </section>
 

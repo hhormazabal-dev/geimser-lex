@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast' // tienes este hook en tu árbol
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -35,7 +37,7 @@ export default function LoginForm() {
         return
       }
 
-      toast({ title: 'Inicio de sesión exitoso', description: 'Bienvenido a LEXSER' })
+      toast({ title: 'Inicio de sesión exitoso', description: 'Bienvenido a Xel Chile' })
       router.push('/dashboard')
     } catch (err: any) {
       toast({
@@ -58,20 +60,31 @@ export default function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           className="mt-1"
-          placeholder="tuemail@lexser.com"
+          placeholder="tuemail@xelchile.com"
         />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Contraseña</label>
-        <Input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="mt-1"
-          placeholder="••••••••"
-        />
+        <div className="relative mt-1">
+          <Input
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="pr-10"
+            placeholder="••••••••"
+            autoComplete="current-password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((prev) => !prev)}
+            className="absolute inset-y-0 right-3 inline-flex items-center text-gray-400 transition hover:text-gray-600"
+            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
       <Button type="submit" disabled={isLoading} className="w-full">

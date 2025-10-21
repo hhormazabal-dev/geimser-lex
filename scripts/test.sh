@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# LEXSER Test Runner Script
-# This script runs the complete test suite for the LEXSER application
+# Xel Chile Test Runner Script
+# This script runs the complete test suite for the Xel Chile application
 
 set -e  # Exit on any error
 
-echo "🚀 Starting LEXSER Test Suite"
+echo "🚀 Starting Xel Chile Test Suite"
 echo "================================"
 
 # Colors for output

@@ -4,385 +4,173 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --background: 220 33% 97%;
+    --foreground: 222 47% 12%;
+    --surface: 0 0% 100%;
+    --surface-foreground: 222 47% 12%;
+    --card: var(--surface);
+    --card-foreground: var(--surface-foreground);
+    --popover: var(--surface);
+    --popover-foreground: var(--surface-foreground);
+    --glass: rgba(255, 255, 255, 0.72);
+    --glass-border: rgba(148, 163, 184, 0.2);
+    --glass-hover: rgba(255, 255, 255, 0.85);
+    --primary: 215 98% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 212 30% 91%;
+    --secondary-foreground: 222 47% 20%;
+    --muted: 213 28% 92%;
+    --muted-foreground: 223 22% 45%;
+    --destructive: 2 88% 62%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 25% 88%;
+    --input: 215 25% 88%;
+    --ring: 215 98% 53%;
+    --radius: 1rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 7%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
+    --surface: 222 47% 9%;
+    --surface-foreground: 210 40% 98%;
+    --card: var(--surface);
+    --card-foreground: var(--surface-foreground);
+    --popover: var(--surface);
+    --popover-foreground: var(--surface-foreground);
+    --glass: rgba(15, 23, 42, 0.6);
+    --glass-border: rgba(148, 163, 184, 0.3);
+    --glass-hover: rgba(15, 23, 42, 0.75);
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 221 39% 11%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --muted: 221 39% 16%;
+    --muted-foreground: 215 20% 70%;
+    --destructive: 2 77% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 22% 16%;
+    --input: 220 22% 16%;
+    --ring: 217 91% 60%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground min-h-screen antialiased;
+    font-family: var(--font-sans), 'Inter', 'Segoe UI', system-ui, -apple-system,
+      sans-serif;
+    background-image: radial-gradient(
+        circle at 10% 20%,
+        rgba(147, 197, 253, 0.35),
+        transparent 55%
+      ),
+      radial-gradient(
+        circle at 90% 10%,
+        rgba(191, 219, 254, 0.4),
+        transparent 40%
+      ),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.98) 100%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background-color: rgba(59, 130, 246, 0.25);
+    color: hsl(var(--foreground));
+  }
+
+  html {
+    font-feature-settings:
+      'cv02' on,
+      'cv03' on,
+      'cv04' on,
+      'zero' on,
+      'ss01' on,
+      'ss02' on;
   }
 }
 
-/* Estilos personalizados para LEXSER */
 @layer components {
-  /* Estilos para formularios */
-  .form-field {
-    @apply space-y-2;
+  .glass-panel {
+    @apply rounded-3xl border border-white/20 bg-white/60 backdrop-blur-xl shadow-xl transition-all duration-200;
   }
 
-  .form-label {
-    @apply text-sm font-medium text-lexser-gray-700;
+  .glass-panel:hover {
+    @apply border-white/30 bg-white/80;
   }
 
-  .form-input {
-    @apply w-full px-3 py-2 border border-lexser-gray-300 rounded-md shadow-sm placeholder-lexser-gray-400 focus:outline-none focus:ring-2 focus:ring-lexser-blue-500 focus:border-lexser-blue-500;
-  }
-
-  .form-error {
-    @apply text-sm text-red-600;
-  }
-
-  /* Estilos para botones */
-  .btn-primary {
-    @apply bg-lexser-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-lexser-blue-700 focus:outline-none focus:ring-2 focus:ring-lexser-blue-500 focus:ring-offset-2 transition-colors;
-  }
-
-  .btn-secondary {
-    @apply bg-lexser-gray-200 text-lexser-gray-900 px-4 py-2 rounded-md font-medium hover:bg-lexser-gray-300 focus:outline-none focus:ring-2 focus:ring-lexser-gray-500 focus:ring-offset-2 transition-colors;
-  }
-
-  .btn-danger {
-    @apply bg-red-600 text-white px-4 py-2 rounded-md font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors;
-  }
-
-  /* Estilos para cards */
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-lexser-gray-200;
+    @apply rounded-3xl border border-white/10 bg-white/70 p-6 text-foreground shadow-lg backdrop-blur-xl;
   }
 
   .card-header {
-    @apply px-6 py-4 border-b border-lexser-gray-200;
+    @apply mb-4 flex flex-col gap-1.5 text-foreground;
   }
 
   .card-content {
-    @apply px-6 py-4;
+    @apply text-sm text-foreground/70;
   }
 
-  .card-footer {
-    @apply px-6 py-4 border-t border-lexser-gray-200;
+  .soft-section {
+    @apply rounded-3xl border border-white/10 bg-white/50 backdrop-blur-xl shadow-lg;
   }
 
-  /* Estilos para badges */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  .form-label {
+    @apply text-sm font-medium text-foreground/80;
   }
 
-  .badge-success {
-    @apply bg-green-100 text-green-800;
+  .input-field {
+    @apply h-11 w-full rounded-2xl border border-transparent bg-white/80 px-4 text-sm text-foreground/90 shadow-inner transition-colors placeholder:text-foreground/40 focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/40;
   }
 
-  .badge-warning {
-    @apply bg-yellow-100 text-yellow-800;
+  .pill {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/40 px-3 py-1 text-xs font-medium text-foreground/70;
   }
 
-  .badge-danger {
-    @apply bg-red-100 text-red-800;
+  .badge-spark {
+    @apply inline-flex items-center rounded-full border border-white/30 bg-gradient-to-r from-white/70 to-white/30 px-3 py-0.5 text-xs font-medium text-foreground/70 shadow-sm;
   }
 
-  .badge-info {
-    @apply bg-lexser-blue-100 text-lexser-blue-800;
+  .section-title {
+    @apply text-lg font-semibold tracking-tight text-foreground;
   }
 
-  .badge-gray {
-    @apply bg-lexser-gray-100 text-lexser-gray-800;
-  }
-
-  /* Estilos para estados de casos */
-  .status-activo {
-    @apply badge-success;
-  }
-
-  .status-suspendido {
-    @apply badge-warning;
-  }
-
-  .status-archivado {
-    @apply badge-gray;
-  }
-
-  .status-terminado {
-    @apply badge-info;
-  }
-
-  /* Estilos para prioridades */
-  .priority-baja {
-    @apply badge-gray;
-  }
-
-  .priority-media {
-    @apply badge-info;
-  }
-
-  .priority-alta {
-    @apply badge-warning;
-  }
-
-  .priority-urgente {
-    @apply badge-danger;
-  }
-
-  /* Estilos para etapas */
-  .stage-pendiente {
-    @apply badge-gray;
-  }
-
-  .stage-en_proceso {
-    @apply badge-warning;
-  }
-
-  .stage-completado {
-    @apply badge-success;
-  }
-
-  /* Estilos para navegación */
-  .nav-link {
-    @apply flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors;
-  }
-
-  .nav-link-active {
-    @apply bg-lexser-blue-100 text-lexser-blue-700;
-  }
-
-  .nav-link-inactive {
-    @apply text-lexser-gray-600 hover:text-lexser-gray-900 hover:bg-lexser-gray-50;
-  }
-
-  /* Estilos para tablas */
-  .table {
-    @apply min-w-full divide-y divide-lexser-gray-200;
-  }
-
-  .table-header {
-    @apply bg-lexser-gray-50;
-  }
-
-  .table-header-cell {
-    @apply px-6 py-3 text-left text-xs font-medium text-lexser-gray-500 uppercase tracking-wider;
-  }
-
-  .table-body {
-    @apply bg-white divide-y divide-lexser-gray-200;
-  }
-
-  .table-row {
-    @apply hover:bg-lexser-gray-50 transition-colors;
-  }
-
-  .table-cell {
-    @apply px-6 py-4 whitespace-nowrap text-sm text-lexser-gray-900;
-  }
-
-  /* Estilos para timeline */
-  .timeline {
-    @apply relative;
-  }
-
-  .timeline-item {
-    @apply relative pb-8;
-  }
-
-  .timeline-item:last-child {
-    @apply pb-0;
-  }
-
-  .timeline-line {
-    @apply absolute left-4 top-4 -ml-px h-full w-0.5 bg-lexser-gray-200;
-  }
-
-  .timeline-item:last-child .timeline-line {
-    @apply hidden;
-  }
-
-  .timeline-marker {
-    @apply relative flex h-8 w-8 items-center justify-center rounded-full border-2 bg-white;
-  }
-
-  .timeline-marker-completed {
-    @apply border-green-500 bg-green-500;
-  }
-
-  .timeline-marker-current {
-    @apply border-lexser-blue-500 bg-lexser-blue-500;
-  }
-
-  .timeline-marker-pending {
-    @apply border-lexser-gray-300 bg-white;
-  }
-
-  .timeline-content {
-    @apply ml-16 min-w-0 flex-1;
-  }
-
-  /* Estilos para loading */
-  .loading-spinner {
-    @apply animate-spin rounded-full h-4 w-4 border-b-2 border-lexser-blue-600;
-  }
-
-  /* Estilos para empty states */
-  .empty-state {
-    @apply text-center py-12;
-  }
-
-  .empty-state-icon {
-    @apply mx-auto h-12 w-12 text-lexser-gray-400;
-  }
-
-  .empty-state-title {
-    @apply mt-4 text-lg font-medium text-lexser-gray-900;
-  }
-
-  .empty-state-description {
-    @apply mt-2 text-sm text-lexser-gray-500;
+  .subtle-description {
+    @apply text-sm text-foreground/60;
   }
 }
 
-/* Estilos para animaciones */
 @layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-in-out;
+  .elevation-sm {
+    box-shadow: 0 20px 60px -35px rgba(15, 23, 42, 0.28);
   }
 
-  .animate-slide-up {
-    animation: slideUp 0.3s ease-out;
+  .elevation-md {
+    box-shadow:
+      0 16px 40px -28px rgba(30, 64, 175, 0.35),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.35);
   }
 
-  .animate-slide-down {
-    animation: slideDown 0.3s ease-out;
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
+  .glass-border {
+    border: 1px solid var(--glass-border);
   }
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+::-webkit-scrollbar {
+  width: 10px;
 }
 
-@keyframes slideDown {
-  from {
-    transform: translateY(-10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* Estilos para impresión */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-
-  .print-break-before {
-    page-break-before: always;
-  }
-
-  .print-break-after {
-    page-break-after: always;
-  }
-
-  .print-break-inside-avoid {
-    page-break-inside: avoid;
-  }
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
 }
 
-/* Estilos para accesibilidad */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* Focus visible para mejor accesibilidad */
-.focus-visible:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-/* Estilos para scrollbars */
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f1f5f9;
-}
-
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
 }

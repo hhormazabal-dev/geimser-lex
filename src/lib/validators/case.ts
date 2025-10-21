@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // ---------- Util: validador RUT ----------
-function isValidRut(rut?: unknown): boolean {
+export function isValidRut(rut?: unknown): boolean {
   // rut es opcional y debe ser string no vacío
   if (typeof rut !== 'string' || rut.trim().length === 0) return true;
 
@@ -25,7 +25,7 @@ function isValidRut(rut?: unknown): boolean {
 }
 
 // Validador para RUT chileno (opcional)
-const rutSchema = z.string().optional().refine(isValidRut, { message: 'RUT inválido' });
+export const rutSchema = z.string().optional().refine(isValidRut, { message: 'RUT inválido' });
 
 // ---------- Base schema ----------
 const baseCaseSchema = z.object({
@@ -58,6 +58,18 @@ const baseCaseSchema = z.object({
     .default('preparacion'),
   prioridad: z.enum(['baja', 'media', 'alta', 'urgente']).default('media'),
   valor_estimado: z.number().positive('El valor debe ser positivo').optional(),
+  honorario_total_uf: z.number().nonnegative('El honorario total debe ser positivo').optional(),
+  honorario_pagado_uf: z.number().nonnegative('El monto pagado debe ser positivo').optional(),
+  honorario_variable_porcentaje: z
+    .number()
+    .min(0, 'El porcentaje variable debe ser positivo')
+    .max(100, 'El porcentaje variable no puede superar 100%')
+    .optional(),
+  honorario_variable_base: z.string().max(1000, 'La base variable no puede exceder 1000 caracteres').optional(),
+  honorario_moneda: z.enum(['UF', 'CLP', 'USD']).default('UF'),
+  modalidad_cobro: z.enum(['prepago', 'postpago', 'mixto']).default('prepago'),
+  honorario_notas: z.string().max(2000, 'Las notas no pueden exceder 2000 caracteres').optional(),
+  tarifa_referencia: z.string().max(200, 'El identificador de tarifa no puede exceder 200 caracteres').optional(),
   observaciones: z.string().optional(),
   descripcion_inicial: z
     .string()
@@ -98,11 +110,33 @@ function validateWorkflowCommon(data: Partial<BaseCaseSchema>, ctx: z.Refinement
 export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
   // aquí data es BaseCaseSchema (no-partial)
   validateWorkflowCommon(data, ctx);
+  if (
+    typeof data.honorario_total_uf === 'number' &&
+    typeof data.honorario_pagado_uf === 'number' &&
+    data.honorario_pagado_uf > data.honorario_total_uf
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'El monto pagado no puede superar el honorario total.',
+      path: ['honorario_pagado_uf'],
+    });
+  }
 });
 
 export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx) => {
   // aquí data es Partial<BaseCaseSchema>
   validateWorkflowCommon(data as Partial<BaseCaseSchema>, ctx);
+  if (
+    data.honorario_total_uf !== undefined &&
+    data.honorario_pagado_uf !== undefined &&
+    data.honorario_pagado_uf > (data.honorario_total_uf ?? 0)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'El monto pagado no puede superar el honorario total.',
+      path: ['honorario_pagado_uf'],
+    });
+  }
 });
 
 export const createCaseFromBriefSchema = z.object({

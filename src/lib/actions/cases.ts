@@ -20,6 +20,8 @@ import {
 } from '@/lib/validators/case';
 
 import { getStageTemplatesByMateria } from '@/lib/validators/stages';
+import type { StageTemplate } from '@/lib/validators/stages';
+import { findLegalFeeItemById } from '@/lib/pricing/legalFees';
 
 import type {
   Case,
@@ -100,6 +102,17 @@ export async function createCase(input: CreateCaseInput) {
       prioridad: caseInput.prioridad ?? 'media',
 
       valor_estimado: nOrNull(caseInput.valor_estimado),
+      honorario_total_uf: nOrNull(caseInput.honorario_total_uf),
+      honorario_variable_porcentaje: nOrNull(caseInput.honorario_variable_porcentaje),
+      honorario_variable_base: sOrNull(caseInput.honorario_variable_base),
+      honorario_moneda: caseInput.honorario_moneda ?? 'UF',
+      modalidad_cobro: caseInput.modalidad_cobro ?? 'prepago',
+      honorario_notas: sOrNull(caseInput.honorario_notas),
+      tarifa_referencia: sOrNull(caseInput.tarifa_referencia),
+      honorario_pagado_uf:
+        caseInput.honorario_pagado_uf !== undefined && caseInput.honorario_pagado_uf !== null
+          ? Number(caseInput.honorario_pagado_uf)
+          : 0,
       observaciones: sOrNull(caseInput.observaciones),
 
       cliente_principal_id: sOrNull((caseInput as any).cliente_principal_id),
@@ -168,6 +181,14 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       objetivo_cliente: extracted.objetivo_cliente ?? undefined,
       observaciones: extracted.observaciones ?? `Caso creado desde brief:\n\n${validated.brief}`,
       valor_estimado: extracted.valor_estimado ?? undefined,
+      honorario_total_uf: extracted.honorario_total_uf ?? undefined,
+      honorario_pagado_uf: extracted.honorario_pagado_uf ?? undefined,
+      honorario_variable_porcentaje: extracted.honorario_variable_porcentaje ?? undefined,
+      honorario_variable_base: extracted.honorario_variable_base ?? undefined,
+      honorario_moneda: extracted.honorario_moneda ?? 'UF',
+      modalidad_cobro: extracted.modalidad_cobro ?? 'prepago',
+      honorario_notas: extracted.honorario_notas ?? undefined,
+      tarifa_referencia: extracted.tarifa_referencia ?? undefined,
       rut_cliente: extracted.rut_cliente ?? undefined,
       cliente_principal_id: (extracted as any).cliente_principal_id ?? undefined,
       fecha_inicio: extracted.fecha_inicio ?? undefined,
@@ -191,6 +212,19 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       prioridad: (overrides as any)?.prioridad ?? base.prioridad!,
       descripcion_inicial:
         (overrides as any)?.descripcion_inicial ?? base.descripcion_inicial ?? '',
+      modalidad_cobro: (overrides as any)?.modalidad_cobro ?? base.modalidad_cobro ?? 'prepago',
+      honorario_moneda: (overrides as any)?.honorario_moneda ?? base.honorario_moneda ?? 'UF',
+      honorario_total_uf:
+        (overrides as any)?.honorario_total_uf ?? (base.honorario_total_uf as number | undefined),
+      honorario_pagado_uf:
+        (overrides as any)?.honorario_pagado_uf ?? (base.honorario_pagado_uf as number | undefined),
+      honorario_variable_porcentaje:
+        (overrides as any)?.honorario_variable_porcentaje ??
+        (base.honorario_variable_porcentaje as number | undefined),
+      honorario_variable_base:
+        (overrides as any)?.honorario_variable_base ?? base.honorario_variable_base,
+      honorario_notas: (overrides as any)?.honorario_notas ?? base.honorario_notas,
+      tarifa_referencia: (overrides as any)?.tarifa_referencia ?? base.tarifa_referencia,
     };
 
     return await createCase(caseData);
@@ -240,6 +274,23 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       ...(rest.objetivo_cliente !== undefined && { objetivo_cliente: rest.objetivo_cliente }),
       ...(rest.observaciones !== undefined && { observaciones: rest.observaciones }),
       ...(rest.valor_estimado !== undefined && { valor_estimado: nOrNull(rest.valor_estimado) }),
+      ...(rest.honorario_total_uf !== undefined && { honorario_total_uf: nOrNull(rest.honorario_total_uf) }),
+      ...(rest.honorario_pagado_uf !== undefined && {
+        honorario_pagado_uf:
+          rest.honorario_pagado_uf !== null && rest.honorario_pagado_uf !== undefined
+            ? Number(rest.honorario_pagado_uf)
+            : 0,
+      }),
+      ...(rest.honorario_variable_porcentaje !== undefined && {
+        honorario_variable_porcentaje: nOrNull(rest.honorario_variable_porcentaje),
+      }),
+      ...(rest.honorario_variable_base !== undefined && {
+        honorario_variable_base: sOrNull(rest.honorario_variable_base),
+      }),
+      ...(rest.honorario_moneda !== undefined && { honorario_moneda: rest.honorario_moneda }),
+      ...(rest.modalidad_cobro !== undefined && { modalidad_cobro: rest.modalidad_cobro }),
+      ...(rest.honorario_notas !== undefined && { honorario_notas: sOrNull(rest.honorario_notas) }),
+      ...(rest.tarifa_referencia !== undefined && { tarifa_referencia: sOrNull(rest.tarifa_referencia) }),
       ...(rest.rut_cliente !== undefined && { rut_cliente: rest.rut_cliente }),
       ...(rest.cliente_principal_id !== undefined && { cliente_principal_id: sOrNull(rest.cliente_principal_id) }),
       ...(rest.abogado_responsable !== undefined && { abogado_responsable: sOrNull(rest.abogado_responsable) }),
@@ -527,26 +578,48 @@ async function upsertPrimaryClient(caseId: string, clientProfileId?: string | nu
   }
 }
 
-type StageTemplate = {
-  etapa: string;
-  descripcion?: string;
-  diasEstimados: number;
-  esPublica?: boolean;
-};
-
 async function createInitialStages(caseRecord: Case) {
   const supabase = await getSB();
 
   const templates: StageTemplate[] = getStageTemplatesByMateria(caseRecord.materia || 'Civil');
   const baseDate = caseRecord.fecha_inicio ? new Date(caseRecord.fecha_inicio) : new Date();
 
+  const tarifaReferencia = findLegalFeeItemById(caseRecord.tarifa_referencia);
+  const totalAsignado =
+    typeof caseRecord.honorario_total_uf === 'number'
+      ? Number(caseRecord.honorario_total_uf)
+      : tarifaReferencia?.montoUf ?? null;
+
+  const shouldDistributeCosts =
+    (caseRecord.modalidad_cobro ?? 'prepago') === 'prepago' &&
+    caseRecord.honorario_moneda === 'UF' &&
+    totalAsignado !== null;
+  const honorarioTotal = shouldDistributeCosts ? totalAsignado : null;
+
+  const toFixedUf = (value: number) => Number(value.toFixed(2));
+
   let cumulativeDays = 0;
+  let allocatedUf = 0;
+
   const stages: CaseStageInsert[] = templates.map((template: StageTemplate, index: number) => {
     cumulativeDays += template.diasEstimados;
 
     const scheduledDate = new Date(baseDate.getTime());
     scheduledDate.setDate(scheduledDate.getDate() + cumulativeDays);
     const fechaStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    let costoEtapa: number | null = null;
+    if (honorarioTotal !== null) {
+      const porcentaje = template.porcentajeHonorario ?? 0;
+      if (porcentaje > 0) {
+        if (index === templates.length - 1) {
+          costoEtapa = toFixedUf(honorarioTotal - allocatedUf);
+        } else {
+          costoEtapa = toFixedUf(honorarioTotal * porcentaje);
+          allocatedUf += costoEtapa;
+        }
+      }
+    }
 
     return {
       case_id: caseRecord.id,
@@ -558,6 +631,15 @@ async function createInitialStages(caseRecord: Case) {
       fecha_programada: fechaStr ?? null, // string|null, nunca undefined
       fecha_cumplida: null,
       responsable_id: null,
+      requiere_pago: shouldDistributeCosts,
+      costo_uf: costoEtapa,
+      porcentaje_variable: template.porcentajeVariable ?? null,
+      estado_pago: 'pendiente',
+      enlace_pago: null,
+      notas_pago: template.notasPago ?? null,
+      monto_variable_base:
+        template.porcentajeVariable && template.notasPago ? template.notasPago : null,
+      monto_pagado_uf: 0,
     };
   });
 

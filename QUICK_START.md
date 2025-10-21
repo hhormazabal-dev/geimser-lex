@@ -1,6 +1,6 @@
-# LEXSER - Guía de Instalación Rápida
+# Xel Chile - Guía de Instalación Rápida
 
-Esta guía te permitirá tener LEXSER funcionando en menos de 10 minutos.
+Esta guía te permitirá tener Xel Chile funcionando en menos de 10 minutos.
 
 ## Requisitos Previos
 
@@ -12,8 +12,8 @@ Esta guía te permitirá tener LEXSER funcionando en menos de 10 minutos.
 
 ### 1. Clonar e Instalar
 ```bash
-git clone https://github.com/lexser/lexser-platform.git
-cd lexser-platform
+git clone https://github.com/xelchile/xelchile-platform.git
+cd xelchile-platform
 npm install
 ```
 
@@ -46,10 +46,10 @@ npm run dev
 
 ## Credenciales de Prueba
 
-- **Admin**: admin@lexser.com / admin123
-- **Analista**: analista@lexser.com / analista123
-- **Abogado**: abogado@lexser.com / password123
-- **Cliente**: cliente@lexser.com / client123
+- **Admin**: admin@xelchile.com / admin123
+- **Analista**: analista@xelchile.com / analista123
+- **Abogado**: abogado@xelchile.com / password123
+- **Cliente**: cliente@xelchile.com / client123
 
 ## Comandos Útiles
 
@@ -76,7 +76,7 @@ npm run build
 ## Estructura de Archivos Importantes
 
 ```
-/lexser
+/xelchile-platform
 ├── src/app/                # Rutas de la aplicación
 ├── src/components/         # Componentes React
 ├── src/lib/               # Lógica de negocio

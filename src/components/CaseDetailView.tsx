@@ -25,6 +25,7 @@ import {
   DollarSign,
   Edit,
   Users,
+  Wallet,
 } from 'lucide-react';
 import type { Profile, Case } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
@@ -105,6 +106,19 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     );
   };
 
+  const formatUf = (value?: number | null) => {
+    if (value === undefined || value === null || Number.isNaN(value)) return '—';
+    return `${new Intl.NumberFormat('es-CL', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)} UF`;
+  };
+
+  const honorarioTotal = caseData.honorario_total_uf ?? null;
+  const honorarioPagado = caseData.honorario_pagado_uf ?? 0;
+  const honorarioPendiente =
+    honorarioTotal !== null ? Math.max(honorarioTotal - honorarioPagado, 0) : null;
+
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: Scale },
     { id: 'timeline', label: 'Timeline', icon: Clock },
@@ -130,7 +144,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               <Scale className="h-6 w-6 text-blue-600" />
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">Detalle del Caso</h1>
-                <p className="text-sm text-gray-500">LEXSER</p>
+                <p className="text-sm text-gray-500">Xel Chile</p>
               </div>
             </div>
 
@@ -253,6 +267,49 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                   <p className="text-lg font-bold text-yellow-800">
                     {formatCurrency(caseData.valor_estimado)}
                   </p>
+                </div>
+              )}
+
+              {(honorarioTotal !== null || caseData.tarifa_referencia) && (
+                <div className="bg-indigo-50 rounded-lg p-4">
+                  <h3 className="font-medium text-indigo-900 mb-2 flex items-center">
+                    <Wallet className="h-4 w-4 mr-2" />
+                    Honorarios
+                  </h3>
+                  <div className="space-y-1 text-sm text-indigo-800">
+                    {caseData.modalidad_cobro && (
+                      <p className="uppercase text-xs tracking-wide text-indigo-600">
+                        {caseData.modalidad_cobro}
+                      </p>
+                    )}
+                    {honorarioTotal !== null && (
+                      <p className="font-semibold">Total: {formatUf(honorarioTotal)}</p>
+                    )}
+                    {honorarioTotal !== null && (
+                      <p>Pagado: {formatUf(honorarioPagado)}</p>
+                    )}
+                    {honorarioPendiente !== null && (
+                      <p>Pendiente: {formatUf(honorarioPendiente)}</p>
+                    )}
+                    {caseData.honorario_variable_porcentaje && (
+                      <p>
+                        Variable: {caseData.honorario_variable_porcentaje}%
+                        {caseData.honorario_variable_base
+                          ? ` (${caseData.honorario_variable_base})`
+                          : ''}
+                      </p>
+                    )}
+                    {caseData.tarifa_referencia && (
+                      <p className="text-xs text-indigo-600">
+                        Tarifa: {caseData.tarifa_referencia}
+                      </p>
+                    )}
+                    {caseData.honorario_notas && (
+                      <p className="text-xs text-indigo-700 whitespace-pre-wrap">
+                        {caseData.honorario_notas}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

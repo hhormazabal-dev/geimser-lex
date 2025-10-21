@@ -14,6 +14,16 @@ export const createStageSchema = z.object({
   es_publica: z.boolean().default(true),
   orden: z.number().int().positive('El orden debe ser un número positivo'),
   responsable_id: z.string().uuid('ID de responsable inválido').optional(),
+  requiere_pago: z.boolean().default(false),
+  costo_uf: z.number().min(0, 'El costo debe ser positivo').optional(),
+  porcentaje_variable: z.number().min(0, 'El porcentaje debe ser positivo').max(100, 'El porcentaje no puede exceder 100').optional(),
+  estado_pago: z
+    .enum(['pendiente', 'en_proceso', 'parcial', 'pagado', 'vencido'])
+    .default('pendiente'),
+  enlace_pago: z.string().url('Debe ser una URL válida').optional(),
+  notas_pago: z.string().max(1000, 'Las notas no pueden exceder 1000 caracteres').optional(),
+  monto_variable_base: z.string().optional(),
+  monto_pagado_uf: z.number().min(0, 'El monto pagado debe ser positivo').optional(),
 });
 
 // ✅ FIX 1: usar shape en omit, no un array
@@ -49,7 +59,19 @@ export interface StageTemplate {
   descripcion: string;
   diasEstimados: number;
   esPublica?: boolean;
+  requierePago?: boolean;
+  costoUF?: number;
+  porcentajeVariable?: number;
+  porcentajeHonorario?: number;
+  notasPago?: string;
 }
+
+const STAGE_PRICING_DISTRIBUTION: Partial<Record<'Civil' | 'Comercial' | 'Laboral' | 'Familia', number[]>> = {
+  Civil: [0.15, 0.1, 0.1, 0.1, 0.15, 0.2, 0.1, 0.05, 0.05],
+  Comercial: [0.2, 0.15, 0.15, 0.2, 0.15, 0.1, 0.05],
+  Laboral: [0.2, 0.2, 0.2, 0.2, 0.1, 0.1],
+  Familia: [0.2, 0.15, 0.15, 0.15, 0.2, 0.15],
+};
 
 // ✅ Tipamos el Record con claves literales conocidas
 const PROCEDURE_STAGE_TEMPLATES: Record<
@@ -104,11 +126,28 @@ export function getStageTemplatesByMateria(materia: string): StageTemplate[] {
   >;
 
   const key = keys.find(k => k.toLowerCase() === lower);
-  return key ? PROCEDURE_STAGE_TEMPLATES[key] : PROCEDURE_STAGE_TEMPLATES.Civil;
+  const templates = key ? PROCEDURE_STAGE_TEMPLATES[key] : PROCEDURE_STAGE_TEMPLATES.Civil;
+  const distribution =
+    key && STAGE_PRICING_DISTRIBUTION[key]
+      ? STAGE_PRICING_DISTRIBUTION[key]!
+      : STAGE_PRICING_DISTRIBUTION.Civil ?? [];
+
+  return templates.map((template, index) => ({
+    ...template,
+    porcentajeHonorario: (distribution[index] ?? 0) as number,
+  }));
 }
 
 export const STAGE_STATUSES = [
   { value: 'pendiente', label: 'Pendiente', color: 'gray' },
   { value: 'en_proceso', label: 'En Proceso', color: 'blue' },
   { value: 'completado', label: 'Completado', color: 'green' },
+] as const;
+
+export const STAGE_PAYMENT_STATUSES = [
+  { value: 'pendiente', label: 'Pendiente', color: 'gray' },
+  { value: 'en_proceso', label: 'En proceso', color: 'amber' },
+  { value: 'parcial', label: 'Pago parcial', color: 'blue' },
+  { value: 'pagado', label: 'Pagado', color: 'green' },
+  { value: 'vencido', label: 'Vencido', color: 'red' },
 ] as const;

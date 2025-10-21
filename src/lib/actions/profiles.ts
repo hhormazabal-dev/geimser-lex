@@ -4,7 +4,7 @@ import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth/roles';
 import type { Profile } from '@/lib/supabase/types';
 
-interface DirectoryProfile extends Pick<Profile, 'id' | 'nombre' | 'role' | 'telefono'> {}
+interface DirectoryProfile extends Pick<Profile, 'id' | 'nombre' | 'role' | 'telefono' | 'rut' | 'email'> {}
 
 function canUseServiceClient(role: Profile['role']) {
   return role === 'admin_firma' || role === 'analista';
@@ -23,7 +23,7 @@ async function fetchProfilesByRole(targetRole: Profile['role']): Promise<Directo
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, nombre, role, telefono')
+    .select('id, nombre, role, telefono, rut, email')
     .eq('role', targetRole)
     .eq('activo', true)
     .order('nombre');

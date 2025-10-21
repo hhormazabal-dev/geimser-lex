@@ -1,8 +1,19 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Plus, Pencil, Trash2, Users, XCircle } from 'lucide-react';
+import {
+  Pencil,
+  Trash2,
+  Users,
+  UserCheck,
+  ShieldCheck,
+  Shield,
+  Target,
+  Search,
+  XCircle,
+  Plus,
+} from 'lucide-react';
 import {
   createManagedUser,
   updateManagedUser,
@@ -30,6 +41,21 @@ type PendingState = {
   userId?: string;
 };
 
+
+function HighlightStat({ title, value, subtitle, icon }: { title: string; value: number; subtitle: string; icon: ReactNode }) {
+  return (
+    <div className='rounded-2xl border border-white/20 bg-white/50 p-4 shadow-sm backdrop-blur-xl'>
+      <div className='flex items-center justify-between'>
+        <p className='text-xs uppercase tracking-wide text-foreground/50'>{title}</p>
+        <span className='inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/50 text-xs text-foreground/60'>
+          {icon}
+        </span>
+      </div>
+      <p className='mt-2 text-2xl font-semibold text-foreground'>{value}</p>
+      <p className='text-xs text-foreground/50'>{subtitle}</p>
+    </div>
+  );
+}
 export function AdminUserManager({ initialUsers }: AdminUserManagerProps) {
   const { toast } = useToast();
   const [users, setUsers] = useState(initialUsers);
@@ -228,136 +254,138 @@ export function AdminUserManager({ initialUsers }: AdminUserManagerProps) {
 
   const activeClass = (role: RoleFilter) =>
     cn(
-      'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+      'inline-flex items-center rounded-full border px-4 py-1.5 text-xs font-medium transition-all backdrop-blur-md',
       filter === role
-        ? 'border-blue-600 bg-blue-50 text-blue-700'
-        : 'border-transparent text-gray-600 hover:bg-gray-100',
+        ? 'border-primary/30 bg-primary/15 text-primary'
+        : 'border-white/20 bg-white/30 text-foreground/60 hover:bg-white/50',
     );
 
   return (
     <div className='space-y-10'>
-      <section>
-        <Card className='border-blue-100'>
-          <CardHeader className='flex flex-row items-center justify-between'>
-            <div>
-              <CardTitle className='flex items-center gap-2 text-base text-blue-800'>
-                <Users className='h-5 w-5' /> Gestión de usuarios
-              </CardTitle>
-              <p className='mt-2 text-sm text-muted-foreground'>
-                Administra las cuentas de tu firma: crea accesos, edita roles y controla el estado de cada
-                usuario.
-              </p>
+      <section className='rounded-3xl border border-white/15 bg-white/60 px-6 py-6 shadow-xl backdrop-blur-2xl sm:px-8'>
+        <div className='flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between'>
+          <div className='space-y-2'>
+            <div className='inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/40 px-3 py-1 text-xs font-semibold text-foreground/60'>
+              <Users className='h-4 w-4 text-primary' /> Gestión de usuarios
             </div>
-            <Button asChild variant='outline'>
-              <Link href='/dashboard/admin'>Volver al dashboard</Link>
+            <h1 className='text-2xl font-semibold tracking-tight text-foreground'>
+              Controla los accesos del estudio con visibilidad total
+            </h1>
+            <p className='max-w-xl text-sm text-foreground/60'>
+              Crea, edita y administra roles en segundos; mantén la seguridad y el orden organizacional.
+            </p>
+          </div>
+          <Button
+            asChild
+            variant='secondary'
+            size='sm'
+            className='rounded-full bg-white/80 text-foreground hover:bg-white shadow-md'
+          >
+            <Link href='/dashboard/admin'>Volver al dashboard</Link>
+          </Button>
+        </div>
+
+        <div className='mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5'>
+          <HighlightStat
+            title='Usuarios activos'
+            value={stats.total - stats.inactive}
+            subtitle={`${stats.inactive} desactivados`}
+            icon={<UserCheck className='h-4 w-4 text-emerald-400' />}
+          />
+          <HighlightStat
+            title='Administradores'
+            value={stats.byRole['admin_firma'] ?? 0}
+            subtitle='Rol admin_firma'
+            icon={<ShieldCheck className='h-4 w-4 text-sky-400' />}
+          />
+          <HighlightStat
+            title='Abogados'
+            value={stats.byRole['abogado'] ?? 0}
+            subtitle='Equipo litigios'
+            icon={<Shield className='h-4 w-4 text-indigo-400' />}
+          />
+          <HighlightStat
+            title='Analistas'
+            value={stats.byRole['analista'] ?? 0}
+            subtitle='Soporte interno'
+            icon={<Target className='h-4 w-4 text-purple-400' />}
+          />
+          <HighlightStat
+            title='Clientes activos'
+            value={stats.byRole['cliente'] ?? 0}
+            subtitle='Portal cliente'
+            icon={<Users className='h-4 w-4 text-blue-400' />}
+          />
+        </div>
+      </section>
+
+      <section className='rounded-3xl border border-white/15 bg-white/70 shadow-xl backdrop-blur-2xl'>
+        <header className='flex flex-col gap-2 border-b border-white/10 px-6 py-6 sm:px-8 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <h2 className='text-lg font-semibold text-foreground'>Crear nuevo usuario</h2>
+            <p className='text-sm text-foreground/60'>Completa la información para habilitar acceso inmediato.</p>
+          </div>
+          <div className='rounded-full border border-white/20 bg-white/40 px-3 py-1 text-xs text-foreground/60'>
+            Tiempo estimado: 2 minutos
+          </div>
+        </header>
+        <form onSubmit={handleCreate} className='grid gap-4 px-6 py-6 sm:px-8 md:grid-cols-2 xl:grid-cols-3'>
+          <div className='space-y-2'>
+            <Label htmlFor='create-nombre'>Nombre completo</Label>
+            <Input id='create-nombre' name='nombre' placeholder='Nombre y apellidos' required disabled={isPending} />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='create-email'>Email</Label>
+            <Input id='create-email' name='email' type='email' placeholder='usuario@empresa.com' required disabled={isPending} />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='create-password'>Contraseña temporal</Label>
+            <Input id='create-password' name='password' type='password' placeholder='Mínimo 8 caracteres' required disabled={isPending} />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='create-role'>Rol</Label>
+            <select
+              id='create-role'
+              name='role'
+              className='h-11 w-full rounded-2xl border border-white/30 bg-white/70 px-4 text-sm text-foreground/80 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30'
+              defaultValue='abogado'
+              disabled={isPending}
+            >
+              {managedUserRoles.map((role) => (
+                <option key={role} value={role} className='capitalize'>
+                  {role.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='create-rut'>RUT (opcional)</Label>
+            <Input id='create-rut' name='rut' placeholder='12345678-9' disabled={isPending} />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='create-telefono'>Teléfono (opcional)</Label>
+            <Input id='create-telefono' name='telefono' placeholder='+569...' disabled={isPending} />
+          </div>
+          <div className='col-span-full flex items-center gap-2 rounded-2xl border border-white/20 bg-white/40 px-5 py-3 text-sm text-foreground/70'>
+            <input
+              id='create-activo'
+              name='activo'
+              type='checkbox'
+              defaultChecked
+              disabled={isPending}
+              className='h-4 w-4 rounded border-white/30 bg-white text-primary focus:ring-primary/40'
+            />
+            <Label htmlFor='create-activo'>Habilitar acceso inmediato</Label>
+          </div>
+          <div className='col-span-full flex justify-end'>
+            <Button type='submit' disabled={isPending} className='rounded-full px-6'>
+              {pendingState.type === 'create' && pending ? 'Creando…' : 'Crear usuario'}
             </Button>
-          </CardHeader>
-          <CardContent>
-            <dl className='grid gap-4 text-sm md:grid-cols-4'>
-              <div className='rounded-md border border-blue-100 bg-blue-50 p-4 text-blue-700'>
-                <dt className='text-xs uppercase tracking-wide'>Usuarios activos</dt>
-                <dd className='text-2xl font-semibold'>{stats.total - stats.inactive}</dd>
-              </div>
-              <div className='rounded-md border border-gray-200 p-4'>
-                <dt className='text-xs uppercase tracking-wide'>Administradores</dt>
-                <dd className='text-xl font-semibold'>{stats.byRole['admin_firma'] ?? 0}</dd>
-              </div>
-              <div className='rounded-md border border-gray-200 p-4'>
-                <dt className='text-xs uppercase tracking-wide'>Abogados</dt>
-                <dd className='text-xl font-semibold'>{stats.byRole['abogado'] ?? 0}</dd>
-              </div>
-              <div className='rounded-md border border-gray-200 p-4'>
-                <dt className='text-xs uppercase tracking-wide'>Clientes</dt>
-                <dd className='text-xl font-semibold'>{stats.byRole['cliente'] ?? 0}</dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
+          </div>
+        </form>
       </section>
 
-      <section>
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2 text-base'>
-              <Plus className='h-4 w-4 text-blue-600' /> Crear nuevo usuario
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreate} className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
-              <div className='space-y-2'>
-                <Label htmlFor='create-nombre'>Nombre completo</Label>
-                <Input id='create-nombre' name='nombre' placeholder='Nombre y apellidos' required disabled={isPending} />
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='create-email'>Email</Label>
-                <Input
-                  id='create-email'
-                  name='email'
-                  type='email'
-                  placeholder='usuario@empresa.com'
-                  required
-                  disabled={isPending}
-                />
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='create-password'>Contraseña temporal</Label>
-                <Input
-                  id='create-password'
-                  name='password'
-                  type='password'
-                  placeholder='Mínimo 8 caracteres'
-                  required
-                  disabled={isPending}
-                />
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='create-role'>Rol</Label>
-                <select
-                  id='create-role'
-                  name='role'
-                  className='w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-                  defaultValue='abogado'
-                  disabled={isPending}
-                >
-                  {managedUserRoles.map((role) => (
-                    <option key={role} value={role}>
-                      {role.replace('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='create-rut'>RUT (opcional)</Label>
-                <Input id='create-rut' name='rut' placeholder='12345678-9' disabled={isPending} />
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='create-telefono'>Teléfono (opcional)</Label>
-                <Input id='create-telefono' name='telefono' placeholder='+569...' disabled={isPending} />
-              </div>
-              <div className='flex items-center gap-2 pt-4'>
-                <input
-                  id='create-activo'
-                  name='activo'
-                  type='checkbox'
-                  defaultChecked
-                  disabled={isPending}
-                  className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
-                />
-                <Label htmlFor='create-activo' className='text-sm text-muted-foreground'>
-                  Habilitar acceso inmediato
-                </Label>
-              </div>
-              <div className='md:col-span-2 lg:col-span-3'>
-                <Button type='submit' disabled={isPending}>
-                  {pendingState.type === 'create' && pending ? 'Creando...' : 'Crear usuario'}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className='space-y-4'>
+      <section className='space-y-6 rounded-3xl border border-white/15 bg-white/70 px-6 py-6 shadow-xl backdrop-blur-2xl sm:px-8'>
         <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
           <div className='flex flex-wrap gap-2'>
             <button type='button' onClick={() => setFilter('todos')} className={activeClass('todos')}>
@@ -385,12 +413,15 @@ export function AdminUserManager({ initialUsers }: AdminUserManagerProps) {
             </button>
           </div>
           <div className='flex items-center gap-2'>
-            <Input
+            <div className='flex items-center gap-2 rounded-full border border-white/20 bg-white/40 px-4 py-1.5 text-sm text-foreground/60'>
+            <Search className='h-4 w-4 text-foreground/40' />
+            <input
               placeholder='Buscar por nombre, email o teléfono'
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className='md:w-72'
+              className='bg-transparent outline-none placeholder:text-foreground/40'
             />
+          </div>
           </div>
         </div>
 
