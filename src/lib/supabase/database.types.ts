@@ -286,6 +286,7 @@ export type Database = {
       }
       case_stages: {
         Row: {
+          audiencia_tipo: Database["public"]["Enums"]["stage_audience_type"] | null
           case_id: string
           costo_uf: number | null
           created_at: string | null
@@ -305,6 +306,7 @@ export type Database = {
           pagado_en: string | null
           payku_payment_id: string | null
           porcentaje_variable: number | null
+          requiere_testigos: boolean
           requiere_pago: boolean
           responsable_id: string | null
           solicitado_at: string | null
@@ -312,6 +314,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          audiencia_tipo?: Database["public"]["Enums"]["stage_audience_type"] | null
           case_id: string
           costo_uf?: number | null
           created_at?: string | null
@@ -331,6 +334,7 @@ export type Database = {
           pagado_en?: string | null
           payku_payment_id?: string | null
           porcentaje_variable?: number | null
+          requiere_testigos?: boolean
           requiere_pago?: boolean
           responsable_id?: string | null
           solicitado_at?: string | null
@@ -338,6 +342,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          audiencia_tipo?: Database["public"]["Enums"]["stage_audience_type"] | null
           case_id?: string
           costo_uf?: number | null
           created_at?: string | null
@@ -357,6 +362,7 @@ export type Database = {
           pagado_en?: string | null
           payku_payment_id?: string | null
           porcentaje_variable?: number | null
+          requiere_testigos?: boolean
           requiere_pago?: boolean
           responsable_id?: string | null
           solicitado_at?: string | null
@@ -1239,6 +1245,7 @@ export type Database = {
         | "vencido"
         | "solicitado"
       stage_status: "pendiente" | "en_proceso" | "completado"
+      stage_audience_type: "preparatoria" | "juicio"
       user_role: "admin_firma" | "abogado" | "cliente" | "analista" | "usuario"
     }
     CompositeTypes: {

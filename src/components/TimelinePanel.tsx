@@ -23,6 +23,8 @@ import {
   Trash2, 
   Calendar,
   User,
+  Users,
+  Gavel,
   Loader2,
   DollarSign,
   ExternalLink,
@@ -33,7 +35,7 @@ import {
 } from 'lucide-react';
 import type { CaseStage } from '@/lib/supabase/types';
 import type { CreateStageInput } from '@/lib/validators/stages';
-import { STAGE_STATUSES, STAGE_PAYMENT_STATUSES, getStageTemplatesByMateria } from '@/lib/validators/stages';
+import { STAGE_STATUSES, STAGE_PAYMENT_STATUSES, STAGE_AUDIENCE_TYPES, getStageTemplatesByMateria } from '@/lib/validators/stages';
 
 interface TimelinePanelProps {
   caseId: string;
@@ -49,6 +51,24 @@ interface TimelinePanelProps {
   onStagesLoaded?: (stages: CaseStage[]) => void;
 }
 
+type DraftStageState = {
+  etapa: string;
+  descripcion: string;
+  fecha_programada: string;
+  es_publica: boolean;
+  isCustom: boolean;
+  audiencia_tipo: '' | NonNullable<CreateStageInput['audiencia_tipo']>;
+  requiere_testigos: boolean;
+  requiere_pago: boolean;
+  costo_uf: string;
+  porcentaje_variable: string;
+  enlace_pago: string;
+  notas_pago: string;
+  monto_variable_base: string;
+  estado_pago: CreateStageInput['estado_pago'];
+  monto_pagado_uf: string;
+};
+
 export function TimelinePanel({
   caseId,
   caseMateria = 'Civil',
@@ -63,12 +83,14 @@ export function TimelinePanel({
   const [isCreating, setIsCreating] = useState(false);
   const [editingStage, setEditingStage] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newStage, setNewStage] = useState({
+  const [newStage, setNewStage] = useState<DraftStageState>({
     etapa: '',
     descripcion: '',
     fecha_programada: '',
     es_publica: true,
     isCustom: false,
+    audiencia_tipo: '',
+    requiere_testigos: false,
     requiere_pago: false,
     costo_uf: '',
     porcentaje_variable: '',
@@ -206,7 +228,11 @@ export function TimelinePanel({
     setIsCreating(true);
     try {
       const maxOrden = Math.max(...stages.map(s => s.orden || 0), 0);
-      
+
+      const audienciaTipo = newStage.audiencia_tipo
+        ? (newStage.audiencia_tipo as NonNullable<CreateStageInput['audiencia_tipo']>)
+        : undefined;
+
       const stageData: CreateStageInput = {
         case_id: caseId,
         etapa: newStage.etapa.trim(),
@@ -215,6 +241,8 @@ export function TimelinePanel({
         es_publica: newStage.es_publica,
         estado: 'pendiente',
         orden: maxOrden + 1,
+        audiencia_tipo: audienciaTipo,
+        requiere_testigos: newStage.requiere_testigos,
         requiere_pago: newStage.requiere_pago,
         costo_uf: costoUf,
         porcentaje_variable: porcentajeVariable,
@@ -238,6 +266,8 @@ export function TimelinePanel({
           fecha_programada: '',
           es_publica: true,
           isCustom: false,
+          audiencia_tipo: '',
+          requiere_testigos: false,
           requiere_pago: false,
           costo_uf: '',
           porcentaje_variable: '',
@@ -770,6 +800,51 @@ export function TimelinePanel({
                 </div>
 
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  <div className='space-y-2'>
+                    <label className='block text-sm font-medium'>Tipo de audiencia</label>
+                    <select
+                      value={newStage.audiencia_tipo}
+                      onChange={(event) => {
+                        const value = event.target.value as DraftStageState['audiencia_tipo'];
+                        setNewStage((prev) => ({
+                          ...prev,
+                          audiencia_tipo: value,
+                          requiere_testigos: value === '' ? false : prev.requiere_testigos,
+                        }));
+                      }}
+                      className='form-input'
+                    >
+                      <option value=''>Sin audiencia definida</option>
+                      {STAGE_AUDIENCE_TYPES.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className='space-y-2'>
+                    <label className='block text-sm font-medium'>Participación de testigos</label>
+                    <label
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                        newStage.audiencia_tipo ? 'border-gray-300 bg-white text-gray-700' : 'border-dashed border-gray-300 bg-gray-50 text-gray-500'
+                      }`}
+                    >
+                      <input
+                        type='checkbox'
+                        className='rounded border-gray-300'
+                        checked={newStage.requiere_testigos}
+                        disabled={!newStage.audiencia_tipo}
+                        onChange={(event) =>
+                          setNewStage({ ...newStage, requiere_testigos: event.target.checked })
+                        }
+                      />
+                      Se coordinarán testigos para esta audiencia
+                    </label>
+                    <p className='text-xs text-gray-500'>Esta información ayuda al equipo a planificar con tiempo la asistencia.</p>
+                  </div>
+                </div>
+
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
                     <label className='block text-sm font-medium mb-2'>
                       Fecha programada (opcional)
@@ -913,6 +988,8 @@ export function TimelinePanel({
                           fecha_programada: '',
                           es_publica: true,
                           isCustom: false,
+                          audiencia_tipo: '',
+                          requiere_testigos: false,
                           requiere_pago: false,
                           costo_uf: '',
                           porcentaje_variable: '',
@@ -965,6 +1042,10 @@ export function TimelinePanel({
               (stage.estado_pago ?? 'pendiente') === 'pagado' ||
               stageOrder <= clientProgress.solicitado ||
               isRequestingStage === stage.id;
+            const audienceLabel = stage.audiencia_tipo
+              ? STAGE_AUDIENCE_TYPES.find((option) => option.value === stage.audiencia_tipo)?.label ??
+                `Audiencia ${stage.audiencia_tipo}`
+              : null;
 
             return (
               <div key={stage.id} className='relative flex items-start space-x-4 pb-8'>
@@ -992,8 +1073,24 @@ export function TimelinePanel({
                             {stage.descripcion}
                           </p>
                         )}
+                        {(audienceLabel || stage.requiere_testigos) && (
+                          <div className='mt-3 flex flex-wrap items-center gap-2 text-xs'>
+                            {audienceLabel && (
+                              <span className='inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700'>
+                                <Gavel className='h-3 w-3' />
+                                {audienceLabel}
+                              </span>
+                            )}
+                            {stage.requiere_testigos && (
+                              <span className='inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800'>
+                                <Users className='h-3 w-3' />
+                                Requiere testigos
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      
+
                       <div className='flex items-center gap-2 ml-4'>
                         {getStatusBadge(stage.estado || 'pendiente')}
                         {!stage.es_publica && (

@@ -14,6 +14,8 @@ export const createStageSchema = z.object({
   es_publica: z.boolean().default(true),
   orden: z.number().int().positive('El orden debe ser un número positivo'),
   responsable_id: z.string().uuid('ID de responsable inválido').optional(),
+  audiencia_tipo: z.enum(['preparatoria', 'juicio']).optional(),
+  requiere_testigos: z.boolean().default(false),
   requiere_pago: z.boolean().default(false),
   costo_uf: z.number().min(0, 'El costo debe ser positivo').optional(),
   porcentaje_variable: z.number().min(0, 'El porcentaje debe ser positivo').max(100, 'El porcentaje no puede exceder 100').optional(),
@@ -137,6 +139,11 @@ export function getStageTemplatesByMateria(materia: string): StageTemplate[] {
     porcentajeHonorario: (distribution[index] ?? 0) as number,
   }));
 }
+
+export const STAGE_AUDIENCE_TYPES = [
+  { value: 'preparatoria', label: 'Audiencia preparatoria' },
+  { value: 'juicio', label: 'Audiencia de juicio' },
+] as const;
 
 export const STAGE_STATUSES = [
   { value: 'pendiente', label: 'Pendiente', color: 'gray' },

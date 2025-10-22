@@ -550,32 +550,99 @@ export async function authorizeCaseAdvance(caseId: string, targetOrder: number) 
   }
 }
 
+type LawyerSummary = {
+  id: string;
+  nombre: string | null;
+  email: string | null;
+  telefono: string | null;
+  activo: boolean | null;
+};
+
+export async function listAvailableLawyers() {
+  try {
+    await requireAuth(['admin_firma', 'analista']);
+    const supabase = await getSB();
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, nombre, email, telefono, activo')
+      .eq('role', 'abogado')
+      .order('nombre', { ascending: true });
+    if (error) throw error;
+
+    const lawyers: LawyerSummary[] =
+      (data as Array<{ id: string; nombre: string | null; email: string | null; telefono: string | null; activo: boolean | null }> | null)?.map(
+        (row) => ({
+          id: row.id,
+          nombre: row.nombre,
+          email: row.email,
+          telefono: row.telefono,
+          activo: row.activo,
+        }),
+      ) ?? [];
+
+    return { success: true as const, lawyers };
+  } catch (error) {
+    console.error('Error in listAvailableLawyers:', error);
+    return { success: false as const, lawyers: [] as LawyerSummary[], error: (error as Error).message };
+  }
+}
+
 export async function assignLawyer(input: AssignLawyerInput) {
   try {
-    await requireAuth('admin_firma');
+    const profile = await requireAuth(['admin_firma', 'analista']);
     const validated = assignLawyerSchema.parse(input);
     const supabase = await getSB();
 
+    const { data: existingCase, error: fetchError } = await supabase
+      .from('cases')
+      .select('id, abogado_responsable')
+      .eq('id', validated.case_id)
+      .single();
+    if (fetchError || !existingCase) throw fetchError ?? new Error('Caso no encontrado');
+
+    if (existingCase.abogado_responsable === validated.abogado_id) {
+      return {
+        success: false as const,
+        error: 'El caso ya está asignado a ese abogado.',
+      };
+    }
+
+    const nowIso = new Date().toISOString();
     const { data: updatedCase, error } = await supabase
       .from('cases')
-      .update({ abogado_responsable: validated.abogado_id })
+      .update({ abogado_responsable: validated.abogado_id, updated_at: nowIso })
       .eq('id', validated.case_id)
-      .select()
+      .select('id, abogado_responsable')
       .single();
     if (error) throw error;
+
+    const { data: newLawyerProfile } = await supabase
+      .from('profiles')
+      .select('id, nombre, email, telefono')
+      .eq('id', validated.abogado_id)
+      .maybeSingle<{ id: string; nombre: string | null; email: string | null; telefono: string | null }>();
 
     await logAuditAction({
       action: 'ASSIGN_LAWYER',
       entity_type: 'case',
       entity_id: validated.case_id,
-      diff_json: { abogado_responsable: validated.abogado_id },
+      diff_json: {
+        previous_lawyer: existingCase.abogado_responsable ?? null,
+        new_lawyer: validated.abogado_id,
+        changed_by: profile.id,
+      },
     });
 
     revalidatePath(`/cases/${validated.case_id}`);
     revalidatePath('/cases');
     revalidatePath('/dashboard');
 
-    return { success: true, case: updatedCase };
+    return {
+      success: true as const,
+      case: updatedCase,
+      lawyer: newLawyerProfile ?? null,
+    };
   } catch (error) {
     console.error('Error in assignLawyer:', error);
     return { success: false, error: (error as Error).message };

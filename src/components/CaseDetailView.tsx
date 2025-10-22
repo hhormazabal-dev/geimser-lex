@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useTransition } from 'react';
+import { useState, useMemo, useEffect, useTransition, useCallback, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,7 @@ import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { authorizeCaseAdvance } from '@/lib/actions/cases';
+import { authorizeCaseAdvance, assignLawyer, listAvailableLawyers } from '@/lib/actions/cases';
 import { createCaseCounterparty, deleteCaseCounterparty } from '@/lib/actions/counterparties';
 import {
   ArrowLeft,
@@ -78,6 +78,38 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   });
   const [isSubmittingCounterparty, startTransitionCounterparty] = useTransition();
   const [pendingDeleteCounterparty, setPendingDeleteCounterparty] = useState<string | null>(null);
+  const [currentLawyer, setCurrentLawyer] = useState<{
+    id: string;
+    nombre: string;
+    telefono?: string | null;
+    email?: string | null;
+  } | null>(
+    caseData.abogado_responsable
+      ? {
+          id: caseData.abogado_responsable.id,
+          nombre: caseData.abogado_responsable.nombre,
+          telefono: caseData.abogado_responsable.telefono ?? null,
+          email: caseData.abogado_responsable.email ?? null,
+        }
+      : null,
+  );
+  const [availableLawyers, setAvailableLawyers] = useState<
+    Array<{ id: string; nombre: string; email: string | null; telefono: string | null }>
+  >(
+    caseData.abogado_responsable
+      ? [
+          {
+            id: caseData.abogado_responsable.id,
+            nombre: caseData.abogado_responsable.nombre,
+            email: caseData.abogado_responsable.email ?? null,
+            telefono: caseData.abogado_responsable.telefono ?? null,
+          },
+        ]
+      : [],
+  );
+  const [selectedLawyerId, setSelectedLawyerId] = useState<string>(caseData.abogado_responsable?.id ?? '');
+  const [isLoadingLawyers, setIsLoadingLawyers] = useState(false);
+  const [isReassigning, setIsReassigning] = useState(false);
   const stageNamesByOrder = useMemo(() => {
     const map = new Map<number, string>();
     stageCatalog.forEach((stage) => {
@@ -107,9 +139,30 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     setCounterparties(caseData.counterparties ?? []);
   }, [caseData.counterparties]);
 
+  useEffect(() => {
+    if (caseData.abogado_responsable) {
+      setCurrentLawyer({
+        id: caseData.abogado_responsable.id,
+        nombre: caseData.abogado_responsable.nombre,
+        telefono: caseData.abogado_responsable.telefono ?? null,
+        email: caseData.abogado_responsable.email ?? null,
+      });
+      setSelectedLawyerId(caseData.abogado_responsable.id);
+    } else {
+      setCurrentLawyer(null);
+      setSelectedLawyerId('');
+    }
+  }, [
+    caseData.abogado_responsable?.id,
+    caseData.abogado_responsable?.nombre,
+    caseData.abogado_responsable?.telefono,
+    caseData.abogado_responsable?.email,
+  ]);
+
   const canEdit =
     profile.role === 'admin_firma' ||
     (profile.role === 'abogado' && caseData.abogado_responsable?.id === profile.id);
+  const canReassign = profile.role === 'admin_firma' || profile.role === 'analista';
 
   const canManageStages = canEdit;
   const canManageDocuments = canEdit;
@@ -118,6 +171,83 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   const canManageClients = canEdit;
 
   const showPrivateContent = profile.role !== 'cliente';
+
+  const fetchAvailableLawyers = useCallback(
+    async (ensureLawyer?: {
+      id: string;
+      nombre: string;
+      email: string | null;
+      telefono: string | null;
+    }) => {
+      if (!canReassign) return;
+      setIsLoadingLawyers(true);
+      try {
+        const result = await listAvailableLawyers();
+        if (result.success) {
+          let options =
+            (result.lawyers ?? []).map((lawyer: any) => ({
+              id: lawyer.id,
+              nombre: (lawyer.nombre ?? 'Sin nombre') as string,
+              email: lawyer.email ?? null,
+              telefono: lawyer.telefono ?? null,
+            })) ?? [];
+
+          const fallback =
+            ensureLawyer ??
+            (currentLawyer
+              ? {
+                  id: currentLawyer.id,
+                  nombre: currentLawyer.nombre,
+                  email: currentLawyer.email ?? null,
+                  telefono: currentLawyer.telefono ?? null,
+                }
+              : null);
+
+          if (fallback && !options.some((lawyer) => lawyer.id === fallback.id)) {
+            options = [...options, fallback];
+          }
+
+          options.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+          setAvailableLawyers(options);
+        } else {
+          toast({
+            title: 'No se pudo cargar el equipo',
+            description: result.error ?? 'Intenta nuevamente en unos minutos.',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching lawyers:', error);
+        toast({
+          title: 'Error',
+          description: 'No pudimos obtener la lista de abogados disponibles.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingLawyers(false);
+      }
+    },
+    [canReassign, currentLawyer, toast],
+  );
+
+  useEffect(() => {
+    fetchAvailableLawyers().catch(() => {
+      /* la notificación ya se maneja dentro */
+    });
+  }, [fetchAvailableLawyers]);
+
+  useEffect(() => {
+    if (!currentLawyer && selectedLawyerId) {
+      const match = availableLawyers.find((lawyer) => lawyer.id === selectedLawyerId);
+      if (match) {
+        setCurrentLawyer(match);
+      }
+    }
+  }, [availableLawyers, currentLawyer, selectedLawyerId]);
+
+  useEffect(() => {
+    setSelectedLawyerId(currentLawyer?.id ?? '');
+  }, [currentLawyer?.id]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, string> = {
@@ -163,6 +293,77 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)} UF`;
+  };
+
+  const handleReassignLawyer = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canReassign) return;
+
+    if (!selectedLawyerId) {
+      toast({
+        title: 'Selecciona un abogado',
+        description: 'Debes elegir un abogado para reasignar el caso.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (selectedLawyerId === currentLawyer?.id) {
+      toast({
+        title: 'Sin cambios',
+        description: 'El caso ya está asignado a ese abogado.',
+      });
+      return;
+    }
+
+    setIsReassigning(true);
+    try {
+      const result = await assignLawyer({
+        case_id: caseData.id,
+        abogado_id: selectedLawyerId,
+      });
+
+      if (result.success) {
+        const resolvedLawyer =
+          (result.lawyer as { id: string; nombre: string | null; email: string | null; telefono: string | null } | null) ??
+          availableLawyers.find((lawyer) => lawyer.id === selectedLawyerId) ??
+          null;
+
+        if (resolvedLawyer) {
+          const normalized = {
+            id: resolvedLawyer.id,
+            nombre: resolvedLawyer.nombre ?? 'Sin nombre',
+            email: resolvedLawyer.email ?? null,
+            telefono: resolvedLawyer.telefono ?? null,
+          };
+          setCurrentLawyer(normalized);
+          await fetchAvailableLawyers(normalized);
+        } else {
+          setCurrentLawyer(null);
+          await fetchAvailableLawyers();
+        }
+
+        toast({
+          title: 'Caso reasignado',
+          description: 'Actualizamos el abogado responsable sin afectar el historial del caso.',
+        });
+      } else {
+        toast({
+          title: 'No se pudo reasignar',
+          description: result.error ?? 'Intenta nuevamente en unos minutos.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error reassigning lawyer:', error);
+      toast({
+        title: 'Error inesperado',
+        description: 'No pudimos reasignar este caso, intenta nuevamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsReassigning(false);
+    }
   };
 
   const honorarioTotal = caseData.honorario_total_uf ?? null;
@@ -343,31 +544,72 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             {/* Información principal */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
               {/* Abogado responsable */}
-              {caseData.abogado_responsable && (
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h3 className="font-medium text-blue-900 mb-2 flex items-center">
-                    <User className="h-4 w-4 mr-2" />
-                    Abogado Responsable
-                  </h3>
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="font-medium text-blue-900 mb-2 flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  Abogado Responsable
+                </h3>
+                {currentLawyer ? (
                   <div className="space-y-1 text-sm">
-                    <p className="font-medium text-blue-800">
-                      {caseData.abogado_responsable.nombre}
-                    </p>
-                    {caseData.abogado_responsable.telefono && (
+                    <p className="font-medium text-blue-800">{currentLawyer.nombre}</p>
+                    {currentLawyer.telefono && (
                       <p className="flex items-center text-blue-700">
                         <Phone className="h-3 w-3 mr-1" />
-                        {caseData.abogado_responsable.telefono}
+                        {currentLawyer.telefono}
                       </p>
                     )}
-                    {caseData.abogado_responsable.email && (
+                    {currentLawyer.email && (
                       <p className="flex items-center text-blue-700">
                         <Mail className="h-3 w-3 mr-1" />
-                        {caseData.abogado_responsable.email}
+                        {currentLawyer.email}
                       </p>
                     )}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-blue-700">Este caso aún no tiene un abogado asignado.</p>
+                )}
+
+                {canReassign && (
+                  <form className="mt-4 space-y-2" onSubmit={handleReassignLawyer}>
+                    <Label htmlFor="case-lawyer-select" className="text-xs uppercase tracking-wide text-blue-800">
+                      Reasignar / asignar abogado
+                    </Label>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <select
+                        id="case-lawyer-select"
+                        className="form-input flex-1"
+                        value={selectedLawyerId}
+                        onChange={(event) => setSelectedLawyerId(event.target.value)}
+                        disabled={isLoadingLawyers || isReassigning}
+                      >
+                        <option value="">{isLoadingLawyers ? 'Cargando abogados…' : 'Selecciona un abogado'}</option>
+                        {availableLawyers.map((lawyer) => (
+                          <option key={lawyer.id} value={lawyer.id}>
+                            {lawyer.nombre}
+                            {lawyer.email ? ` • ${lawyer.email}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        type="submit"
+                        disabled={isReassigning || !selectedLawyerId || selectedLawyerId === currentLawyer?.id}
+                      >
+                        {isReassigning ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Guardando…
+                          </>
+                        ) : (
+                          'Actualizar'
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-blue-700">
+                      Los cambios quedan registrados automáticamente en el historial del caso.
+                    </p>
+                  </form>
+                )}
+              </div>
 
               {/* Cliente */}
               {caseData.nombre_cliente && (

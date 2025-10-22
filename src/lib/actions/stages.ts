@@ -28,6 +28,8 @@ type CreateStageDB = Pick<
   | 'descripcion'
   | 'fecha_programada'
   | 'fecha_cumplida'
+  | 'audiencia_tipo'
+  | 'requiere_testigos'
   | 'requiere_pago'
   | 'costo_uf'
   | 'porcentaje_variable'
@@ -49,17 +51,19 @@ type UpdateStageDB = Partial<
     | 'responsable_id'
     | 'descripcion'
     | 'fecha_programada'
+    | 'audiencia_tipo'
+    | 'requiere_testigos'
     | 'fecha_cumplida'
     | 'requiere_pago'
     | 'costo_uf'
     | 'porcentaje_variable'
     | 'estado_pago'
-  | 'enlace_pago'
-  | 'notas_pago'
-  | 'monto_variable_base'
-  | 'monto_pagado_uf'
-  | 'solicitado_por'
-  | 'solicitado_at'
+    | 'enlace_pago'
+    | 'notas_pago'
+    | 'monto_variable_base'
+    | 'monto_pagado_uf'
+    | 'solicitado_por'
+    | 'solicitado_at'
   >
 >;
 type CompleteStageDB = Partial<Pick<CaseStage, 'estado' | 'fecha_cumplida' | 'descripcion'>>;
@@ -103,6 +107,8 @@ export async function createStage(input: CreateStageInput) {
       fecha_programada: vi.fecha_programada ?? null,
       // validators -> DB
       fecha_cumplida: vi.fecha_completada ?? null,
+      audiencia_tipo: vi.audiencia_tipo ?? null,
+      requiere_testigos: vi.requiere_testigos ?? false,
       requiere_pago: vi.requiere_pago ?? false,
       costo_uf: vi.costo_uf ?? null,
       porcentaje_variable: vi.porcentaje_variable ?? null,
@@ -177,6 +183,8 @@ export async function updateStage(stageId: string, input: UpdateStageInput) {
     copyIfPresent(validatedInput, updatePayload, 'fecha_programada', 'fecha_programada', (v) => (v ?? null));
     // validators -> DB
     copyIfPresent(validatedInput, updatePayload, 'fecha_completada', 'fecha_cumplida', (v) => (v ?? null));
+    copyIfPresent(validatedInput, updatePayload, 'audiencia_tipo', 'audiencia_tipo', (v) => (v ?? null));
+    copyIfPresent(validatedInput, updatePayload, 'requiere_testigos', 'requiere_testigos', (v) => Boolean(v));
     copyIfPresent(validatedInput, updatePayload, 'requiere_pago', 'requiere_pago');
     copyIfPresent(validatedInput, updatePayload, 'costo_uf', 'costo_uf', (v) => (v ?? null));
     copyIfPresent(validatedInput, updatePayload, 'porcentaje_variable', 'porcentaje_variable', (v) => (v ?? null));
