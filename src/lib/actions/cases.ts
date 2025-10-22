@@ -74,6 +74,10 @@ export async function createCase(input: CreateCaseInput) {
     const parsed = createCaseSchema.parse(input);
     const { marcar_validado, ...caseInput } = parsed;
 
+    if (!caseInput.cliente_principal_id) {
+      throw new Error('Debes seleccionar un cliente principal antes de crear el caso.');
+    }
+
     const supabase = await getSB();
     const nowIso = new Date().toISOString();
 
@@ -204,9 +208,14 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       abogado_responsable: profile.id,
     };
 
-    const caseData: CreateCaseInput = {
-      ...base,
-      ...overrides,
+  const finalClienteId = (overrides as any)?.cliente_principal_id ?? base.cliente_principal_id;
+  if (!finalClienteId) {
+    throw new Error('Debes indicar el cliente principal al crear el caso.');
+  }
+
+  const caseData: CreateCaseInput = {
+    ...base,
+    ...overrides,
 
       // mantener literal seguro
       workflow_state: parseWorkflow((overrides as any)?.workflow_state ?? base.workflow_state),
@@ -239,6 +248,7 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       alcance_cliente_solicitado:
         (overrides as any)?.alcance_cliente_solicitado ??
         (base.alcance_cliente_solicitado as number | undefined),
+      cliente_principal_id: finalClienteId,
     };
 
     return await createCase(caseData);
@@ -612,7 +622,8 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
       `
         *,
         abogado_responsable:profiles!cases_abogado_responsable_fkey(id, nombre),
-        case_stages(id, etapa, estado, fecha_programada, orden)
+        case_stages(id, etapa, estado, fecha_programada, orden),
+        counterparties:case_counterparties(nombre, tipo)
       `,
       { count: 'exact' }
     );
@@ -698,7 +709,7 @@ export async function getCaseById(caseId: string) {
       throw new Error('Sin permisos para ver este caso');
     }
 
-    const [lawyerProfile, stagesRes, notesRes, docsRes, reqsRes] = await Promise.all([
+    const [lawyerProfile, stagesRes, notesRes, docsRes, reqsRes, counterpartiesRes, clientsRes] = await Promise.all([
       (async () => {
         if (!caseRow.abogado_responsable) return null;
         const { data, error } = await supabase
@@ -732,6 +743,16 @@ export async function getCaseById(caseId: string) {
         .select('*, creador:profiles(id, nombre)')
         .eq('case_id', caseId)
         .order('created_at', { ascending: false }),
+      supabase
+        .from('case_counterparties')
+        .select('*')
+        .eq('case_id', caseId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('case_clients')
+        .select('client:profiles(id, nombre, email, telefono)')
+        .eq('case_id', caseId)
+        .order('created_at', { ascending: true }),
     ]);
 
     const enrichedCase: any = {
@@ -749,6 +770,14 @@ export async function getCaseById(caseId: string) {
       notes: notesRes?.data ?? [],
       documents: docsRes?.data ?? [],
       info_requests: reqsRes?.data ?? [],
+      counterparties: counterpartiesRes?.data ?? [],
+      clients:
+        clientsRes?.data
+          ?.map((item: { client: { id: string; nombre: string; email: string; telefono: string | null } | null }) =>
+            item.client ? { ...item.client } : null,
+          )
+          .filter((client): client is { id: string; nombre: string; email: string; telefono: string | null } => Boolean(client)) ??
+        [],
     };
 
     return { success: true, case: enrichedCase };

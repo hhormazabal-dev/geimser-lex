@@ -37,7 +37,7 @@ const baseCaseSchema = z.object({
   materia: z
     .string()
     .min(1, 'La materia es requerida')
-    .max(100, 'La materia no puede exceder 100 caracteres'),
+    .max(1000, 'La materia no puede exceder 1000 caracteres'),
   tribunal: z.string().optional(),
   region: z.string().optional(),
   comuna: z.string().optional(),
@@ -45,14 +45,14 @@ const baseCaseSchema = z.object({
   nombre_cliente: z
     .string()
     .min(1, 'El nombre del cliente es requerido')
-    .max(200, 'El nombre no puede exceder 200 caracteres'),
+    .max(1000, 'El nombre no puede exceder 1000 caracteres'),
   contraparte: z.string().optional(),
   etapa_actual: z.string().default('Ingreso Demanda'),
   estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado']).default('activo'),
   fecha_inicio: z.string().optional(),
   abogado_responsable: z.string().uuid('ID de abogado inválido').optional(),
   analista_id: z.string().uuid('ID de analista inválido').optional(),
-  cliente_principal_id: z.string().uuid('ID de cliente inválido').optional(),
+  cliente_principal_id: z.string().uuid('ID de cliente inválido'),
   workflow_state: z
     .enum(['preparacion', 'en_revision', 'activo', 'cerrado'])
     .default('preparacion'),
@@ -69,7 +69,10 @@ const baseCaseSchema = z.object({
   honorario_moneda: z.enum(['UF', 'CLP', 'USD']).default('UF'),
   modalidad_cobro: z.enum(['prepago', 'postpago', 'mixto']).default('prepago'),
   honorario_notas: z.string().max(2000, 'Las notas no pueden exceder 2000 caracteres').optional(),
-  tarifa_referencia: z.string().max(200, 'El identificador de tarifa no puede exceder 200 caracteres').optional(),
+  tarifa_referencia: z
+    .string()
+    .max(1000, 'El identificador de tarifa no puede exceder 1000 caracteres')
+    .optional(),
   alcance_cliente_solicitado: z
     .number()
     .int('El alcance solicitado debe ser un número entero')
@@ -122,6 +125,13 @@ function validateWorkflowCommon(data: Partial<BaseCaseSchema>, ctx: z.Refinement
 export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
   // aquí data es BaseCaseSchema (no-partial)
   validateWorkflowCommon(data, ctx);
+  if (!data.cliente_principal_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Selecciona un cliente principal antes de crear el caso.',
+      path: ['cliente_principal_id'],
+    });
+  }
   if (
     typeof data.honorario_total_uf === 'number' &&
     typeof data.honorario_pagado_uf === 'number' &&

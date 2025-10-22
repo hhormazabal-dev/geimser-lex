@@ -93,7 +93,7 @@ export function CaseForm({
         estado: (existingCase.estado || 'activo') as CreateCaseInput['estado'],
         fecha_inicio: existingCase.fecha_inicio || new Date().toISOString().split('T')[0],
         abogado_responsable: existingLawyerId || defaultLawyerId,
-        cliente_principal_id: existingCase.cliente_principal_id || undefined,
+        cliente_principal_id: existingCase.cliente_principal_id ?? '',
         prioridad: (existingCase.prioridad || 'media') as CreateCaseInput['prioridad'],
         valor_estimado: existingCase.valor_estimado || undefined,
         honorario_total_uf: (existingCase as any).honorario_total_uf ?? undefined,
@@ -126,7 +126,7 @@ export function CaseForm({
         estado: 'activo',
         fecha_inicio: new Date().toISOString().split('T')[0],
         abogado_responsable: defaultLawyerId,
-        cliente_principal_id: undefined,
+        cliente_principal_id: '',
         prioridad: 'media',
         valor_estimado: undefined,
         honorario_total_uf: undefined,
@@ -175,6 +175,7 @@ export function CaseForm({
   });
 
   const rutCliente = watch('rut_cliente');
+  const clientePrincipalId = watch('cliente_principal_id');
   const marcarValidado = watch('marcar_validado');
   const workflowState = watch('workflow_state');
   const modalidadCobro = watch('modalidad_cobro');
@@ -204,6 +205,9 @@ export function CaseForm({
 
   useEffect(() => {
     setClientOptions(clients);
+    if (clients.length === 0) {
+      setIsAddingClient(true);
+    }
   }, [clients]);
 
   const resetFileSelection = () => {
@@ -432,9 +436,32 @@ export function CaseForm({
   return (
     <Card className='w-full max-w-4xl mx-auto'>
       <CardHeader>
-        <CardTitle>
-          {existingCase ? 'Editar Caso' : 'Nuevo Caso'}
-        </CardTitle>
+        <div className='space-y-4'>
+          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+            <CardTitle>{existingCase ? 'Editar Caso' : 'Nuevo Caso'}</CardTitle>
+          </div>
+          <div className='flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em]'>
+            <span
+              className={`rounded-full px-3 py-1 transition ${
+                clientePrincipalId
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              Paso 1 · Cliente
+            </span>
+            <span
+              className={`rounded-full px-3 py-1 ${
+                clientePrincipalId ? 'bg-slate-100 text-slate-600' : 'bg-slate-100 text-slate-400'
+              }`}
+            >
+              Paso 2 · Datos del caso
+            </span>
+          </div>
+          <p className='text-sm text-slate-500'>
+            Primero registra al cliente desde el directorio o créalo aquí para seleccionarlo como titular del expediente. Luego completa la información legal del caso y agrega las contrapartes necesarias.
+          </p>
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className='space-y-8'>
@@ -545,6 +572,7 @@ export function CaseForm({
                 <Controller
                   control={control}
                   name='cliente_principal_id'
+                  rules={{ required: 'Selecciona un cliente registrado para continuar.' }}
                   render={({ field }) => (
                     <select
                       id='cliente_principal_id'
@@ -563,7 +591,9 @@ export function CaseForm({
                   )}
                 />
                 {clientOptions.length === 0 && (
-                  <p className='text-xs text-gray-500'>No hay clientes registrados. Puedes vincularlo más tarde.</p>
+                  <p className='text-xs font-medium text-red-500'>
+                    No hay clientes registrados. Crea primero el cliente para habilitar la creación del caso.
+                  </p>
                 )}
                 {errors.cliente_principal_id && (
                   <p className='text-sm text-red-600'>{errors.cliente_principal_id.message}</p>
@@ -1191,7 +1221,7 @@ export function CaseForm({
                 Cancelar
               </Button>
             )}
-            <Button type='submit' disabled={isLoading}>
+            <Button type='submit' disabled={isLoading || !clientePrincipalId}>
               {isLoading ? (
                 <>
                   <Loader2 className='w-4 h-4 mr-2 animate-spin' />

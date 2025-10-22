@@ -6,7 +6,7 @@ export const createStageSchema = z.object({
   etapa: z
     .string()
     .min(1, 'El nombre de la etapa es requerido')
-    .max(100, 'El nombre no puede exceder 100 caracteres'),
+    .max(1000, 'El nombre no puede exceder 1000 caracteres'),
   descripcion: z.string().optional(),
   fecha_programada: z.string().optional(),
   fecha_completada: z.string().optional(),

@@ -6,7 +6,7 @@ export const createInfoRequestSchema = z.object({
   titulo: z
     .string()
     .min(1, 'El título es requerido')
-    .max(200, 'El título no puede exceder 200 caracteres'),
+    .max(1000, 'El título no puede exceder 1000 caracteres'),
   descripcion: z
     .string()
     .min(1, 'La descripción es requerida')

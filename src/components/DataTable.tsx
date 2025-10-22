@@ -7,11 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDate, formatCurrency } from '@/lib/utils';
-import { Search, Filter, Plus, Eye, Edit, MoreHorizontal } from 'lucide-react';
+import { Search, Filter, Plus, Eye, Edit } from 'lucide-react';
 import type { Case } from '@/lib/supabase/types';
 
+type CaseWithParties = Case & {
+  counterparties?: Array<{ nombre: string; tipo: string }>;
+};
+
 interface DataTableProps {
-  cases: Case[];
+  cases: CaseWithParties[];
   total: number;
   page: number;
   limit: number;
@@ -172,12 +176,13 @@ export function DataTable({
       </section>
 
       <section className='rounded-3xl border border-white/15 bg-white/80 shadow-[0_24px_80px_-60px_rgba(15,23,42,0.55)] backdrop-blur-xl'>
-        <div className='overflow-x-auto rounded-3xl'>
+        <div className='overflow-hidden rounded-3xl'>
           <table className='w-full border-separate border-spacing-y-3 px-3'>
             <thead>
               <tr className='text-xs uppercase tracking-[0.2em] text-slate-400'>
                 <th className='px-5 text-left'>Caso</th>
-                <th className='px-5 text-left'>Cliente</th>
+                <th className='px-5 text-left'>Cliente / Demandante</th>
+                <th className='px-5 text-left'>Contrapartes</th>
                 <th className='px-5 text-left'>Estado</th>
                 <th className='px-5 text-left'>Prioridad</th>
                 <th className='px-5 text-left'>Etapa</th>
@@ -189,9 +194,9 @@ export function DataTable({
             <tbody>
               {cases.map((caseItem) => (
                 <tr key={caseItem.id} className='group overflow-hidden rounded-2xl border border-white/25 bg-white/90 shadow-sm transition hover:-translate-y-1 hover:border-sky-100 hover:bg-white hover:shadow-xl'>
-                  <td className='px-5 py-4 align-top'>
+                  <td className='px-5 py-4 align-top max-w-[220px] whitespace-normal break-words'>
                     <div className='space-y-1'>
-                      <p className='text-sm font-semibold text-slate-900'>{caseItem.caratulado}</p>
+                      <p className='text-sm font-semibold text-slate-900 leading-snug'>{caseItem.caratulado}</p>
                       {caseItem.numero_causa && (
                         <p className='text-xs font-medium uppercase tracking-[0.18em] text-slate-400'>{caseItem.numero_causa}</p>
                       )}
@@ -202,13 +207,34 @@ export function DataTable({
                       )}
                     </div>
                   </td>
-                  <td className='px-5 py-4 align-top'>
-                    <div className='space-y-1 text-sm'>
+                  <td className='px-5 py-4 align-top max-w-[200px] whitespace-normal break-words'>
+                    <div className='space-y-1 text-sm leading-snug'>
                       <p className='font-medium text-slate-800'>{caseItem.nombre_cliente}</p>
                       {caseItem.rut_cliente && (
                         <p className='text-xs text-slate-500'>{caseItem.rut_cliente}</p>
                       )}
                     </div>
+                  </td>
+                  <td className='px-5 py-4 align-top max-w-[260px] whitespace-normal break-words'>
+                    {caseItem.counterparties && caseItem.counterparties.length > 0 ? (
+                      <div className='flex flex-col gap-1 text-xs text-slate-600'>
+                        {caseItem.counterparties.slice(0, 3).map((party: { nombre: string; tipo: string }, index: number) => (
+                          <div key={`${party.nombre}-${index}`} className='flex items-center gap-2'>
+                            <span className='inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600'>
+                              {party.tipo.charAt(0).toUpperCase() + party.tipo.slice(1)}
+                            </span>
+                            <span className='text-slate-700'>{party.nombre}</span>
+                          </div>
+                        ))}
+                        {caseItem.counterparties.length > 3 && (
+                          <span className='text-[11px] font-medium text-slate-400'>
+                            +{caseItem.counterparties.length - 3} más
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className='text-xs text-slate-400'>Sin registrar</span>
+                    )}
                   </td>
                   <td className='px-5 py-4 align-top'>
                     {getStatusBadge(caseItem.estado || 'activo')}
@@ -216,7 +242,7 @@ export function DataTable({
                   <td className='px-5 py-4 align-top'>
                     {getPriorityBadge(caseItem.prioridad || 'media')}
                   </td>
-                  <td className='px-5 py-4 align-top text-sm text-slate-700'>
+                  <td className='px-5 py-4 align-top text-sm text-slate-700 max-w-[220px] whitespace-normal break-words'>
                     {caseItem.etapa_actual || 'Sin definir'}
                   </td>
                   <td className='px-5 py-4 align-top text-sm text-slate-700'>
@@ -249,13 +275,6 @@ export function DataTable({
                           </Link>
                         </Button>
                       )}
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        className='h-9 w-9 rounded-full border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-                      >
-                        <MoreHorizontal className='h-4 w-4' />
-                      </Button>
                     </div>
                   </td>
                 </tr>

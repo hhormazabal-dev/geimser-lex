@@ -22,7 +22,7 @@
     "test:e2e:install": "playwright install",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:generate-types": "supabase gen types typescript --project-id xsvvdshbhaheqymquzjl > src/lib/supabase/types.ts",
+    "db:generate-types": "supabase gen types typescript --project-id xsvvdshbhaheqymquzjl > src/lib/supabase/database.types.ts",
     "db:reset": "supabase db reset",
     "db:migrate": "supabase db push",
     "db:seed": "supabase db seed",

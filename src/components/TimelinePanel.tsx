@@ -83,7 +83,7 @@ export function TimelinePanel({
   const [paymentActionStage, setPaymentActionStage] = useState<string | null>(null);
   const alcanceAutorizado = clientContext?.alcanceAutorizado ?? 0;
   const alcanceSolicitado = clientContext?.alcanceSolicitado ?? 0;
-  const viewerRole = clientContext?.role ?? 'guest';
+  const viewerRole = clientContext?.role ?? 'cliente';
   const clientMode = viewerRole === 'cliente';
   const [clientProgress, setClientProgress] = useState({
     solicitado: alcanceSolicitado,
@@ -130,10 +130,14 @@ export function TimelinePanel({
   }, [alcanceSolicitado, alcanceAutorizado]);
 
   useEffect(() => {
-    if (onClientProgressChange) {
+    if (!onClientProgressChange) return;
+    if (
+      clientProgress.autorizado !== alcanceAutorizado ||
+      clientProgress.solicitado !== alcanceSolicitado
+    ) {
       onClientProgressChange(clientProgress);
     }
-  }, [clientProgress, onClientProgressChange]);
+  }, [clientProgress, onClientProgressChange, alcanceAutorizado, alcanceSolicitado]);
 
   const handleCreateStage = async () => {
     if (!newStage.etapa.trim()) {

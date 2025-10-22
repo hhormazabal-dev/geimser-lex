@@ -5,7 +5,7 @@ export const createClientSchema = z.object({
   nombre: z
     .string()
     .min(2, 'El nombre es requerido')
-    .max(200, 'El nombre no puede exceder 200 caracteres'),
+    .max(1000, 'El nombre no puede exceder 1000 caracteres'),
   email: z
     .string()
     .min(1, 'El correo es requerido')

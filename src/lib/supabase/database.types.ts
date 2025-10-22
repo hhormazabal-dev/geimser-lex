@@ -204,6 +204,41 @@ export type Database = {
           },
         ]
       }
+      case_counterparties: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: string
+          nombre: string
+          rut: string | null
+          tipo: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: string
+          nombre: string
+          rut?: string | null
+          tipo?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+          rut?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_counterparties_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_messages: {
         Row: {
           attachment_url: string | null
@@ -252,24 +287,24 @@ export type Database = {
       case_stages: {
         Row: {
           case_id: string
+          costo_uf: number | null
           created_at: string | null
           descripcion: string | null
           enlace_pago: string | null
           es_publica: boolean | null
           estado: Database["public"]["Enums"]["stage_status"] | null
-          estado_pago: Database["public"]["Enums"]["stage_payment_status"] | null
+          estado_pago: Database["public"]["Enums"]["stage_payment_status"]
           etapa: string
           fecha_cumplida: string | null
           fecha_programada: string | null
           id: string
           monto_pagado_uf: number | null
           monto_variable_base: string | null
-          orden: number | null
-          porcentaje_variable: number | null
-          costo_uf: number | null
           notas_pago: string | null
+          orden: number | null
           pagado_en: string | null
           payku_payment_id: string | null
+          porcentaje_variable: number | null
           requiere_pago: boolean
           responsable_id: string | null
           solicitado_at: string | null
@@ -278,24 +313,24 @@ export type Database = {
         }
         Insert: {
           case_id: string
+          costo_uf?: number | null
           created_at?: string | null
           descripcion?: string | null
           enlace_pago?: string | null
           es_publica?: boolean | null
           estado?: Database["public"]["Enums"]["stage_status"] | null
-          estado_pago?: Database["public"]["Enums"]["stage_payment_status"] | null
+          estado_pago?: Database["public"]["Enums"]["stage_payment_status"]
           etapa: string
           fecha_cumplida?: string | null
           fecha_programada?: string | null
           id?: string
           monto_pagado_uf?: number | null
           monto_variable_base?: string | null
-          orden?: number | null
-          porcentaje_variable?: number | null
-          costo_uf?: number | null
           notas_pago?: string | null
+          orden?: number | null
           pagado_en?: string | null
           payku_payment_id?: string | null
+          porcentaje_variable?: number | null
           requiere_pago?: boolean
           responsable_id?: string | null
           solicitado_at?: string | null
@@ -304,24 +339,24 @@ export type Database = {
         }
         Update: {
           case_id?: string
+          costo_uf?: number | null
           created_at?: string | null
           descripcion?: string | null
           enlace_pago?: string | null
           es_publica?: boolean | null
           estado?: Database["public"]["Enums"]["stage_status"] | null
-          estado_pago?: Database["public"]["Enums"]["stage_payment_status"] | null
+          estado_pago?: Database["public"]["Enums"]["stage_payment_status"]
           etapa?: string
           fecha_cumplida?: string | null
           fecha_programada?: string | null
           id?: string
           monto_pagado_uf?: number | null
           monto_variable_base?: string | null
-          orden?: number | null
-          porcentaje_variable?: number | null
-          costo_uf?: number | null
           notas_pago?: string | null
+          orden?: number | null
           pagado_en?: string | null
           payku_payment_id?: string | null
+          porcentaje_variable?: number | null
           requiere_pago?: boolean
           responsable_id?: string | null
           solicitado_at?: string | null
@@ -355,9 +390,9 @@ export type Database = {
       cases: {
         Row: {
           abogado_responsable: string | null
-          analista_id: string | null
           alcance_cliente_autorizado: number | null
           alcance_cliente_solicitado: number | null
+          analista_id: string | null
           caratulado: string
           cliente_principal_id: string | null
           comuna: string | null
@@ -368,15 +403,15 @@ export type Database = {
           estado: Database["public"]["Enums"]["case_status"] | null
           etapa_actual: string | null
           fecha_inicio: string | null
-          honorario_total_uf: number | null
-          honorario_variable_porcentaje: number | null
-          honorario_variable_base: string | null
           honorario_moneda: string
           honorario_notas: string | null
           honorario_pagado_uf: number
+          honorario_total_uf: number | null
+          honorario_variable_base: string | null
+          honorario_variable_porcentaje: number | null
           id: string
-          modalidad_cobro: string
           materia: string | null
+          modalidad_cobro: string
           nombre_cliente: string
           numero_causa: string | null
           objetivo_cliente: string | null
@@ -393,9 +428,9 @@ export type Database = {
         }
         Insert: {
           abogado_responsable?: string | null
-          analista_id?: string | null
           alcance_cliente_autorizado?: number | null
           alcance_cliente_solicitado?: number | null
+          analista_id?: string | null
           caratulado: string
           cliente_principal_id?: string | null
           comuna?: string | null
@@ -406,15 +441,15 @@ export type Database = {
           estado?: Database["public"]["Enums"]["case_status"] | null
           etapa_actual?: string | null
           fecha_inicio?: string | null
-          honorario_total_uf?: number | null
-          honorario_variable_porcentaje?: number | null
-          honorario_variable_base?: string | null
-          honorario_moneda?: string | null
+          honorario_moneda?: string
           honorario_notas?: string | null
-          honorario_pagado_uf?: number | null
+          honorario_pagado_uf?: number
+          honorario_total_uf?: number | null
+          honorario_variable_base?: string | null
+          honorario_variable_porcentaje?: number | null
           id?: string
-          modalidad_cobro?: string | null
           materia?: string | null
+          modalidad_cobro?: string
           nombre_cliente: string
           numero_causa?: string | null
           objetivo_cliente?: string | null
@@ -431,9 +466,9 @@ export type Database = {
         }
         Update: {
           abogado_responsable?: string | null
-          analista_id?: string | null
           alcance_cliente_autorizado?: number | null
           alcance_cliente_solicitado?: number | null
+          analista_id?: string | null
           caratulado?: string
           cliente_principal_id?: string | null
           comuna?: string | null
@@ -444,15 +479,15 @@ export type Database = {
           estado?: Database["public"]["Enums"]["case_status"] | null
           etapa_actual?: string | null
           fecha_inicio?: string | null
-          honorario_total_uf?: number | null
-          honorario_variable_porcentaje?: number | null
-          honorario_variable_base?: string | null
-          honorario_moneda?: string | null
+          honorario_moneda?: string
           honorario_notas?: string | null
-          honorario_pagado_uf?: number | null
+          honorario_pagado_uf?: number
+          honorario_total_uf?: number | null
+          honorario_variable_base?: string | null
+          honorario_variable_porcentaje?: number | null
           id?: string
-          modalidad_cobro?: string | null
           materia?: string | null
+          modalidad_cobro?: string
           nombre_cliente?: string
           numero_causa?: string | null
           objetivo_cliente?: string | null
@@ -1167,6 +1202,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      is_analista: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_cliente: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -1192,9 +1231,15 @@ export type Database = {
         | "otro"
         | "informacion"
         | "reunion"
+      stage_payment_status:
+        | "pendiente"
+        | "en_proceso"
+        | "parcial"
+        | "pagado"
+        | "vencido"
+        | "solicitado"
       stage_status: "pendiente" | "en_proceso" | "completado"
-      stage_payment_status: "pendiente" | "solicitado" | "en_proceso" | "parcial" | "pagado" | "vencido"
-      user_role: "admin_firma" | "abogado" | "cliente" | "analista"
+      user_role: "admin_firma" | "abogado" | "cliente" | "analista" | "usuario"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1343,8 +1388,16 @@ export const Constants = {
         "informacion",
         "reunion",
       ],
+      stage_payment_status: [
+        "pendiente",
+        "en_proceso",
+        "parcial",
+        "pagado",
+        "vencido",
+        "solicitado",
+      ],
       stage_status: ["pendiente", "en_proceso", "completado"],
-      user_role: ["admin_firma", "abogado", "cliente", "analista"],
+      user_role: ["admin_firma", "abogado", "cliente", "analista", "usuario"],
     },
   },
 } as const

@@ -428,9 +428,36 @@ export async function getDocumentDownloadUrl(documentId: string) {
       throw new Error('Sin permisos para descargar este documento');
     }
 
-    // Extraer path del archivo desde URL pública
-    const urlParts = document.url.split('/');
-    const filePath = urlParts.slice(-2).join('/'); // cases/{case_id}/{filename}
+    // Extraer path del archivo desde URL pública (bucket/path)
+    let filePath: string | null = null;
+    try {
+      const url = new URL(document.url);
+      const PUBLIC_PREFIX = '/storage/v1/object/public/';
+      if (url.pathname.startsWith(PUBLIC_PREFIX)) {
+        // Obtiene "bucket/path"
+        const fullPath = decodeURIComponent(url.pathname.slice(PUBLIC_PREFIX.length));
+        const [bucket, ...rest] = fullPath.split('/');
+        if (bucket === 'documents' && rest.length > 0) {
+          filePath = rest.join('/') || null;
+        }
+      }
+    } catch (parseError) {
+      // noop: fallback más abajo
+      console.warn('[documents] No se pudo parsear URL pública', parseError);
+    }
+
+    if (!filePath) {
+      // Fallback: extraer después del bucket manualmente
+      const parts = document.url.split('/documents/');
+      if (parts.length === 2) {
+        filePath = parts[1] || null;
+      }
+    }
+
+    if (!filePath) {
+      console.error('No se pudo resolver la ruta del archivo', document.url);
+      throw new Error('Error al preparar la descarga del documento');
+    }
 
     // Generar URL firmada (1 hora)
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { NotesPanel } from '@/components/NotesPanel';
 import { DocumentsPanel } from '@/components/DocumentsPanel';
 import { TimelinePanel } from '@/components/TimelinePanel';
@@ -13,6 +15,7 @@ import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { authorizeCaseAdvance } from '@/lib/actions/cases';
+import { createCaseCounterparty, deleteCaseCounterparty } from '@/lib/actions/counterparties';
 import {
   ArrowLeft,
   Scale,
@@ -29,8 +32,9 @@ import {
   Users,
   Wallet,
   Loader2,
+  Trash2,
 } from 'lucide-react';
-import type { Profile, Case, CaseStage } from '@/lib/supabase/types';
+import type { Profile, Case, CaseStage, CaseCounterparty } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
 
 interface CaseDetailViewProps {
@@ -49,6 +53,7 @@ interface CaseDetailViewProps {
       telefono?: string;
     }>;
     case_stages?: CaseStage[];
+    counterparties?: CaseCounterparty[];
   };
   profile: Profile;
   messages: CaseMessageDTO[];
@@ -65,6 +70,14 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     solicitado: caseData.alcance_cliente_solicitado ?? 0,
     autorizado: caseData.alcance_cliente_autorizado ?? 0,
   });
+  const [counterparties, setCounterparties] = useState<CaseCounterparty[]>(caseData.counterparties ?? []);
+  const [counterpartyForm, setCounterpartyForm] = useState({
+    nombre: '',
+    rut: '',
+    tipo: 'demandado' as 'demandado' | 'demandante' | 'tercero',
+  });
+  const [isSubmittingCounterparty, startTransitionCounterparty] = useTransition();
+  const [pendingDeleteCounterparty, setPendingDeleteCounterparty] = useState<string | null>(null);
   const stageNamesByOrder = useMemo(() => {
     const map = new Map<number, string>();
     stageCatalog.forEach((stage) => {
@@ -89,6 +102,10 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       autorizado: caseData.alcance_cliente_autorizado ?? 0,
     });
   }, [caseData.alcance_cliente_solicitado, caseData.alcance_cliente_autorizado]);
+
+  useEffect(() => {
+    setCounterparties(caseData.counterparties ?? []);
+  }, [caseData.counterparties]);
 
   const canEdit =
     profile.role === 'admin_firma' ||
@@ -184,6 +201,59 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       });
     } finally {
       setIsAuthorizing(false);
+    }
+  };
+
+  const handleCounterpartyInputChange = (field: 'nombre' | 'rut' | 'tipo', value: string) => {
+    setCounterpartyForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleCreateCounterparty = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    startTransitionCounterparty(async () => {
+      const result = await createCaseCounterparty({
+        caseId: caseData.id,
+        nombre: counterpartyForm.nombre,
+        rut: counterpartyForm.rut || undefined,
+        tipo: counterpartyForm.tipo,
+      });
+
+      if (result.success) {
+        setCounterparties((prev) => [result.counterparty, ...prev]);
+        setCounterpartyForm({ nombre: '', rut: '', tipo: 'demandado' as 'demandado' | 'demandante' | 'tercero' });
+        toast({
+          title: 'Contraparte agregada',
+          description: 'Registramos la contraparte en el expediente.',
+        });
+      } else {
+        toast({
+          title: 'No se pudo agregar la contraparte',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    });
+  };
+
+  const handleDeleteCounterparty = async (id: string) => {
+    setPendingDeleteCounterparty(id);
+    try {
+      const result = await deleteCaseCounterparty({ id });
+      if (result.success) {
+        setCounterparties((prev) => prev.filter((item) => item.id !== id));
+        toast({ title: 'Contraparte eliminada' });
+      } else {
+        toast({
+          title: 'No se pudo eliminar la contraparte',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setPendingDeleteCounterparty(null);
     }
   };
 
@@ -471,16 +541,23 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                   canManageStages={canManageStages}
                   showPrivateStages={showPrivateContent}
                   clientContext={{
-                    role: profile.role,
+                    role: profile.role === 'usuario' ? 'cliente' : profile.role,
                     alcanceAutorizado: clientAdvance.autorizado,
                     alcanceSolicitado: clientAdvance.solicitado,
                   }}
-                  onClientProgressChange={(progress) =>
-                    setClientAdvance((prev) => ({
-                      solicitado: progress.solicitado ?? prev.solicitado,
-                      autorizado: progress.autorizado ?? prev.autorizado,
-                    }))
-                  }
+                  onClientProgressChange={(progress) => {
+                    setClientAdvance((prev) => {
+                      const nextSolicitado = progress.solicitado ?? prev.solicitado;
+                      const nextAutorizado = progress.autorizado ?? prev.autorizado;
+                      if (
+                        nextSolicitado === prev.solicitado &&
+                        nextAutorizado === prev.autorizado
+                      ) {
+                        return prev;
+                      }
+                      return { solicitado: nextSolicitado, autorizado: nextAutorizado };
+                    });
+                  }}
                   onStagesLoaded={setStageCatalog}
                 />
               </div>
@@ -509,16 +586,20 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               canManageStages={canManageStages}
               showPrivateStages={showPrivateContent}
               clientContext={{
-                role: profile.role,
+                role: profile.role === 'usuario' ? 'cliente' : profile.role,
                 alcanceAutorizado: clientAdvance.autorizado,
                 alcanceSolicitado: clientAdvance.solicitado,
               }}
-              onClientProgressChange={(progress) =>
-                setClientAdvance((prev) => ({
-                  solicitado: progress.solicitado ?? prev.solicitado,
-                  autorizado: progress.autorizado ?? prev.autorizado,
-                }))
-              }
+              onClientProgressChange={(progress) => {
+                setClientAdvance((prev) => {
+                  const nextSolicitado = progress.solicitado ?? prev.solicitado;
+                  const nextAutorizado = progress.autorizado ?? prev.autorizado;
+                  if (nextSolicitado === prev.solicitado && nextAutorizado === prev.autorizado) {
+                    return prev;
+                  }
+                  return { solicitado: nextSolicitado, autorizado: nextAutorizado };
+                });
+              }}
               onStagesLoaded={setStageCatalog}
             />
           )}
@@ -608,6 +689,106 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                   </CardContent>
                 </Card>
               )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Contrapartes (demandados)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <form onSubmit={handleCreateCounterparty} className="grid gap-4 md:grid-cols-[1.2fr_1fr_0.8fr_auto]">
+                    <div className="space-y-2">
+                      <Label htmlFor="counterparty_nombre">Nombre completo *</Label>
+                      <Input
+                        id="counterparty_nombre"
+                        placeholder="Empresa demandada o persona"
+                        value={counterpartyForm.nombre}
+                        onChange={(event) => handleCounterpartyInputChange('nombre', event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="counterparty_rut">RUT</Label>
+                      <Input
+                        id="counterparty_rut"
+                        placeholder="12.345.678-9"
+                        value={counterpartyForm.rut}
+                        onChange={(event) => handleCounterpartyInputChange('rut', event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="counterparty_tipo">Rol</Label>
+                      <select
+                        id="counterparty_tipo"
+                        className="form-input"
+                        value={counterpartyForm.tipo}
+                        onChange={(event) => handleCounterpartyInputChange('tipo', event.target.value as 'demandado' | 'demandante' | 'tercero')}
+                      >
+                        <option value="demandado">Demandado</option>
+                        <option value="demandante">Demandante</option>
+                        <option value="tercero">Tercero</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isSubmittingCounterparty || counterpartyForm.nombre.trim().length < 2}
+                      >
+                        {isSubmittingCounterparty ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Registrando…
+                          </>
+                        ) : (
+                          'Agregar'
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+
+                  <div className="space-y-3">
+                    {counterparties.length === 0 ? (
+                      <p className="text-sm text-slate-500">
+                        Aún no se agregan demandados al expediente. Regístralos para tener claridad de las partes involucradas.
+                      </p>
+                    ) : (
+                      counterparties.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium text-slate-900">{item.nombre}</span>
+                            <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-600">
+                                {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)}
+                              </span>
+                              {item.rut && <span>RUT: {item.rut}</span>}
+                              <span>Agregado: {item.created_at ? formatDate(item.created_at) : '—'}</span>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-full text-slate-400 hover:text-red-600"
+                            onClick={() => handleDeleteCounterparty(item.id)}
+                            disabled={pendingDeleteCounterparty === item.id}
+                          >
+                            {pendingDeleteCounterparty === item.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
