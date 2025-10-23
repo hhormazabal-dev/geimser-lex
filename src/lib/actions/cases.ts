@@ -697,8 +697,6 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
 
     if (profile.role === 'abogado') {
       query = query.eq('abogado_responsable', profile.id);
-    } else if (profile.role === 'analista') {
-      query = query.eq('analista_id', profile.id);
     } else if (profile.role === 'cliente') {
       const { data: clientCases } = await supabase
         .from('case_clients')
@@ -772,10 +770,6 @@ export async function getCaseById(caseId: string) {
     if (profile.role === 'abogado' && caseRow.abogado_responsable && caseRow.abogado_responsable !== profile.id) {
       throw new Error('Sin permisos para ver este caso');
     }
-    if (profile.role === 'analista' && caseRow.analista_id && caseRow.analista_id !== profile.id) {
-      throw new Error('Sin permisos para ver este caso');
-    }
-
     const [lawyerProfile, stagesRes, notesRes, docsRes, reqsRes, counterpartiesRes, clientsRes] = await Promise.all([
       (async () => {
         if (!caseRow.abogado_responsable) return null;
