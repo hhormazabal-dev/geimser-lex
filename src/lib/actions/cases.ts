@@ -72,7 +72,12 @@ export async function createCase(input: CreateCaseInput) {
   try {
     const profile = await requireAuth(['abogado', 'analista']);
     const parsed = createCaseSchema.parse(input);
-    const { marcar_validado, ...caseInput } = parsed;
+    const {
+      marcar_validado,
+      audiencia_inicial_tipo,
+      audiencia_inicial_requiere_testigos,
+      ...caseInput
+    } = parsed;
 
     if (!caseInput.cliente_principal_id) {
       throw new Error('Debes seleccionar un cliente principal antes de crear el caso.');
@@ -146,6 +151,15 @@ export async function createCase(input: CreateCaseInput) {
 
     await upsertPrimaryClient(newCase.id, baseData.cliente_principal_id);
     await createInitialStages(newCase);
+
+    if (audiencia_inicial_tipo) {
+      await applyInitialAudiencePreferences(newCase, {
+        audienciaTipo: audiencia_inicial_tipo,
+        ...(audiencia_inicial_requiere_testigos !== undefined && {
+          requiereTestigos: audiencia_inicial_requiere_testigos ? true : false,
+        }),
+      });
+    }
 
     await logAuditAction({
       action: 'CREATE',
@@ -262,7 +276,12 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
   try {
     const profile = await requireAuth();
     const validated = updateCaseSchema.parse(input);
-    const { marcar_validado, ...rest } = validated;
+    const {
+      marcar_validado,
+      audiencia_inicial_tipo,
+      audiencia_inicial_requiere_testigos,
+      ...rest
+    } = validated;
 
     const supabase = await getSB();
     const { data: existingCase, error: fetchError } = await supabase
@@ -366,6 +385,15 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       entity_id: caseId,
       diff_json: { from: existingCase, to: updatedCase },
     });
+
+    if (audiencia_inicial_tipo) {
+      await applyInitialAudiencePreferences(updatedCase as Case, {
+        audienciaTipo: audiencia_inicial_tipo,
+        ...(audiencia_inicial_requiere_testigos !== undefined && {
+          requiereTestigos: audiencia_inicial_requiere_testigos ? true : false,
+        }),
+      });
+    }
 
     revalidatePath(`/cases/${caseId}`);
     revalidatePath('/cases');
@@ -933,6 +961,66 @@ async function createInitialStages(caseRecord: Case) {
 
   if (stages.length === 0) return;
   await supabase.from('case_stages').insert(stages);
+}
+
+async function applyInitialAudiencePreferences(
+  caseRecord: Case,
+  options: { audienciaTipo?: 'preparatoria' | 'juicio'; requiereTestigos?: boolean | null },
+) {
+  const { audienciaTipo, requiereTestigos } = options;
+  if (!audienciaTipo) return;
+
+  try {
+    const supabase = await getSB();
+
+    const targetNames =
+      audienciaTipo === 'preparatoria'
+        ? ['Audiencia preparatoria', 'Audiencia preliminar']
+        : ['Audiencia de juicio', 'Audiencia juicio', 'Juicio', 'Alegatos y vista de la causa'];
+
+    const { data: directMatch, error: directError } = await supabase
+      .from('case_stages')
+      .select('id, etapa')
+      .eq('case_id', caseRecord.id)
+      .in('etapa', targetNames)
+      .order('orden', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (directError) {
+      console.error('Error buscando etapa de audiencia inicial:', directError);
+    }
+
+    let stageId = directMatch?.id ?? null;
+
+    if (!stageId) {
+      const { data: fallback, error: fallbackError } = await supabase
+        .from('case_stages')
+        .select('id, etapa')
+        .eq('case_id', caseRecord.id)
+        .ilike('etapa', '%audiencia%')
+        .order('orden', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (fallbackError) {
+        console.error('Error buscando etapa de audiencia (fallback):', fallbackError);
+      }
+      stageId = fallback?.id ?? null;
+    }
+
+    if (!stageId) return;
+
+    await supabase
+      .from('case_stages')
+      .update({
+        audiencia_tipo: audienciaTipo,
+        requiere_testigos: Boolean(requiereTestigos),
+      })
+      .eq('id', stageId);
+  } catch (error) {
+    console.error('Error aplicando preferencia de audiencia inicial:', error);
+  }
 }
 
 async function extractCaseDataFromBrief(brief: string): Promise<Partial<CreateCaseInput>> {

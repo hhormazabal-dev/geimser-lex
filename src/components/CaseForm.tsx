@@ -22,6 +22,7 @@ import {
   CASE_MATERIAS,
   REGIONES_CHILE,
 } from '@/lib/validators/case';
+import { STAGE_AUDIENCE_TYPES } from '@/lib/validators/stages';
 import { createClientSchema, type CreateClientInput } from '@/lib/validators/clients';
 import { formatRUT } from '@/lib/utils';
 import { Loader2, Save, X, Trash2, Paperclip, UploadCloud } from 'lucide-react';
@@ -111,6 +112,8 @@ export function CaseForm({
         workflow_state: (existingCase.workflow_state || 'preparacion') as CreateCaseInput['workflow_state'],
         validado_at: existingCase.validado_at || undefined,
         marcar_validado: Boolean(existingCase.validado_at),
+        audiencia_inicial_tipo: undefined,
+        audiencia_inicial_requiere_testigos: false,
       }
     : {
         numero_causa: '',
@@ -143,6 +146,8 @@ export function CaseForm({
         documentacion_recibida: '',
         workflow_state: 'preparacion',
         marcar_validado: false,
+        audiencia_inicial_tipo: undefined,
+        audiencia_inicial_requiere_testigos: false,
       };
 
   const {
@@ -181,6 +186,8 @@ export function CaseForm({
   const modalidadCobro = watch('modalidad_cobro');
   const honorarioMoneda = watch('honorario_moneda');
   const honorarioTotal = watch('honorario_total_uf');
+  const audienciaInicialTipo = watch('audiencia_inicial_tipo');
+  const audienciaInicialRequiereTestigos = watch('audiencia_inicial_requiere_testigos');
   const honorarioPagado = watch('honorario_pagado_uf');
   const honorarioPendiente =
     typeof honorarioTotal === 'number' && !Number.isNaN(honorarioTotal)
@@ -432,6 +439,12 @@ export function CaseForm({
     resetNewClientForm();
     setIsAddingClient(false);
   };
+
+  useEffect(() => {
+    if (!audienciaInicialTipo) {
+      setValue('audiencia_inicial_requiere_testigos', false);
+    }
+  }, [audienciaInicialTipo, setValue]);
 
   return (
     <Card className='w-full max-w-4xl mx-auto'>
@@ -845,6 +858,86 @@ export function CaseForm({
               {errors.observaciones && (
                 <p className='text-sm text-red-600'>{errors.observaciones.message}</p>
               )}
+            </div>
+          </section>
+
+          <section className='space-y-4'>
+            <div>
+              <h2 className='text-lg font-semibold text-gray-900'>Audiencias iniciales</h2>
+              <p className='text-sm text-gray-500'>
+                Define el tipo de audiencia que esperas como primer hito y si requerirá coordinación de testigos.
+              </p>
+            </div>
+
+            <div className='grid gap-4 md:grid-cols-2'>
+              <div className='space-y-3'>
+                <Label>Tipo de audiencia inicial</Label>
+                <div className='grid gap-2'>
+                  <label
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                      audienciaInicialTipo ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-200 bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <input
+                      type='radio'
+                      value=''
+                      className='text-slate-600'
+                      {...register('audiencia_inicial_tipo')}
+                    />
+                    Sin audiencia definida por ahora
+                  </label>
+                  {STAGE_AUDIENCE_TYPES.map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                        audienciaInicialTipo === option.value
+                          ? 'border-sky-300 bg-sky-50 text-sky-700'
+                          : 'border-slate-200 bg-white text-slate-700'
+                      }`}
+                    >
+                      <input
+                        type='radio'
+                        value={option.value}
+                        className='text-slate-600'
+                        {...register('audiencia_inicial_tipo')}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className='space-y-3'>
+                <Label>Participación de testigos</Label>
+                <Controller
+                  control={control}
+                  name='audiencia_inicial_requiere_testigos'
+                  render={({ field }) => (
+                    <label
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                        audienciaInicialTipo
+                          ? 'border-slate-200 bg-white text-slate-700'
+                          : 'border-dashed border-slate-200 bg-slate-50 text-slate-500'
+                      }`}
+                    >
+                      <input
+                        type='checkbox'
+                        className='rounded border-slate-300'
+                        checked={Boolean(field.value)}
+                        onChange={(event) => field.onChange(event.target.checked)}
+                        onBlur={field.onBlur}
+                        ref={field.ref}
+                        name={field.name}
+                        disabled={!audienciaInicialTipo}
+                      />
+                      Se coordinarán testigos para esta audiencia
+                    </label>
+                  )}
+                />
+                <p className='text-xs text-gray-500'>
+                  Esta marca solo aplica si defines una audiencia inicial y se reflejará en la primera etapa del timeline.
+                </p>
+              </div>
             </div>
           </section>
 
