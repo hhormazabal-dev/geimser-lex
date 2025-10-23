@@ -70,42 +70,33 @@ export default function CasesPage() {
     loadCases(updatedFilters);
   };
 
-  if (isLoading) {
-    return (
-      <div className='container mx-auto py-8'>
-        <div className='animate-pulse space-y-4'>
-          <div className='h-8 bg-gray-200 rounded w-1/4'></div>
-          <div className='h-64 bg-gray-200 rounded'></div>
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className='space-y-6'>
+          <div className='h-9 w-48 rounded-lg bg-slate-200/70' />
+          <div className='h-72 rounded-2xl border border-slate-100 bg-white/70 shadow-sm backdrop-blur' />
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (cases.length === 0 && !filters.search) {
-    return (
-      <div className='container mx-auto py-8'>
+    if (cases.length === 0 && !filters.search) {
+      return (
         <EmptyState
           icon={FolderOpen}
           title='No hay casos'
           description='Aún no se han creado casos en el sistema. Crea tu primer caso para comenzar.'
           action={{
-            label: 'Crear Primer Caso',
-            onClick: () => window.location.href = '/cases/new',
+            label: 'Crear primer caso',
+            onClick: () => {
+              window.location.href = '/cases/new';
+            },
           }}
         />
-      </div>
-    );
-  }
+      );
+    }
 
-  return (
-    <div className='container mx-auto py-8'>
-      <div className='mb-8'>
-        <h1 className='text-3xl font-bold text-gray-900'>Casos</h1>
-        <p className='text-gray-600 mt-2'>
-          Gestiona todos los casos jurídicos del estudio
-        </p>
-      </div>
-
+    return (
       <DataTable
         cases={cases}
         total={total}
@@ -114,9 +105,25 @@ export default function CasesPage() {
         onPageChange={handlePageChange}
         onSearch={handleSearch}
         onFilter={handleFilter}
-        canCreate={true}
-        canEdit={true}
+        canCreate
+        canEdit
       />
+    );
+  };
+
+  return (
+    <div className='min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-50 text-slate-900'>
+      <main className='mx-auto flex max-w-5xl flex-col gap-8 px-4 pb-12 pt-6 sm:px-6 lg:px-8'>
+        <header className='space-y-2'>
+          <p className='text-[11px] uppercase tracking-[0.25em] text-slate-400'>Gestión de cartera</p>
+          <h1 className='text-2xl font-semibold tracking-tight'>Casos</h1>
+          <p className='max-w-2xl text-sm leading-relaxed text-slate-600'>
+            Consulta y actualiza el estado de cada expediente. Usa los filtros para priorizar según vencimientos, estado o tipo de materia.
+          </p>
+        </header>
+
+        {renderContent()}
+      </main>
     </div>
   );
 }

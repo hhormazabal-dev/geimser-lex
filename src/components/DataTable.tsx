@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { formatDate, formatCurrency } from '@/lib/utils';
-import { Search, Filter, Plus, Eye, Edit } from 'lucide-react';
+import { Search, Filter, Plus, Eye, Edit, X } from 'lucide-react';
 import type { Case } from '@/lib/supabase/types';
 
 type CaseWithParties = Case & {
@@ -26,6 +26,20 @@ interface DataTableProps {
   canEdit?: boolean;
 }
 
+const STATUS_VARIANTS: Record<string, { label: string; chipClass: string }> = {
+  activo: { label: 'Activo', chipClass: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
+  suspendido: { label: 'Suspendido', chipClass: 'bg-amber-50 text-amber-700 border border-amber-100' },
+  archivado: { label: 'Archivado', chipClass: 'bg-slate-100 text-slate-600 border border-slate-200' },
+  terminado: { label: 'Terminado', chipClass: 'bg-sky-50 text-sky-700 border border-sky-100' },
+};
+
+const PRIORITY_VARIANTS: Record<string, string> = {
+  baja: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
+  media: 'bg-sky-50 text-sky-700 border border-sky-100',
+  alta: 'bg-amber-50 text-amber-700 border border-amber-100',
+  urgente: 'bg-red-50 text-red-600 border border-red-100',
+};
+
 export function DataTable({
   cases,
   total,
@@ -39,101 +53,123 @@ export function DataTable({
 }: DataTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [filterValues, setFilterValues] = useState<{ estado: string; prioridad: string; materia: string }>({
+    estado: '',
+    prioridad: '',
+    materia: '',
+  });
 
-  const totalPages = Math.ceil(total / limit);
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total, limit]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSearch(searchTerm);
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSearch(searchTerm.trim());
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      activo: 'default',
-      suspendido: 'secondary',
-      archivado: 'outline',
-      terminado: 'destructive',
-    };
+  const handleFilterChange = (field: 'estado' | 'prioridad' | 'materia') => (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    setFilterValues((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const applyFilters = () => {
+    const cleaned = Object.fromEntries(
+      Object.entries(filterValues)
+        .filter(([, value]) => value)
+        .map(([key, value]) => [key, value])
+    );
+    onFilter(cleaned);
+  };
+
+  const resetFilters = () => {
+    setFilterValues({ estado: '', prioridad: '', materia: '' });
+    onFilter({});
+  };
+
+  const activeFilters = Object.values(filterValues).filter(Boolean).length;
+
+  const renderStatusBadge = (status?: string | null) => {
+    const key = (status ?? '').toLowerCase();
+    const config = STATUS_VARIANTS[key];
+    if (!config) {
+      return (
+        <span className='inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600'>
+          Sin estado
+        </span>
+      );
+    }
 
     return (
-      <Badge variant={variants[status] || 'outline'}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
+      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium capitalize ${config.chipClass}`}>
+        {config.label}
+      </span>
     );
   };
 
-  const getPriorityBadge = (priority: string) => {
-    const colors: Record<string, string> = {
-      baja: 'bg-gray-100 text-gray-800',
-      media: 'bg-blue-100 text-blue-800',
-      alta: 'bg-yellow-100 text-yellow-800',
-      urgente: 'bg-red-100 text-red-800',
-    };
-
+  const renderPriorityBadge = (priority?: string | null) => {
+    const key = (priority ?? 'media').toLowerCase();
+    const classes = PRIORITY_VARIANTS[key] ?? 'bg-slate-100 text-slate-600 border border-slate-200';
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[priority] || 'bg-gray-100 text-gray-800'}`}>
-        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${classes}`}>
+        {key}
       </span>
     );
   };
 
   return (
-    <div className='space-y-8'>
-      <section className='relative overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-white/85 via-white/70 to-white/55 p-6 shadow-[0_40px_90px_-60px_rgba(15,23,42,0.6)] backdrop-blur-xl'>
-        <div className='pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_60%),radial-gradient(circle_at_bottom,_rgba(124,58,237,0.12),_transparent_55%)]' />
-        <CardHeader className='px-0 pt-0 pb-6'>
-          <div className='flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between'>
-            <div>
-              <CardTitle className='text-2xl font-semibold text-slate-900'>Casos ({total})</CardTitle>
-              <p className='mt-1 text-sm text-slate-500'>
-                Gestiona el pipeline jurídico y sigue la salud de cada expediente en tiempo real.
-              </p>
-            </div>
+    <div className='space-y-6'>
+      <Card className='border border-slate-200 bg-white/95 shadow-sm'>
+        <div className='flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between'>
+          <div className='space-y-1'>
+            <p className='text-sm font-semibold text-slate-900'>Casos ({total})</p>
+            <p className='text-sm text-slate-500'>Monitorea el avance y prioriza dónde actuar primero.</p>
+          </div>
 
-            <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
-              <form onSubmit={handleSearch} className='flex w-full items-center gap-3 rounded-full border border-slate-200 bg-white/80 px-4 py-2.5 shadow-sm transition hover:border-sky-200 sm:w-auto'>
-                <Search className='h-4 w-4 text-slate-400' />
-                <Input
-                  placeholder='Buscar casos, clientes o materias…'
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className='border-0 bg-transparent p-0 text-sm focus-visible:ring-0'
-                />
-                <Button type='submit' size='sm' className='rounded-full px-4'>
-                  Buscar
-                </Button>
-              </form>
+          <div className='flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center'>
+            <form onSubmit={handleSearchSubmit} className='flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-[280px]'>
+              <Search className='h-4 w-4 text-slate-400' />
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder='Buscar casos o clientes'
+                className='border-0 bg-transparent p-0 text-sm focus-visible:ring-0'
+              />
+              <Button type='submit' size='sm' variant='secondary'>
+                Buscar
+              </Button>
+            </form>
 
-              <div className='flex w-full flex-col gap-2 sm:w-auto sm:flex-row'>
-                <Button
-                  variant='outline'
-                  className='rounded-full border-slate-200 bg-white/70 text-slate-700 hover:border-sky-200 hover:bg-sky-50'
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Filter className='mr-2 h-4 w-4' />
-                  Filtros
+            <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
+              <Button
+                variant='outline'
+                onClick={() => setShowFilters((prev) => !prev)}
+                className='flex items-center gap-2 rounded-xl border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50'
+              >
+                <Filter className='h-4 w-4' />
+                Filtros {activeFilters > 0 && <span className='rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white'>{activeFilters}</span>}
+              </Button>
+
+              {canCreate && (
+                <Button asChild className='rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800'>
+                  <Link href='/cases/new'>
+                    <Plus className='mr-2 h-4 w-4' />
+                    Nuevo caso
+                  </Link>
                 </Button>
-                {canCreate && (
-                  <Button asChild className='rounded-full bg-slate-900 px-5 text-sm font-medium shadow-lg shadow-slate-900/20 hover:bg-slate-800'>
-                    <Link href='/cases/new'>
-                      <Plus className='mr-2 h-4 w-4' />
-                      Nuevo caso
-                    </Link>
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
           </div>
-        </CardHeader>
+        </div>
 
         {showFilters && (
-          <CardContent className='rounded-2xl border border-white/40 bg-white/70 px-4 py-5 shadow-inner'>
+          <div className='border-t border-slate-200 bg-slate-50/60 px-5 py-4'>
             <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
               <div>
-                <label className='block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400'>
-                  Estado
-                </label>
-                <select className='mt-2 w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-700 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100'>
+                <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Estado</label>
+                <select
+                  value={filterValues.estado}
+                  onChange={handleFilterChange('estado')}
+                  className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
+                >
                   <option value=''>Todos</option>
                   <option value='activo'>Activo</option>
                   <option value='suspendido'>Suspendido</option>
@@ -141,11 +177,14 @@ export function DataTable({
                   <option value='terminado'>Terminado</option>
                 </select>
               </div>
+
               <div>
-                <label className='block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400'>
-                  Prioridad
-                </label>
-                <select className='mt-2 w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-700 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100'>
+                <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Prioridad</label>
+                <select
+                  value={filterValues.prioridad}
+                  onChange={handleFilterChange('prioridad')}
+                  className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
+                >
                   <option value=''>Todas</option>
                   <option value='baja'>Baja</option>
                   <option value='media'>Media</option>
@@ -153,11 +192,14 @@ export function DataTable({
                   <option value='urgente'>Urgente</option>
                 </select>
               </div>
+
               <div>
-                <label className='block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400'>
-                  Materia
-                </label>
-                <select className='mt-2 w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-700 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100'>
+                <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Materia</label>
+                <select
+                  value={filterValues.materia}
+                  onChange={handleFilterChange('materia')}
+                  className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
+                >
                   <option value=''>Todas</option>
                   <option value='Laboral'>Laboral</option>
                   <option value='Civil'>Civil</option>
@@ -165,98 +207,99 @@ export function DataTable({
                   <option value='Penal'>Penal</option>
                 </select>
               </div>
-              <div className='flex items-end'>
-                <Button className='w-full rounded-full bg-slate-900 text-sm font-medium hover:bg-slate-800' onClick={() => onFilter({})}>
+
+              <div className='flex items-end gap-2'>
+                <Button onClick={applyFilters} className='w-full rounded-xl bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800'>
                   Aplicar filtros
                 </Button>
+                {activeFilters > 0 && (
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    onClick={resetFilters}
+                    className='h-10 w-10 rounded-xl border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-white'
+                  >
+                    <X className='h-4 w-4' />
+                  </Button>
+                )}
               </div>
             </div>
-          </CardContent>
+          </div>
         )}
-      </section>
+      </Card>
 
-      <section className='rounded-3xl border border-white/15 bg-white/80 shadow-[0_24px_80px_-60px_rgba(15,23,42,0.55)] backdrop-blur-xl'>
-        <div className='overflow-hidden rounded-3xl'>
-          <table className='w-full border-separate border-spacing-y-3 px-3'>
-            <thead>
-              <tr className='text-xs uppercase tracking-[0.2em] text-slate-400'>
-                <th className='px-5 text-left'>Caso</th>
-                <th className='px-5 text-left'>Cliente / Demandante</th>
-                <th className='px-5 text-left'>Contrapartes</th>
-                <th className='px-5 text-left'>Estado</th>
-                <th className='px-5 text-left'>Prioridad</th>
-                <th className='px-5 text-left'>Etapa</th>
-                <th className='px-5 text-left whitespace-nowrap'>Fecha inicio</th>
-                <th className='px-5 text-left'>Valor</th>
-                <th className='px-5 text-right'>Acciones</th>
+      <Card className='overflow-hidden border border-slate-200 bg-white/95 shadow-sm'>
+        <div className='overflow-x-auto'>
+          <table className='min-w-full divide-y divide-slate-200 text-sm'>
+            <thead className='bg-slate-50/80 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
+              <tr>
+                <th scope='col' className='px-5 py-3 text-left'>Caso</th>
+                <th scope='col' className='px-5 py-3 text-left'>Cliente</th>
+                <th scope='col' className='px-5 py-3 text-left'>Contrapartes</th>
+                <th scope='col' className='px-5 py-3 text-left'>Estado</th>
+                <th scope='col' className='px-5 py-3 text-left'>Prioridad</th>
+                <th scope='col' className='px-5 py-3 text-left'>Etapa</th>
+                <th scope='col' className='px-5 py-3 text-left whitespace-nowrap'>Inicio</th>
+                <th scope='col' className='px-5 py-3 text-left'>Valor</th>
+                <th scope='col' className='px-5 py-3 text-right'>Acciones</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className='divide-y divide-slate-100 text-slate-700'>
               {cases.map((caseItem) => (
-                <tr key={caseItem.id} className='group overflow-hidden rounded-2xl border border-white/25 bg-white/90 shadow-sm transition hover:-translate-y-1 hover:border-sky-100 hover:bg-white hover:shadow-xl'>
-                  <td className='px-5 py-4 align-top max-w-[220px] whitespace-normal break-words'>
+                <tr key={caseItem.id} className='transition-colors hover:bg-slate-50/70'>
+                  <td className='px-5 py-4 align-top'>
                     <div className='space-y-1'>
-                      <p className='text-sm font-semibold text-slate-900 leading-snug'>{caseItem.caratulado}</p>
+                      <p className='text-sm font-semibold text-slate-900'>{caseItem.caratulado}</p>
                       {caseItem.numero_causa && (
                         <p className='text-xs font-medium uppercase tracking-[0.18em] text-slate-400'>{caseItem.numero_causa}</p>
                       )}
                       {caseItem.materia && (
-                        <span className='inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600'>
+                        <span className='inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600'>
                           {caseItem.materia}
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className='px-5 py-4 align-top max-w-[200px] whitespace-normal break-words'>
-                    <div className='space-y-1 text-sm leading-snug'>
-                      <p className='font-medium text-slate-800'>{caseItem.nombre_cliente}</p>
-                      {caseItem.rut_cliente && (
-                        <p className='text-xs text-slate-500'>{caseItem.rut_cliente}</p>
-                      )}
+                  <td className='px-5 py-4 align-top'>
+                    <div className='space-y-1'>
+                      <p className='text-sm font-medium text-slate-800'>{caseItem.nombre_cliente}</p>
+                      {caseItem.rut_cliente && <p className='text-xs text-slate-500'>{caseItem.rut_cliente}</p>}
                     </div>
                   </td>
-                  <td className='px-5 py-4 align-top max-w-[260px] whitespace-normal break-words'>
+                  <td className='px-5 py-4 align-top'>
                     {caseItem.counterparties && caseItem.counterparties.length > 0 ? (
-                      <div className='flex flex-col gap-1 text-xs text-slate-600'>
-                        {caseItem.counterparties.slice(0, 3).map((party: { nombre: string; tipo: string }, index: number) => (
+                      <div className='space-y-1 text-xs text-slate-600'>
+                        {caseItem.counterparties.slice(0, 3).map((party, index) => (
                           <div key={`${party.nombre}-${index}`} className='flex items-center gap-2'>
-                            <span className='inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600'>
-                              {party.tipo.charAt(0).toUpperCase() + party.tipo.slice(1)}
-                            </span>
+                            <Badge variant='outline' className='border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-600'>
+                              {party.tipo}
+                            </Badge>
                             <span className='text-slate-700'>{party.nombre}</span>
                           </div>
                         ))}
                         {caseItem.counterparties.length > 3 && (
-                          <span className='text-[11px] font-medium text-slate-400'>
-                            +{caseItem.counterparties.length - 3} más
-                          </span>
+                          <span className='text-[11px] font-medium text-slate-400'>+{caseItem.counterparties.length - 3} más</span>
                         )}
                       </div>
                     ) : (
                       <span className='text-xs text-slate-400'>Sin registrar</span>
                     )}
                   </td>
-                  <td className='px-5 py-4 align-top'>
-                    {getStatusBadge(caseItem.estado || 'activo')}
-                  </td>
-                  <td className='px-5 py-4 align-top'>
-                    {getPriorityBadge(caseItem.prioridad || 'media')}
-                  </td>
-                  <td className='px-5 py-4 align-top text-sm text-slate-700 max-w-[220px] whitespace-normal break-words'>
-                    {caseItem.etapa_actual || 'Sin definir'}
-                  </td>
-                  <td className='px-5 py-4 align-top text-sm text-slate-700'>
+                  <td className='px-5 py-4 align-top'>{renderStatusBadge(caseItem.estado)}</td>
+                  <td className='px-5 py-4 align-top'>{renderPriorityBadge(caseItem.prioridad)}</td>
+                  <td className='px-5 py-4 align-top text-sm'>{caseItem.etapa_actual || 'Sin definir'}</td>
+                  <td className='px-5 py-4 align-top text-sm'>
                     {caseItem.fecha_inicio ? formatDate(caseItem.fecha_inicio) : <span className='text-slate-400'>Pendiente</span>}
                   </td>
                   <td className='px-5 py-4 align-top text-sm font-semibold text-slate-900'>
-                    {caseItem.valor_estimado ? formatCurrency(caseItem.valor_estimado) : <span className='text-slate-400'>-</span>}
+                    {caseItem.valor_estimado ? formatCurrency(caseItem.valor_estimado) : <span className='font-normal text-slate-400'>-</span>}
                   </td>
-                  <td className='px-5 py-4'>
+                  <td className='px-5 py-4 align-top'>
                     <div className='flex items-center justify-end gap-2'>
                       <Button
                         variant='ghost'
                         size='icon'
-                        className='h-9 w-9 rounded-full border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                        className='h-9 w-9 rounded-full border border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
                         asChild
                       >
                         <Link href={`/cases/${caseItem.id}`}>
@@ -267,7 +310,7 @@ export function DataTable({
                         <Button
                           variant='ghost'
                           size='icon'
-                          className='h-9 w-9 rounded-full border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                          className='h-9 w-9 rounded-full border border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
                           asChild
                         >
                           <Link href={`/cases/${caseItem.id}/edit`}>
@@ -284,47 +327,52 @@ export function DataTable({
         </div>
 
         {cases.length === 0 && (
-          <div className='flex flex-col items-center justify-center gap-2 px-6 py-16 text-center'>
+          <div className='flex flex-col items-center justify-center gap-3 px-6 py-16 text-center'>
             <div className='rounded-full bg-slate-100 p-3 text-slate-400'>
               <Search className='h-5 w-5' />
             </div>
             <h3 className='text-base font-semibold text-slate-800'>Sin resultados</h3>
             <p className='max-w-md text-sm text-slate-500'>
-              Ajusta la búsqueda o crea un nuevo caso para comenzar a poblar el pipeline de la firma.
+              Ajusta la búsqueda o crea un nuevo caso para poblar el pipeline.
             </p>
           </div>
         )}
-      </section>
+      </Card>
 
       {totalPages > 1 && (
         <div className='flex flex-wrap items-center justify-center gap-3'>
           <Button
             variant='outline'
-            className='rounded-full px-4'
+            className='rounded-xl px-4'
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
           >
             Anterior
           </Button>
           <div className='flex items-center gap-2'>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, index) => {
-              const pageNum = Math.max(1, Math.min(totalPages - 4, page - 2)) + index;
-              return (
-                <Button
-                  key={pageNum}
-                  variant={pageNum === page ? 'default' : 'outline'}
-                  className={`rounded-full ${pageNum === page ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border-slate-200'}`}
-                  size='sm'
-                  onClick={() => onPageChange(pageNum)}
-                >
-                  {pageNum}
-                </Button>
-              );
-            })}
+            {(() => {
+              const pagesToShow = Math.min(5, totalPages);
+              const startPage = Math.max(1, Math.min(page - Math.floor(pagesToShow / 2), totalPages - pagesToShow + 1));
+
+              return Array.from({ length: pagesToShow }, (_, index) => {
+                const pageNum = startPage + index;
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={pageNum === page ? 'default' : 'outline'}
+                    className={`rounded-xl px-3 ${pageNum === page ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border-slate-200'}`}
+                    size='sm'
+                    onClick={() => onPageChange(pageNum)}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              });
+            })()}
           </div>
           <Button
             variant='outline'
-            className='rounded-full px-4'
+            className='rounded-xl px-4'
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
           >

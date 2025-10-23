@@ -62,19 +62,32 @@ export function QuickLinksPanel({ links }: QuickLinksPanelProps) {
   };
 
   return (
-    <Card className='border-lexser-gray-100'>
-      <CardHeader>
-        <CardTitle className='flex items-center justify-between text-base'>
+    <Card className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
+      <CardHeader className='p-6 pb-4'>
+        <CardTitle className='flex items-center justify-between text-sm font-semibold text-slate-800'>
           Accesos rápidos
-          {isSubmitting && <Loader2 className='h-4 w-4 animate-spin text-lexser-blue-600' />}
+          {isSubmitting && <Loader2 className='h-4 w-4 animate-spin text-sky-500' />}
         </CardTitle>
       </CardHeader>
-      <CardContent className='space-y-6'>
+      <CardContent className='space-y-6 px-6 pb-6 pt-0'>
         <form ref={formRef} action={handleSubmit} className='grid gap-3 md:grid-cols-3'>
-          <Input name='title' placeholder='Nombre (Ej. Poder Judicial)' required disabled={isSubmitting} />
-          <Input name='url' placeholder='https://...' type='url' required disabled={isSubmitting} />
+          <Input
+            name='title'
+            placeholder='Nombre (Ej. Poder Judicial)'
+            required
+            disabled={isSubmitting}
+            className='rounded-xl border-slate-200'
+          />
+          <Input
+            name='url'
+            placeholder='https://...'
+            type='url'
+            required
+            disabled={isSubmitting}
+            className='rounded-xl border-slate-200'
+          />
           <div className='flex items-center gap-2'>
-            <Input name='category' placeholder='Categoría (opcional)' disabled={isSubmitting} />
+            <Input name='category' placeholder='Categoría (opcional)' disabled={isSubmitting} className='rounded-xl border-slate-200' />
             <Button type='submit' disabled={isSubmitting}>
               Agregar
             </Button>
@@ -82,21 +95,21 @@ export function QuickLinksPanel({ links }: QuickLinksPanelProps) {
         </form>
 
         <div className='space-y-2'>
-          {items.length === 0 && <p className='text-sm text-muted-foreground'>Sin enlaces guardados aún.</p>}
+          {items.length === 0 && <p className='text-sm text-slate-500'>Sin enlaces guardados aún.</p>}
           {items.map((link) => (
-            <div key={link.id} className='flex items-center justify-between rounded-md border border-lexser-gray-100 p-3 text-sm'>
+            <div key={link.id} className='flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm'>
               <div>
-                <p className='font-medium text-lexser-gray-900'>{link.title}</p>
+                <p className='font-medium text-slate-900'>{link.title}</p>
                 <a
                   href={link.url}
-                  className='inline-flex items-center gap-1 text-xs text-lexser-blue-600 hover:text-lexser-blue-700'
+                  className='inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700'
                   target='_blank'
                   rel='noopener noreferrer'
                 >
                   <ExternalLink className='h-3 w-3' />
                   {link.url}
                 </a>
-                {link.category && <p className='text-xs text-muted-foreground'>Categoría: {link.category}</p>}
+                {link.category && <p className='text-xs text-slate-500'>Categoría: {link.category}</p>}
               </div>
               <Button
                 variant='ghost'
@@ -104,7 +117,7 @@ export function QuickLinksPanel({ links }: QuickLinksPanelProps) {
                 onClick={() => handleDelete(link.id)}
                 disabled={isSubmitting}
               >
-                <Trash className='h-4 w-4 text-muted-foreground' />
+                <Trash className='h-4 w-4 text-slate-400 hover:text-slate-600' />
               </Button>
             </div>
           ))}
