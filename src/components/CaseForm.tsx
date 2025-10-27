@@ -107,7 +107,6 @@ export function CaseForm({
         tarifa_referencia: (existingCase as any).tarifa_referencia ?? '',
         observaciones: existingCase.observaciones || '',
         descripcion_inicial: existingCase.descripcion_inicial || '',
-        objetivo_cliente: existingCase.objetivo_cliente || '',
         documentacion_recibida: existingCase.documentacion_recibida || '',
         workflow_state: (existingCase.workflow_state || 'preparacion') as CreateCaseInput['workflow_state'],
         validado_at: existingCase.validado_at || undefined,
@@ -142,7 +141,6 @@ export function CaseForm({
         tarifa_referencia: '',
         observaciones: '',
         descripcion_inicial: '',
-        objetivo_cliente: '',
         documentacion_recibida: '',
         workflow_state: 'preparacion',
         marcar_validado: false,
@@ -1114,19 +1112,6 @@ export function CaseForm({
               )}
             </div>
 
-            <div className='space-y-2'>
-              <Label htmlFor='objetivo_cliente'>Objetivo del cliente</Label>
-              <Textarea
-                id='objetivo_cliente'
-                rows={4}
-                placeholder='¿Qué espera lograr el cliente con este procedimiento?'
-                {...register('objetivo_cliente')}
-                disabled={isLoading}
-              />
-              {errors.objetivo_cliente && (
-                <p className='text-sm text-red-600'>{errors.objetivo_cliente.message}</p>
-              )}
-            </div>
 
             <div className='space-y-2'>
               <Label htmlFor='documentacion_recibida'>Documentación recibida</Label>

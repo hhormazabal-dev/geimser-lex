@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { getCurrentProfile, requireAuth, canAccessCase } from '@/lib/auth/roles';
 import { logAuditAction } from '@/lib/audit/log';
 import {
@@ -68,6 +68,13 @@ type UpdateStageDB = Partial<
 >;
 type CompleteStageDB = Partial<Pick<CaseStage, 'estado' | 'fecha_cumplida' | 'descripcion'>>;
 
+const hasServiceKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+async function getSB() {
+  if (hasServiceKey) return createServiceClient();
+  return createServerClient();
+}
+
 // Helper: copia condicional leyendo por índice (evita TS2339 aunque el tipo sea {}).
 function copyIfPresent<T extends object, K extends keyof any>(
   src: any,
@@ -93,7 +100,7 @@ export async function createStage(input: CreateStageInput) {
     if (!hasAccess) throw new Error('Sin permisos para acceder a este caso');
     if (profile.role === 'cliente') throw new Error('Sin permisos para crear etapas');
 
-    const supabase = await createServerClient();
+    const supabase = await getSB();
 
     const vi: any = validatedInput;
     const stageData: CreateStageDB = {
@@ -126,8 +133,7 @@ export async function createStage(input: CreateStageInput) {
       .insert(stageData)
       .select(`
         *,
-        responsable:profiles(nombre),
-        case:cases(caratulado)
+        responsable:profiles!case_stages_responsable_id_fkey(nombre)
       `)
       .single();
 
@@ -155,7 +161,7 @@ export async function updateStage(stageId: string, input: UpdateStageInput) {
   try {
     const profile = await requireAuth();
     const validatedInput = updateStageSchema.parse(input) as unknown as Record<string, any>;
-    const supabase = await createServerClient();
+    const supabase = await getSB();
 
     const { data: existingStage, error: fetchError } = await supabase
       .from('case_stages')
@@ -202,8 +208,7 @@ export async function updateStage(stageId: string, input: UpdateStageInput) {
       .eq('id', stageId)
       .select(`
         *,
-        responsable:profiles(nombre),
-        case:cases(caratulado)
+        responsable:profiles!case_stages_responsable_id_fkey(nombre)
       `)
       .single();
 
@@ -231,7 +236,7 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
   try {
     const profile = await requireAuth();
     const validatedInput = completeStageSchema.parse(input) as unknown as Record<string, any>;
-    const supabase = await createServerClient();
+    const supabase = await getSB();
 
     const { data: existingStage, error: fetchError } = await supabase
       .from('case_stages')
@@ -265,8 +270,7 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
       .eq('id', stageId)
       .select(`
         *,
-        responsable:profiles(nombre),
-        case:cases(caratulado)
+        responsable:profiles!case_stages_responsable_id_fkey(nombre)
       `)
       .single();
 
@@ -295,7 +299,7 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
 export async function deleteStage(stageId: string) {
   try {
     const profile = await requireAuth();
-    const supabase = await createServerClient();
+    const supabase = await getSB();
 
     const { data: existingStage, error: fetchError } = await supabase
       .from('case_stages')
@@ -337,15 +341,14 @@ export async function getStages(filters?: Partial<StageFiltersInput>) {
     const input = { page: 1, limit: 20, ...(filters ?? {}) };
     const validatedFilters = stageFiltersSchema.parse(input) as any;
 
-    const supabase = await createServerClient();
+    const supabase = await getSB();
 
     let query = supabase
       .from('case_stages')
       .select(
         `
         *,
-        responsable:profiles(id, nombre),
-        case:cases(id, caratulado)
+        responsable:profiles!case_stages_responsable_id_fkey(id, nombre)
       `,
         { count: 'exact' }
       );
@@ -381,16 +384,19 @@ export async function getStages(filters?: Partial<StageFiltersInput>) {
     if (validatedFilters.fecha_desde) query = query.gte('fecha_programada', validatedFilters.fecha_desde);
     if (validatedFilters.fecha_hasta) query = query.lte('fecha_programada', validatedFilters.fecha_hasta);
 
-    const from = (validatedFilters.page - 1) * validatedFilters.limit;
-    const to = from + validatedFilters.limit - 1;
+    const { data: stages, error, count } = await query.order('orden', { ascending: true });
+    if (error) {
+      console.error('[getStages] Supabase error', error);
+      throw new Error(error.message || 'Error al obtener etapas');
+    }
 
-    const { data: stages, error, count } = await query.range(from, to).order('orden', { ascending: true });
-    if (error) throw new Error('Error al obtener etapas');
+    const from = (validatedFilters.page - 1) * validatedFilters.limit;
+    const paginatedStages = stages?.slice(from, from + validatedFilters.limit) ?? [];
 
     return {
       success: true,
-      stages: stages || [],
-      total: count || 0,
+      stages: paginatedStages,
+      total: count ?? stages?.length ?? 0,
       page: validatedFilters.page,
       limit: validatedFilters.limit,
     };
@@ -404,7 +410,7 @@ export async function getStages(filters?: Partial<StageFiltersInput>) {
  * Función auxiliar
  */
 async function updateCaseCurrentStage(caseId: string) {
-  const supabase = await createServerClient();
+  const supabase = await getSB();
 
   const { data: nextStage } = await supabase
     .from('case_stages')

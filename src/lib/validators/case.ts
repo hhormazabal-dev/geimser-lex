@@ -92,7 +92,6 @@ const baseCaseSchema = z.object({
     .string()
     .min(20, 'Describe el contexto del caso con al menos 20 caracteres')
     .max(2000, 'La descripción inicial no puede exceder 2000 caracteres'),
-  objetivo_cliente: z.string().max(1000, 'El objetivo del cliente no puede exceder 1000 caracteres').optional(),
   documentacion_recibida: z
     .string()
     .max(2000, 'El listado de documentación no puede exceder 2000 caracteres')

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ import {
   getStages 
 } from '@/lib/actions/stages';
 import { requestCaseAdvance } from '@/lib/actions/cases';
-import { formatDate, formatRelativeTime, isDateInPast } from '@/lib/utils';
+import { cn, formatDate, formatRelativeTime, isDateInPast } from '@/lib/utils';
 import { 
   Clock, 
   CheckCircle, 
@@ -26,6 +26,8 @@ import {
   Users,
   Gavel,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
   DollarSign,
   ExternalLink,
   Wallet,
@@ -112,6 +114,34 @@ export function TimelinePanel({
     autorizado: alcanceAutorizado,
   });
   const [isRequestingStage, setIsRequestingStage] = useState<string | null>(null);
+  const stageTrackRef = useRef<HTMLDivElement | null>(null);
+  const prevStageCountRef = useRef<number>(0);
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+
+  const updateScrollControls = useCallback(() => {
+    const track = stageTrackRef.current;
+    if (!track) {
+      setCanScrollPrev(false);
+      setCanScrollNext(false);
+      return;
+    }
+    const { scrollLeft, scrollWidth, clientWidth } = track;
+    setCanScrollPrev(scrollLeft > 12);
+    setCanScrollNext(scrollLeft + clientWidth < scrollWidth - 12);
+  }, []);
+
+  const scrollTrack = useCallback((direction: 'prev' | 'next') => {
+    const track = stageTrackRef.current;
+    if (!track) return;
+    const offset = direction === 'next' ? track.clientWidth * 0.75 : -track.clientWidth * 0.75;
+    track.scrollBy({ left: offset, behavior: 'smooth' });
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(updateScrollControls);
+    } else {
+      updateScrollControls();
+    }
+  }, [updateScrollControls]);
 
   const loadStages = async () => {
     setIsLoading(true);
@@ -371,11 +401,11 @@ export function TimelinePanel({
   const getStatusIcon = (estado: string) => {
     switch (estado) {
       case 'completado':
-        return <CheckCircle className='h-5 w-5 text-green-600' />;
+        return <CheckCircle className='h-5 w-5 text-emerald-500' />;
       case 'en_proceso':
-        return <Clock className='h-5 w-5 text-blue-600' />;
+        return <Clock className='h-5 w-5 text-sky-500' />;
       default:
-        return <Circle className='h-5 w-5 text-gray-400' />;
+        return <Circle className='h-5 w-5 text-foreground/35' />;
     }
   };
 
@@ -383,17 +413,23 @@ export function TimelinePanel({
     const status = STAGE_STATUSES.find(s => s.value === estado);
     if (!status) return null;
 
-    const colorClasses = {
-      gray: 'bg-gray-100 text-gray-800',
-      blue: 'bg-blue-100 text-blue-800',
-      green: 'bg-green-100 text-green-800',
-      red: 'bg-red-100 text-red-800',
+    const tone: Record<string, string> = {
+      gray: 'border-white/25 bg-white/50 text-foreground/60',
+      blue: 'border-sky-200/50 bg-sky-500/15 text-sky-600',
+      green: 'border-emerald-200/50 bg-emerald-500/15 text-emerald-600',
+      red: 'border-rose-200/50 bg-rose-500/15 text-rose-600',
     };
 
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClasses[status.color as keyof typeof colorClasses]}`}>
+      <Badge
+        variant="outline"
+        className={cn(
+          'px-3 py-1 text-xs font-medium tracking-wide',
+          tone[status.color] ?? tone.gray
+        )}
+      >
         {status.label}
-      </span>
+      </Badge>
     );
   };
 
@@ -410,17 +446,25 @@ export function TimelinePanel({
     const status = STAGE_PAYMENT_STATUSES.find((s) => s.value === estado);
     if (!status) return null;
 
-    const colorMap: Record<string, string> = {
-      gray: 'bg-gray-100 text-gray-800',
-      amber: 'bg-amber-100 text-amber-800',
-      blue: 'bg-blue-100 text-blue-800',
-      green: 'bg-green-100 text-green-800',
-      red: 'bg-red-100 text-red-800',
+    const tone: Record<string, string> = {
+      gray: 'border-white/25 bg-white/50 text-foreground/60',
+      amber: 'border-amber-200/60 bg-amber-400/20 text-amber-700',
+      blue: 'border-sky-200/60 bg-sky-500/15 text-sky-600',
+      green: 'border-emerald-200/60 bg-emerald-500/15 text-emerald-600',
+      red: 'border-rose-200/60 bg-rose-500/15 text-rose-600',
     };
 
-    const color = colorMap[status.color] || 'bg-gray-100 text-gray-800';
-
-    return <Badge className={color} variant="outline">{status.label}</Badge>;
+    return (
+      <Badge
+        variant="outline"
+        className={cn(
+          'px-3 py-1 text-xs font-medium tracking-wide',
+          tone[status.color] ?? tone.gray
+        )}
+      >
+        {status.label}
+      </Badge>
+    );
   };
 
   const handleRequestAdvance = async (stage: CaseStage) => {
@@ -624,6 +668,36 @@ export function TimelinePanel({
   const authorizedStageLabel = clientMode ? findStageLabelByOrder(clientProgress.autorizado) : null;
 
   useEffect(() => {
+    updateScrollControls();
+    const track = stageTrackRef.current;
+    if (!track) return;
+    const handleScroll = () => updateScrollControls();
+    track.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      track.removeEventListener('scroll', handleScroll);
+    };
+  }, [filteredStages.length, updateScrollControls]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (filteredStages.length === 0) {
+      prevStageCountRef.current = 0;
+      return;
+    }
+    const track = stageTrackRef.current;
+    if (!track) return;
+
+    const targetIndex = filteredStages.findIndex((stage) => stage.estado !== 'completado');
+    const indexToReveal = targetIndex === -1 ? filteredStages.length - 1 : targetIndex;
+    const targetChild = track.children.item(indexToReveal) as HTMLElement | null;
+    if (targetChild) {
+      const behavior = prevStageCountRef.current === 0 ? 'auto' : 'smooth';
+      track.scrollTo({ left: targetChild.offsetLeft - 24, behavior });
+    }
+    prevStageCountRef.current = filteredStages.length;
+  }, [filteredStages, isLoading]);
+
+  useEffect(() => {
     if (showAddForm && etapasRequierenPago.length > 0) {
       setNewStage((prev) => ({ ...prev, requiere_pago: true }));
     }
@@ -631,7 +705,7 @@ export function TimelinePanel({
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className='shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)]'>
         <CardHeader>
           <CardTitle className='flex items-center gap-2'>
             <Clock className='h-5 w-5' />
@@ -648,7 +722,7 @@ export function TimelinePanel({
   }
 
   return (
-    <Card>
+    <Card className='shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)]'>
       <CardHeader>
         <div className='flex items-center justify-between'>
           <CardTitle className='flex items-center gap-2'>
@@ -658,6 +732,7 @@ export function TimelinePanel({
           {canManageStages && (
             <Button
               size='sm'
+              className='rounded-full px-4'
               onClick={() => setShowAddForm(!showAddForm)}
               disabled={isCreating}
             >
@@ -670,60 +745,67 @@ export function TimelinePanel({
       <CardContent className='space-y-6'>
         {etapasRequierenPago.length > 0 && (
           <div
-            className={`grid grid-cols-1 ${clientMode ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900`}
+            className={cn(
+              'grid grid-cols-1 gap-4 rounded-2xl border border-sky-200/60 bg-white/80 p-5 text-sm text-foreground/70 shadow-sm backdrop-blur',
+              clientMode ? 'md:grid-cols-4' : 'md:grid-cols-3'
+            )}
           >
-            <div>
-              <p className='text-xs uppercase tracking-wide text-blue-600'>Honorario distribuido</p>
-              <p className='text-lg font-semibold'>{formatUf(totalCostoEtapas)}</p>
+            <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Honorario distribuido</p>
+              <p className="text-lg font-semibold text-foreground">{formatUf(totalCostoEtapas)}</p>
             </div>
-            <div>
-              <p className='text-xs uppercase tracking-wide text-blue-600'>Pagado</p>
-              <p className='text-lg font-semibold'>{formatUf(totalPagadoEtapas)}</p>
+            <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Pagado</p>
+              <p className="text-lg font-semibold text-foreground">{formatUf(totalPagadoEtapas)}</p>
             </div>
-            <div>
-              <p className='text-xs uppercase tracking-wide text-blue-600'>Etapas liberadas</p>
-              <p className='text-lg font-semibold'>{etapasPagadas} / {etapasRequierenPago.length}</p>
+            <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Etapas liberadas</p>
+              <p className="text-lg font-semibold text-foreground">
+                {etapasPagadas} / {etapasRequierenPago.length}
+              </p>
               {etapasPendientesPago > 0 && (
-                <p className='text-xs text-blue-700 mt-1'>Faltan {etapasPendientesPago} pago(s) para completar el plan.</p>
+                <p className="text-xs text-sky-600">Faltan {etapasPendientesPago} pago(s) para completar el plan.</p>
               )}
             </div>
             {clientMode && (
-              <div>
-                <p className='text-xs uppercase tracking-wide text-blue-600'>Solicitadas por el cliente</p>
-                <p className='text-lg font-semibold'>{etapasSolicitadas}</p>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">
+                  Solicitadas por el cliente
+                </p>
+                <p className="text-lg font-semibold text-foreground">{etapasSolicitadas}</p>
               </div>
             )}
           </div>
         )}
 
         {clientMode && (
-          <div className='rounded-xl border border-slate-200 bg-white/80 px-4 py-4 text-sm text-slate-600 shadow-sm'>
-            <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div className="rounded-2xl border border-white/40 bg-white/80 px-5 py-5 text-sm text-foreground/65 shadow-sm backdrop-blur">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className='text-xs uppercase tracking-wide text-slate-500'>Alcance solicitado</p>
-                <p className='text-base font-semibold text-slate-900'>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Alcance solicitado</p>
+                <p className="text-base font-semibold text-foreground mt-1">
                   {clientProgress.solicitado > 0
                     ? requestedStageLabel ?? `Etapa ${clientProgress.solicitado}`
                     : 'Aún no definido'}
                 </p>
               </div>
               <div>
-                <p className='text-xs uppercase tracking-wide text-slate-500'>Autorizado por el estudio</p>
-                <p className='text-base font-semibold text-slate-900'>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Autorizado por el estudio</p>
+                <p className="text-base font-semibold text-foreground mt-1">
                   {clientProgress.autorizado > 0
                     ? authorizedStageLabel ?? `Etapa ${clientProgress.autorizado}`
                     : 'Pendiente'}
                 </p>
               </div>
               <div>
-                <p className='text-xs uppercase tracking-wide text-slate-500'>Etapas solicitadas</p>
-                <p className='text-base font-semibold text-slate-900'>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Etapas solicitadas</p>
+                <p className="text-base font-semibold text-foreground mt-1">
                   {etapasSolicitadas} / {etapasRequierenPago.length}
                 </p>
               </div>
             </div>
             {clientProgress.solicitado > clientProgress.autorizado && (
-              <p className='mt-3 text-xs text-slate-500'>
+              <p className="mt-4 text-xs text-foreground/50">
                 Estamos revisando tu solicitud para avanzar. Te notificaremos cuando esté aprobada.
               </p>
             )}
@@ -732,11 +814,11 @@ export function TimelinePanel({
 
         {/* Formulario para nueva etapa */}
         {showAddForm && canManageStages && (
-          <Card className='border-dashed'>
+          <Card className='border border-dashed border-white/40 bg-white/80 shadow-lg'>
             <CardContent className='pt-6'>
-              <div className='space-y-4'>
+              <div className='space-y-5'>
                 <div>
-                  <label className='block text-sm font-medium mb-2'>
+                  <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45 mb-2'>
                     Etapa
                   </label>
                   <select
@@ -765,7 +847,7 @@ export function TimelinePanel({
                         notas_pago: template?.notasPago || '',
                       });
                     }}
-                    className='form-input'
+                    className='input-field'
                   >
                     <option value=''>Seleccionar etapa</option>
                     {stageTemplates.map(stage => (
@@ -781,13 +863,13 @@ export function TimelinePanel({
                       placeholder='Nombre de la etapa personalizada'
                       value={newStage.etapa}
                       onChange={(e) => setNewStage({ ...newStage, etapa: e.target.value })}
-                      className='form-input mt-2'
+                      className='input-field mt-2'
                     />
                   )}
                 </div>
                 
                 <div>
-                  <label className='block text-sm font-medium mb-2'>
+                  <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45 mb-2'>
                     Descripción (opcional)
                   </label>
                   <textarea
@@ -795,13 +877,15 @@ export function TimelinePanel({
                     onChange={(e) => setNewStage({ ...newStage, descripcion: e.target.value })}
                     placeholder='Descripción de la etapa...'
                     rows={3}
-                    className='form-input'
+                    className='input-field min-h-[120px] resize-y'
                   />
                 </div>
 
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div className='space-y-2'>
-                    <label className='block text-sm font-medium'>Tipo de audiencia</label>
+                    <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                      Tipo de audiencia
+                    </label>
                     <select
                       value={newStage.audiencia_tipo}
                       onChange={(event) => {
@@ -812,7 +896,7 @@ export function TimelinePanel({
                           requiere_testigos: value === '' ? false : prev.requiere_testigos,
                         }));
                       }}
-                      className='form-input'
+                      className='input-field'
                     >
                       <option value=''>Sin audiencia definida</option>
                       {STAGE_AUDIENCE_TYPES.map((option) => (
@@ -822,16 +906,21 @@ export function TimelinePanel({
                       ))}
                     </select>
                   </div>
-                  <div className='space-y-2'>
-                    <label className='block text-sm font-medium'>Participación de testigos</label>
+                  <div className='space-y-3'>
+                    <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                      Participación de testigos
+                    </label>
                     <label
-                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-                        newStage.audiencia_tipo ? 'border-gray-300 bg-white text-gray-700' : 'border-dashed border-gray-300 bg-gray-50 text-gray-500'
-                      }`}
+                      className={cn(
+                        'flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm transition-colors',
+                        newStage.audiencia_tipo
+                          ? 'border-white/40 bg-white/70 text-foreground/70'
+                          : 'border-dashed border-white/40 bg-white/40 text-foreground/45'
+                      )}
                     >
                       <input
                         type='checkbox'
-                        className='rounded border-gray-300'
+                        className='rounded border-white/40'
                         checked={newStage.requiere_testigos}
                         disabled={!newStage.audiencia_tipo}
                         onChange={(event) =>
@@ -840,31 +929,33 @@ export function TimelinePanel({
                       />
                       Se coordinarán testigos para esta audiencia
                     </label>
-                    <p className='text-xs text-gray-500'>Esta información ayuda al equipo a planificar con tiempo la asistencia.</p>
+                    <p className='text-xs text-foreground/50'>
+                      Esta información ayuda al equipo a planificar con tiempo la asistencia.
+                    </p>
                   </div>
                 </div>
 
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
-                    <label className='block text-sm font-medium mb-2'>
+                    <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45 mb-2'>
                       Fecha programada (opcional)
                     </label>
                     <input
                       type='date'
                       value={newStage.fecha_programada}
                       onChange={(e) => setNewStage({ ...newStage, fecha_programada: e.target.value })}
-                      className='form-input'
+                      className='input-field'
                     />
                   </div>
 
                   <div>
-                    <label className='block text-sm font-medium mb-2'>
+                    <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45 mb-2'>
                       Visibilidad
                     </label>
                     <select
                       value={newStage.es_publica ? 'publica' : 'privada'}
                       onChange={(e) => setNewStage({ ...newStage, es_publica: e.target.value === 'publica' })}
-                      className='form-input'
+                      className='input-field'
                     >
                       <option value='publica'>Pública (visible para cliente)</option>
                       <option value='privada'>Privada (solo abogados)</option>
@@ -872,11 +963,11 @@ export function TimelinePanel({
                   </div>
                 </div>
 
-                <div className='space-y-4 border-t border-gray-200 pt-4'>
-                  <label className='flex items-center gap-2 text-sm font-medium text-gray-700'>
+                <div className='space-y-4 border-t border-white/40 pt-4'>
+                  <label className='flex items-center gap-2 text-sm font-medium text-foreground/70'>
                     <input
                       type='checkbox'
-                      className='rounded border-gray-300'
+                      className='rounded border-white/40'
                       checked={newStage.requiere_pago}
                       onChange={(e) =>
                         setNewStage({
@@ -892,19 +983,23 @@ export function TimelinePanel({
                   {newStage.requiere_pago && (
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                       <div className='space-y-2'>
-                        <label className='block text-sm font-medium'>Monto fijo (UF)</label>
+                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                          Monto fijo (UF)
+                        </label>
                         <input
                           type='number'
                           min='0'
                           step='0.01'
                           value={newStage.costo_uf}
                           onChange={(e) => setNewStage({ ...newStage, costo_uf: e.target.value })}
-                          className='form-input'
+                          className='input-field'
                           placeholder='Ej: 5.0'
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='block text-sm font-medium'>Componente variable (%)</label>
+                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                          Componente variable (%)
+                        </label>
                         <input
                           type='number'
                           min='0'
@@ -912,48 +1007,56 @@ export function TimelinePanel({
                           step='0.1'
                           value={newStage.porcentaje_variable}
                           onChange={(e) => setNewStage({ ...newStage, porcentaje_variable: e.target.value })}
-                          className='form-input'
+                          className='input-field'
                           placeholder='Ej: 10'
                         />
                       </div>
                       <div className='md:col-span-2 space-y-2'>
-                        <label className='block text-sm font-medium'>Base del variable</label>
+                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                          Base del variable
+                        </label>
                         <textarea
                           rows={2}
                           value={newStage.monto_variable_base}
                           onChange={(e) => setNewStage({ ...newStage, monto_variable_base: e.target.value })}
-                          className='form-input'
+                          className='input-field min-h-[90px] resize-y'
                           placeholder='Ej: 10% de lo obtenido o ahorrado.'
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='block text-sm font-medium'>Link de pago (Payku)</label>
+                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                          Link de pago (Payku)
+                        </label>
                         <input
                           type='url'
                           value={newStage.enlace_pago}
                           onChange={(e) => setNewStage({ ...newStage, enlace_pago: e.target.value })}
-                          className='form-input'
+                          className='input-field'
                           placeholder='https://...'
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='block text-sm font-medium'>Notas internas</label>
+                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                          Notas internas
+                        </label>
                         <textarea
                           rows={2}
                           value={newStage.notas_pago}
                           onChange={(e) => setNewStage({ ...newStage, notas_pago: e.target.value })}
-                          className='form-input'
+                          className='input-field min-h-[90px] resize-y'
                           placeholder='Instrucciones u observaciones sobre el cobro.'
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='block text-sm font-medium'>Estado inicial del pago</label>
+                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                          Estado inicial del pago
+                        </label>
                         <select
                           value={newStage.estado_pago}
                           onChange={(e) =>
                             setNewStage({ ...newStage, estado_pago: e.target.value as CreateStageInput['estado_pago'] })
                           }
-                          className='form-input'
+                          className='input-field'
                         >
                           {STAGE_PAYMENT_STATUSES.map((status) => (
                             <option key={status.value} value={status.value}>
@@ -963,14 +1066,16 @@ export function TimelinePanel({
                         </select>
                       </div>
                       <div className='space-y-2'>
-                        <label className='block text-sm font-medium'>Monto ya pagado (UF)</label>
+                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
+                          Monto ya pagado (UF)
+                        </label>
                         <input
                           type='number'
                           min='0'
                           step='0.01'
                           value={newStage.monto_pagado_uf}
                           onChange={(e) => setNewStage({ ...newStage, monto_pagado_uf: e.target.value })}
-                          className='form-input'
+                          className='input-field'
                           placeholder='0.00'
                         />
                       </div>
@@ -980,6 +1085,7 @@ export function TimelinePanel({
                   <div className='flex justify-end space-x-2'>
                     <Button
                       variant='outline'
+                      className='rounded-full px-4'
                       onClick={() => {
                         setShowAddForm(false);
                         setNewStage({
@@ -1004,7 +1110,7 @@ export function TimelinePanel({
                     >
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreateStage} disabled={isCreating}>
+                    <Button className='rounded-full px-5' onClick={handleCreateStage} disabled={isCreating}>
                       {isCreating ? (
                         <>
                           <Loader2 className='h-4 w-4 mr-2 animate-spin' />
@@ -1022,302 +1128,343 @@ export function TimelinePanel({
         )}
 
         {/* Timeline de etapas */}
-        <div className='relative'>
-          {filteredStages.map((stage, index) => {
-            const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
-            const stageOrder = stage.orden ?? index + 1;
-            const isAuthorizedStage = clientMode && stageOrder <= clientProgress.autorizado;
-            const isRequestedStage = clientMode && stageOrder <= clientProgress.solicitado && stageOrder > clientProgress.autorizado;
-            const cardStateClasses = [
-              stage.estado === 'completado' ? 'bg-green-50' : '',
-              isAuthorizedStage ? 'border-green-200 bg-green-50/70' : '',
-              !isAuthorizedStage && isRequestedStage ? 'border-blue-200 bg-blue-50/70' : '',
-            ]
-              .filter(Boolean)
-              .join(' ');
-            const isStageCompleted = stage.estado === 'completado';
-            const requestDisabled =
-              isAuthorizedStage ||
-              isStageCompleted ||
-              (stage.estado_pago ?? 'pendiente') === 'pagado' ||
-              stageOrder <= clientProgress.solicitado ||
-              isRequestingStage === stage.id;
-            const audienceLabel = stage.audiencia_tipo
-              ? STAGE_AUDIENCE_TYPES.find((option) => option.value === stage.audiencia_tipo)?.label ??
-                `Audiencia ${stage.audiencia_tipo}`
-              : null;
-
-            return (
-              <div key={stage.id} className='relative flex items-start space-x-4 pb-8'>
-              {/* Línea vertical */}
-              {index < filteredStages.length - 1 && (
-                <div className='absolute left-2.5 top-8 w-0.5 h-full bg-gray-200' />
-              )}
-              
-              {/* Icono de estado */}
-              <div className='relative z-10 flex-shrink-0'>
-                {getStatusIcon(stage.estado || 'pendiente')}
+        <div className='space-y-4'>
+          <div className='flex flex-wrap items-center justify-between gap-3'>
+            <p className='text-sm text-foreground/60'>Arrastra horizontalmente para revisar el avance del caso.</p>
+            {filteredStages.length > 0 && (
+              <div className='hidden md:flex items-center gap-2'>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  className='rounded-full border border-white/40 bg-white/60 backdrop-blur'
+                  onClick={() => scrollTrack('prev')}
+                  disabled={!canScrollPrev}
+                  aria-label='Ver etapas anteriores'
+                >
+                  <ChevronLeft className='h-4 w-4' />
+                </Button>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  className='rounded-full border border-white/40 bg-white/60 backdrop-blur'
+                  onClick={() => scrollTrack('next')}
+                  disabled={!canScrollNext}
+                  aria-label='Ver etapas siguientes'
+                >
+                  <ChevronRight className='h-4 w-4' />
+                </Button>
               </div>
+            )}
+          </div>
+          <div className='relative'>
+            {filteredStages.length > 0 && (
+              <>
+                <div className='pointer-events-none absolute inset-y-0 left-0 hidden w-16 bg-gradient-to-r from-white via-white/80 to-transparent md:block' />
+                <div className='pointer-events-none absolute inset-y-0 right-0 hidden w-16 bg-gradient-to-l from-white via-white/80 to-transparent md:block' />
+              </>
+            )}
+            <div
+              ref={stageTrackRef}
+              className='flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory'
+            >
+              {filteredStages.map((stage, index) => {
+                const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
+                const stageOrder = stage.orden ?? index + 1;
+                const isAuthorizedStage = clientMode && stageOrder <= clientProgress.autorizado;
+                const isRequestedStage = clientMode && stageOrder <= clientProgress.solicitado && stageOrder > clientProgress.autorizado;
+                const isStageCompleted = stage.estado === 'completado';
+                const cardStateClasses = cn(
+                  'h-full border border-white/35 bg-white/80 shadow-sm backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl',
+                  isStageCompleted && 'border-emerald-200/70 bg-emerald-50/70',
+                  !isStageCompleted && isAuthorizedStage && 'border-emerald-200/60 bg-emerald-50/45',
+                  !isStageCompleted && !isAuthorizedStage && isRequestedStage && 'border-sky-200/60 bg-sky-50/45'
+                );
+                const requestDisabled =
+                  isAuthorizedStage ||
+                  isStageCompleted ||
+                  (stage.estado_pago ?? 'pendiente') === 'pagado' ||
+                  stageOrder <= clientProgress.solicitado ||
+                  isRequestingStage === stage.id;
+                const audienceLabel = stage.audiencia_tipo
+                  ? STAGE_AUDIENCE_TYPES.find((option) => option.value === stage.audiencia_tipo)?.label ??
+                    `Audiencia ${stage.audiencia_tipo}`
+                  : null;
+                const statusBadge = getStatusBadge(stage.estado || 'pendiente');
+                const paymentBadge = stage.requiere_pago
+                  ? getPaymentStatusBadge(stage.estado_pago ?? 'pendiente')
+                  : null;
 
-              {/* Contenido de la etapa */}
-              <div className='flex-1 min-w-0'>
-                <Card className={cardStateClasses}>
-                  <CardContent className='pt-4'>
-                    <div className='flex items-start justify-between mb-3'>
-                      <div className='flex-1'>
-                        <h4 className='font-medium text-gray-900'>
-                          {stage.etapa}
-                        </h4>
-                        {stage.descripcion && (
-                          <p className='text-sm text-gray-600 mt-1'>
-                            {stage.descripcion}
-                          </p>
-                        )}
-                        {(audienceLabel || stage.requiere_testigos) && (
-                          <div className='mt-3 flex flex-wrap items-center gap-2 text-xs'>
-                            {audienceLabel && (
-                              <span className='inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700'>
-                                <Gavel className='h-3 w-3' />
-                                {audienceLabel}
-                              </span>
+                return (
+                  <div key={stage.id} className='snap-center shrink-0 basis-full min-w-[280px] sm:basis-[60%] lg:basis-[380px]'>
+                    <Card className={cardStateClasses}>
+                      <CardContent className='flex h-full flex-col gap-5 p-6'>
+                        <div className='flex flex-col gap-4'>
+                          <div className='flex items-start justify-between gap-3'>
+                            <div className='flex items-start gap-3'>
+                              <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-white/40 bg-white/80 shadow-sm'>
+                                {getStatusIcon(stage.estado || 'pendiente')}
+                              </div>
+                              <div>
+                                <p className='text-[11px] uppercase tracking-[0.28em] text-foreground/45'>
+                                  Etapa {stageOrder}
+                                </p>
+                                <h4 className='mt-1 text-lg font-semibold text-foreground tracking-tight'>
+                                  {stage.etapa}
+                                </h4>
+                              </div>
+                            </div>
+                            <div className='flex flex-col items-end gap-2'>
+                              {statusBadge}
+                              {paymentBadge}
+                              {!stage.es_publica && (
+                                <Badge variant='outline' className='px-3 py-1 text-xs text-foreground/55'>Privada</Badge>
+                              )}
+                            </div>
+                          </div>
+                          {stage.descripcion && (
+                            <p className='text-sm leading-relaxed text-foreground/65'>
+                              {stage.descripcion}
+                            </p>
+                          )}
+                          {(audienceLabel ||
+                            stage.requiere_testigos ||
+                            stageResponsable ||
+                            stage.fecha_programada ||
+                            stage.requiere_pago) && (
+                            <div className='grid grid-cols-1 gap-3 text-xs text-foreground/60 sm:grid-cols-2'>
+                              {stage.fecha_programada && (
+                                <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
+                                  <p className='text-[10px] uppercase tracking-[0.22em] text-foreground/40'>
+                                    Fecha programada
+                                  </p>
+                                  <p className='mt-1 text-sm font-medium text-foreground'>
+                                    {formatDate(stage.fecha_programada)}
+                                  </p>
+                                  {isDateInPast(stage.fecha_programada) && stage.estado !== 'completado' && (
+                                    <p className='mt-1 text-[11px] text-rose-500'>Revisar seguimiento</p>
+                                  )}
+                                </div>
+                              )}
+                              {stageResponsable && (
+                                <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
+                                  <p className='text-[10px] uppercase tracking-[0.22em] text-foreground/40'>
+                                    Responsable
+                                  </p>
+                                  <p className='mt-1 text-sm font-medium text-foreground'>
+                                    {stageResponsable.nombre ?? 'Por asignar'}
+                                  </p>
+                                </div>
+                              )}
+                              {audienceLabel && (
+                                <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
+                                  <p className='text-[10px] uppercase tracking-[0.22em] text-foreground/40'>
+                                    Audiencia
+                                  </p>
+                                  <p className='mt-1 flex items-center gap-2 text-sm font-medium text-foreground'>
+                                    <Gavel className='h-4 w-4 text-sky-500' />
+                                    {audienceLabel}
+                                  </p>
+                                  {stage.requiere_testigos && (
+                                    <p className='mt-1 text-xs text-foreground/55'>Con coordinación de testigos.</p>
+                                  )}
+                                </div>
+                              )}
+                              {stage.requiere_pago && (
+                                <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
+                                  <p className='text-[10px] uppercase tracking-[0.22em] text-foreground/40'>
+                                    Cobranza
+                                  </p>
+                                  <p className='mt-1 text-sm font-medium text-foreground'>
+                                    {formatUf(stage.costo_uf)}
+                                  </p>
+                                  {typeof stage.porcentaje_variable === 'number' && stage.porcentaje_variable > 0 && (
+                                    <p className='mt-1 text-xs text-foreground/55'>
+                                      Variable: {stage.porcentaje_variable}%{stage.monto_variable_base ? ` · ${stage.monto_variable_base}` : ''}
+                                    </p>
+                                  )}
+                                  <p className='mt-1 text-xs text-foreground/55'>
+                                    {stage.monto_pagado_uf && stage.monto_pagado_uf > 0
+                                      ? `Pagado ${formatUf(stage.monto_pagado_uf)}`
+                                      : 'Pago pendiente'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {stage.notas_pago && (
+                            <p className='rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-xs text-foreground/60 shadow-inner'>
+                              {stage.notas_pago}
+                            </p>
+                          )}
+                          {stage.estado_pago === 'solicitado' && (
+                            <p className='flex items-center gap-2 text-xs text-amber-600'>
+                              <AlertCircle className='h-3 w-3' />
+                              Solicitud enviada{' '}
+                              {stage.solicitado_at ? formatRelativeTime(stage.solicitado_at) : 'recientemente'}.
+                            </p>
+                          )}
+                        </div>
+                        <div className='flex flex-col gap-3'>
+                          <div className='flex flex-wrap items-center gap-2'>
+                            {stage.enlace_pago && (
+                              <Button size='sm' variant='outline' className='rounded-full px-4' asChild>
+                                <a href={stage.enlace_pago} target='_blank' rel='noopener noreferrer'>
+                                  <ExternalLink className='h-4 w-4 mr-2' />
+                                  Abrir enlace Payku
+                                </a>
+                              </Button>
                             )}
-                            {stage.requiere_testigos && (
-                              <span className='inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800'>
-                                <Users className='h-3 w-3' />
-                                Requiere testigos
-                              </span>
+                            {canManageStages && (
+                              <>
+                                <Button
+                                  size='sm'
+                                  variant='ghost'
+                                  className='rounded-full px-4'
+                                  onClick={() => handleAssignPaymentLink(stage)}
+                                  disabled={paymentActionStage === stage.id}
+                                >
+                                  {paymentActionStage === stage.id ? (
+                                    <>
+                                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                                      Guardando…
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Link2 className='h-4 w-4 mr-2' />
+                                      {stage.enlace_pago ? 'Editar enlace' : 'Asignar enlace'}
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  size='sm'
+                                  variant='ghost'
+                                  className='rounded-full px-4'
+                                  onClick={() => handleRegisterPartialPayment(stage)}
+                                  disabled={paymentActionStage === stage.id}
+                                >
+                                  {paymentActionStage === stage.id ? (
+                                    <>
+                                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                                      Registrando…
+                                    </>
+                                  ) : (
+                                    <>
+                                      <PiggyBank className='h-4 w-4 mr-2' />
+                                      Registrar pago
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  size='sm'
+                                  variant='outline'
+                                  className='rounded-full px-4'
+                                  onClick={() => handleMarkStagePaid(stage)}
+                                  disabled={paymentActionStage === stage.id}
+                                >
+                                  {paymentActionStage === stage.id ? (
+                                    <>
+                                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                                      Confirmando…
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Wallet className='h-4 w-4 mr-2' />
+                                      Marcar pagado
+                                    </>
+                                  )}
+                                </Button>
+                              </>
+                            )}
+                            {clientMode && !canManageStages && (
+                              <Button
+                                size='sm'
+                                variant='outline'
+                                className='rounded-full px-4'
+                                onClick={() => handleRequestAdvance(stage)}
+                                disabled={requestDisabled}
+                              >
+                                {isRequestingStage === stage.id ? (
+                                  <>
+                                    <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                                    Enviando…
+                                  </>
+                                ) : (
+                                  <>
+                                    <DollarSign className='h-4 w-4 mr-2' />
+                                    Solicitar prepago
+                                  </>
+                                )}
+                              </Button>
                             )}
                           </div>
-                        )}
-                      </div>
-
-                      <div className='flex items-center gap-2 ml-4'>
-                        {getStatusBadge(stage.estado || 'pendiente')}
-                        {!stage.es_publica && (
-                          <Badge variant='outline'>Privada</Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className='flex items-center gap-4 text-sm text-gray-500 mb-3'>
-                      {stage.fecha_programada && (
-                        <div className='flex items-center gap-1'>
-                          <Calendar className='h-4 w-4' />
-                          <span className={isDateInPast(stage.fecha_programada) && stage.estado !== 'completado' ? 'text-red-600 font-medium' : ''}>
-                            {formatDate(stage.fecha_programada)}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {stageResponsable?.nombre && (
-                        <div className='flex items-center gap-1'>
-                          <User className='h-4 w-4' />
-                          <span>{stageResponsable.nombre}</span>
-                        </div>
-                      )}
-
-                      {stage.fecha_cumplida && (
-                        <div className='text-green-600'>
-                          Completado {formatRelativeTime(stage.fecha_cumplida)}
-                        </div>
-                      )}
-                    </div>
-
-                    {stage.requiere_pago && (
-                      <div className='mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm space-y-2 text-amber-900'>
-                        <div className='flex flex-wrap items-center justify-between gap-2'>
-                          <div className='flex items-center gap-2 font-semibold'>
-                            <DollarSign className='h-4 w-4' />
-                            <span>Costo de la etapa:</span>
-                            <span>{formatUf(stage.costo_uf)}</span>
-                          </div>
-                          {getPaymentStatusBadge(stage.estado_pago || 'pendiente')}
-                        </div>
-
-                        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 text-amber-800'>
-                          <div className='flex items-center gap-2'>
-                            <PiggyBank className='h-4 w-4' />
-                            <span>Pagado: {formatUf(stage.monto_pagado_uf)}</span>
-                          </div>
-                          {stage.porcentaje_variable && (
-                            <div className='flex items-center gap-2'>
-                              <Wallet className='h-4 w-4' />
-                              <span>
-                                Variable: {stage.porcentaje_variable}% {stage.monto_variable_base ? `(${stage.monto_variable_base})` : ''}
-                              </span>
+                          {stage.estado_pago !== 'pagado' && stage.enlace_pago && (
+                            <p className='flex items-center gap-1 text-xs text-foreground/55'>
+                              <AlertCircle className='h-3 w-3' />
+                              Comparte el enlace con el cliente para liberar esta etapa.
+                            </p>
+                          )}
+                          {canManageStages && (
+                            <div className='flex flex-wrap items-center gap-2 border-t border-white/30 pt-3'>
+                              {stage.estado !== 'completado' && (
+                                <Button
+                                  size='sm'
+                                  variant='outline'
+                                  className='rounded-full px-4'
+                                  onClick={() => handleCompleteStage(stage)}
+                                  disabled={
+                                    processingStage === stage.id ||
+                                    (stage.requiere_pago && stage.estado_pago !== 'pagado')
+                                  }
+                                >
+                                  {processingStage === stage.id ? (
+                                    <>
+                                      <Loader2 className='h-4 w-4 mr-1 animate-spin' />
+                                      Procesando…
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className='h-4 w-4 mr-1' />
+                                      Completar
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              <Button
+                                size='sm'
+                                variant='ghost'
+                                className='rounded-full px-3'
+                                onClick={() => setEditingStage(stage.id)}
+                              >
+                                <Edit className='h-4 w-4' />
+                              </Button>
+                              <Button
+                                size='sm'
+                                variant='ghost'
+                                className='rounded-full px-3'
+                                onClick={() => handleDeleteStage(stage.id)}
+                              >
+                                <Trash2 className='h-4 w-4' />
+                              </Button>
                             </div>
                           )}
                         </div>
-
-                        {stage.notas_pago && (
-                          <p className='text-xs text-amber-700 bg-white/60 border border-amber-200 rounded-md px-3 py-2'>
-                            {stage.notas_pago}
-                          </p>
-                        )}
-
-                        {stage.estado_pago === 'solicitado' && (
-                          <p className='flex items-center gap-2 text-xs text-amber-700'>
-                            <AlertCircle className='h-3 w-3' />
-                            Solicitud enviada{' '}
-                            {stage.solicitado_at ? formatRelativeTime(stage.solicitado_at) : 'recientemente'}.
-                          </p>
-                        )}
-
-                        <div className='flex flex-wrap items-center gap-2'>
-                          {stage.enlace_pago && (
-                            <Button size='sm' variant='outline' asChild>
-                              <a href={stage.enlace_pago} target='_blank' rel='noopener noreferrer'>
-                                <ExternalLink className='h-4 w-4 mr-2' />
-                                Abrir enlace Payku
-                              </a>
-                            </Button>
-                          )}
-                          {canManageStages && (
-                            <>
-                          <Button
-                            size='sm'
-                            variant='ghost'
-                            onClick={() => handleAssignPaymentLink(stage)}
-                            disabled={paymentActionStage === stage.id}
-                          >
-                            {paymentActionStage === stage.id ? (
-                              <>
-                                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                Guardando…
-                              </>
-                            ) : (
-                              <>
-                                <Link2 className='h-4 w-4 mr-2' />
-                                {stage.enlace_pago ? 'Editar enlace' : 'Asignar enlace'}
-                              </>
-                            )}
-                            </Button>
-                            <Button
-                              size='sm'
-                            variant='ghost'
-                            onClick={() => handleRegisterPartialPayment(stage)}
-                            disabled={paymentActionStage === stage.id}
-                          >
-                            {paymentActionStage === stage.id ? (
-                              <>
-                                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                Registrando…
-                              </>
-                            ) : (
-                              <>
-                                <PiggyBank className='h-4 w-4 mr-2' />
-                                Registrar pago
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size='sm'
-                            variant='outline'
-                            onClick={() => handleMarkStagePaid(stage)}
-                            disabled={paymentActionStage === stage.id}
-                          >
-                            {paymentActionStage === stage.id ? (
-                              <>
-                                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                Confirmando…
-                              </>
-                            ) : (
-                              <>
-                                <Wallet className='h-4 w-4 mr-2' />
-                                Marcar pagado
-                              </>
-                            )}
-                          </Button>
-                            </>
-                          )}
-                          {clientMode && !canManageStages && (
-                            <Button
-                              size='sm'
-                              variant='outline'
-                              onClick={() => handleRequestAdvance(stage)}
-                              disabled={requestDisabled}
-                            >
-                              {isRequestingStage === stage.id ? (
-                                <>
-                                  <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                  Enviando…
-                                </>
-                              ) : (
-                                <>
-                                  <DollarSign className='h-4 w-4 mr-2' />
-                                  Solicitar prepago
-                                </>
-                              )}
-                            </Button>
-                          )}
-                        </div>
-
-                        {stage.estado_pago !== 'pagado' && stage.enlace_pago && (
-                          <p className='text-xs text-amber-700 flex items-center gap-1'>
-                            <AlertCircle className='h-3 w-3' />
-                            Comparte el enlace con el cliente para liberar esta etapa.
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {canManageStages && (
-                      <div className='flex items-center gap-2'>
-                        {stage.estado !== 'completado' && (
-                          <Button
-                            size='sm'
-                            variant='outline'
-                          onClick={() => handleCompleteStage(stage)}
-                          disabled={
-                            processingStage === stage.id ||
-                            (stage.requiere_pago && stage.estado_pago !== 'pagado')
-                          }
-                          >
-                            {processingStage === stage.id ? (
-                              <>
-                                <Loader2 className='h-4 w-4 mr-1 animate-spin' />
-                                Procesando…
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className='h-4 w-4 mr-1' />
-                                Completar
-                              </>
-                            )}
-                          </Button>
-                        )}
-                        
-                        <Button
-                          size='sm'
-                          variant='ghost'
-                          onClick={() => setEditingStage(stage.id)}
-                        >
-                          <Edit className='h-4 w-4' />
-                        </Button>
-                        
-                        <Button
-                          size='sm'
-                          variant='ghost'
-                          onClick={() => handleDeleteStage(stage.id)}
-                        >
-                          <Trash2 className='h-4 w-4' />
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })}
             </div>
-            );
-          })}
+          </div>
         </div>
 
         {filteredStages.length === 0 && (
-          <div className='text-center py-8 text-gray-500'>
-            <Clock className='h-12 w-12 mx-auto mb-4 text-gray-300' />
-            <p>No hay etapas definidas para este caso</p>
+          <div className='py-10 text-center text-foreground/60'>
+            <Clock className='mx-auto mb-4 h-12 w-12 text-foreground/20' />
+            <p className='text-base font-medium text-foreground/70'>No hay etapas definidas para este caso</p>
             {canManageStages && (
-              <p className='text-sm mt-2'>
+              <p className='mt-2 text-sm'>
                 Haz clic en "Nueva Etapa" para agregar la primera etapa
               </p>
             )}
@@ -1325,16 +1472,16 @@ export function TimelinePanel({
         )}
 
         {stageTemplates.length > 0 && (
-          <div className='border-t pt-4 mt-2'>
-            <h3 className='text-sm font-semibold text-gray-700'>Plan estimado de referencia para materia {caseMateria || 'Civil'}</h3>
-            <p className='text-xs text-gray-500 mt-1'>Duraciones aproximadas en días a partir del inicio del caso.</p>
-            <ul className='mt-3 space-y-2 text-sm text-gray-600'>
+          <div className='mt-6 border-t border-white/30 pt-5'>
+            <h3 className='text-sm font-semibold text-foreground/70'>Plan estimado de referencia para materia {caseMateria || 'Civil'}</h3>
+            <p className='mt-1 text-xs text-foreground/50'>Duraciones aproximadas en días a partir del inicio del caso.</p>
+            <ul className='mt-3 space-y-2 text-sm text-foreground/60'>
               {stageTemplates.map((template, idx) => (
                 <li key={`${template.etapa}-${idx}`} className='flex items-start gap-2'>
-                  <span className='mt-1 h-2 w-2 rounded-full bg-blue-500 flex-shrink-0' />
+                  <span className='mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-sky-500/70' />
                   <span>
-                    <span className='font-medium text-gray-800'>{template.etapa}</span>
-                    <span className='block text-gray-500'>
+                    <span className='font-medium text-foreground/75'>{template.etapa}</span>
+                    <span className='block text-foreground/50'>
                       {template.descripcion}
                       {template.diasEstimados ? ` · ≈ ${template.diasEstimados} días` : ''}
                     </span>

@@ -469,34 +469,45 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   ] as const;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="relative min-h-screen pb-16">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="sticky top-0 z-40 border-b border-white/40 bg-white/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" onClick={() => router.back()}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full border border-white/40 px-4 text-sm font-medium text-foreground/70 hover:text-foreground"
+                onClick={() => router.back()}
+              >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Volver
               </Button>
               <div className="h-6 w-px bg-gray-300" />
-              <Scale className="h-6 w-6 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-slate-200/40 text-blue-600">
+                <Scale className="h-5 w-5" />
+              </div>
               <div>
-                <h1 className="text-lg font-semibold text-gray-900">Detalle del Caso</h1>
-                <p className="text-sm text-gray-500">Xel Chile</p>
+                <h1 className="text-base font-semibold text-foreground">Detalle del Caso</h1>
+                <p className="text-sm text-foreground/50">Lex Chile · Suite Studio</p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
               {canEdit && (
-                <Button size="sm" variant="outline">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-full border border-white/40 px-4 text-sm font-medium text-foreground/70 hover:text-foreground"
+                >
                   <Edit className="h-4 w-4 mr-2" />
                   Editar Caso
                 </Button>
               )}
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{profile.nombre}</p>
-                <p className="text-xs text-gray-500 capitalize">
+                <p className="text-sm font-medium text-foreground">{profile.nombre}</p>
+                <p className="text-xs text-foreground/50 capitalize">
                   {profile.role.replace('_', ' ')}
                 </p>
               </div>
@@ -511,218 +522,316 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Header del caso */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between mb-6">
+        <Card className="mb-10 shadow-[0_35px_65px_-34px_rgba(15,23,42,0.45)]">
+          <CardContent className="pt-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="flex-1">
-                <h2 className="text-3xl font-bold text-gray-900 mb-3">{caseData.caratulado}</h2>
-                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4">
+                <h2 className="text-3xl font-semibold text-foreground mb-2 tracking-tight">
+                  {caseData.caratulado}
+                </h2>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-foreground/60">
                   {caseData.numero_causa && (
                     <span className="flex items-center">
-                      <Scale className="h-4 w-4 mr-1" />
+                      <Scale className="h-4 w-4 mr-1 text-blue-600" />
                       Causa: {caseData.numero_causa}
                     </span>
                   )}
-                  {caseData.materia && <span>Materia: {caseData.materia}</span>}
+                  {caseData.materia && <span className="inline-flex items-center gap-2">
+                    <Badge variant="outline" className="badge-spark capitalize">
+                      {caseData.materia.toLowerCase()}
+                    </Badge>
+                  </span>}
                   {caseData.tribunal && (
                     <span className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-1" />
+                      <MapPin className="h-4 w-4 mr-1 text-foreground/40" />
                       {caseData.tribunal}
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex flex-col items-end space-y-2">
+              <div className="flex flex-wrap items-center justify-end gap-2 md:flex-col md:items-end md:gap-3">
                 {getStatusBadge(caseData.estado || 'activo')}
                 {caseData.prioridad && getPriorityBadge(caseData.prioridad)}
-                {caseData.etapa_actual && <Badge variant="outline">{caseData.etapa_actual}</Badge>}
+                {caseData.etapa_actual && (
+                  <Badge variant="outline" className="badge-spark">
+                    {caseData.etapa_actual}
+                  </Badge>
+                )}
               </div>
             </div>
 
             {/* Información principal */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
               {/* Abogado responsable */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="font-medium text-blue-900 mb-2 flex items-center">
-                  <User className="h-4 w-4 mr-2" />
-                  Abogado Responsable
-                </h3>
-                {currentLawyer ? (
-                  <div className="space-y-1 text-sm">
-                    <p className="font-medium text-blue-800">{currentLawyer.nombre}</p>
-                    {currentLawyer.telefono && (
-                      <p className="flex items-center text-blue-700">
-                        <Phone className="h-3 w-3 mr-1" />
-                        {currentLawyer.telefono}
+              <div className="group relative overflow-hidden rounded-2xl border border-blue-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                />
+                <div className="relative z-10 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                        Abogado responsable
                       </p>
-                    )}
-                    {currentLawyer.email && (
-                      <p className="flex items-center text-blue-700">
-                        <Mail className="h-3 w-3 mr-1" />
-                        {currentLawyer.email}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-blue-700">Este caso aún no tiene un abogado asignado.</p>
-                )}
-
-                {canReassign && (
-                  <form className="mt-4 space-y-2" onSubmit={handleReassignLawyer}>
-                    <Label htmlFor="case-lawyer-select" className="text-xs uppercase tracking-wide text-blue-800">
-                      Reasignar / asignar abogado
-                    </Label>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <select
-                        id="case-lawyer-select"
-                        className="form-input flex-1"
-                        value={selectedLawyerId}
-                        onChange={(event) => setSelectedLawyerId(event.target.value)}
-                        disabled={isLoadingLawyers || isReassigning}
-                      >
-                        <option value="">{isLoadingLawyers ? 'Cargando abogados…' : 'Selecciona un abogado'}</option>
-                        {availableLawyers.map((lawyer) => (
-                          <option key={lawyer.id} value={lawyer.id}>
-                            {lawyer.nombre}
-                            {lawyer.email ? ` • ${lawyer.email}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        type="submit"
-                        disabled={isReassigning || !selectedLawyerId || selectedLawyerId === currentLawyer?.id}
-                      >
-                        {isReassigning ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Guardando…
-                          </>
-                        ) : (
-                          'Actualizar'
-                        )}
-                      </Button>
+                      {currentLawyer ? (
+                        <div className="mt-3 space-y-1.5 text-sm text-foreground/70">
+                          <p className="text-base font-semibold text-foreground">{currentLawyer.nombre}</p>
+                          {currentLawyer.telefono && (
+                            <p className="flex items-center gap-2 text-foreground/60">
+                              <Phone className="h-3.5 w-3.5 text-blue-500" />
+                              {currentLawyer.telefono}
+                            </p>
+                          )}
+                          {currentLawyer.email && (
+                            <p className="flex items-center gap-2 text-foreground/60">
+                              <Mail className="h-3.5 w-3.5 text-blue-500" />
+                              {currentLawyer.email}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-sm text-foreground/60">
+                          Este caso aún no tiene un abogado asignado.
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs text-blue-700">
-                      Los cambios quedan registrados automáticamente en el historial del caso.
-                    </p>
-                  </form>
-                )}
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-transparent text-blue-600">
+                      <User className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  {canReassign && (
+                    <form className="space-y-3" onSubmit={handleReassignLawyer}>
+                      <Label
+                        htmlFor="case-lawyer-select"
+                        className="text-[11px] font-semibold uppercase tracking-[0.32em] text-foreground/45"
+                      >
+                        Reasignar · asignar abogado
+                      </Label>
+                      <div className="flex flex-col gap-2">
+                        <select
+                          id="case-lawyer-select"
+                          className="input-field w-full"
+                          value={selectedLawyerId}
+                          onChange={(event) => setSelectedLawyerId(event.target.value)}
+                          disabled={isLoadingLawyers || isReassigning}
+                        >
+                          <option value="">
+                            {isLoadingLawyers ? 'Cargando abogados…' : 'Selecciona un abogado'}
+                          </option>
+                          {availableLawyers.map((lawyer) => (
+                            <option key={lawyer.id} value={lawyer.id}>
+                              {lawyer.nombre}
+                              {lawyer.email ? ` · ${lawyer.email}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="rounded-full px-4 self-start"
+                          disabled={isReassigning || !selectedLawyerId || selectedLawyerId === currentLawyer?.id}
+                        >
+                          {isReassigning ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Guardando…
+                            </>
+                          ) : (
+                            'Actualizar'
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-foreground/50">
+                        Los cambios quedarán registrados automáticamente en el historial del caso.
+                      </p>
+                    </form>
+                  )}
+                </div>
               </div>
 
               {/* Cliente */}
               {caseData.nombre_cliente && (
-                <div className="bg-green-50 rounded-lg p-4">
-                  <h3 className="font-medium text-green-900 mb-2 flex items-center">
-                    <User className="h-4 w-4 mr-2" />
-                    Cliente
-                  </h3>
-                  <p className="text-sm font-medium text-green-800">{caseData.nombre_cliente}</p>
-                  {caseData.rut_cliente && (
-                    <p className="text-sm text-green-700">RUT: {caseData.rut_cliente}</p>
-                  )}
+                <div className="group relative overflow-hidden rounded-2xl border border-emerald-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  />
+                  <div className="relative z-10">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                          Cliente principal
+                        </p>
+                        <p className="mt-3 text-base font-semibold text-foreground">
+                          {caseData.nombre_cliente}
+                        </p>
+                        {caseData.rut_cliente && (
+                          <p className="mt-1 text-sm text-foreground/60">RUT · {caseData.rut_cliente}</p>
+                        )}
+                      </div>
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-600">
+                        <User className="h-5 w-5" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {/* Fechas */}
-              <div className="bg-purple-50 rounded-lg p-4">
-                <h3 className="font-medium text-purple-900 mb-2 flex items-center">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Fechas
-                </h3>
-                <div className="space-y-1 text-sm text-purple-700">
-                  {caseData.fecha_inicio && <p>Inicio: {formatDate(caseData.fecha_inicio)}</p>}
-                  {caseData.fecha_termino && <p>Término: {formatDate(caseData.fecha_termino)}</p>}
+              <div className="group relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                />
+                <div className="relative z-10 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                        Fechas clave
+                      </p>
+                      <div className="mt-3 space-y-1.5 text-sm text-foreground/65">
+                        {caseData.fecha_inicio && (
+                          <p>
+                            Inicio · <span className="font-medium text-foreground">{formatDate(caseData.fecha_inicio)}</span>
+                          </p>
+                        )}
+                        {caseData.fecha_termino && (
+                          <p>
+                            Término · <span className="font-medium text-foreground">{formatDate(caseData.fecha_termino)}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 via-indigo-500/10 to-transparent text-indigo-600">
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Valor */}
               {caseData.valor_estimado && (
-                <div className="bg-yellow-50 rounded-lg p-4">
-                  <h3 className="font-medium text-yellow-900 mb-2 flex items-center">
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    Valor Estimado
-                  </h3>
-                  <p className="text-lg font-bold text-yellow-800">
-                    {formatCurrency(caseData.valor_estimado)}
-                  </p>
+                <div className="group relative overflow-hidden rounded-2xl border border-amber-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  />
+                  <div className="relative z-10 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                          Valor estimado
+                        </p>
+                        <p className="mt-3 text-2xl font-semibold text-foreground">
+                          {formatCurrency(caseData.valor_estimado)}
+                        </p>
+                      </div>
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent text-amber-600">
+                        <DollarSign className="h-5 w-5" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {(clientAdvance.solicitado > 0 || clientAdvance.autorizado > 0) && (
-                <div className="bg-sky-50 rounded-lg p-4">
-                  <h3 className="font-medium text-sky-900 mb-2 flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Alcance del cliente
-                  </h3>
-                  <p className="text-sm text-sky-700">
-                    {clientAdvance.solicitado > 0
-                      ? `Solicitado: ${requestedStageName ?? `Etapa ${clientAdvance.solicitado}`}`
-                      : 'Sin solicitudes vigentes'}
-                  </p>
-                  <p className="text-sm text-sky-700">
-                    {clientAdvance.autorizado > 0
-                      ? `Autorizado: ${authorizedStageName ?? `Etapa ${clientAdvance.autorizado}`}`
-                      : 'Aprobación pendiente'}
-                  </p>
-                  {(profile.role === 'admin_firma' || profile.role === 'analista') &&
-                    clientAdvance.solicitado > clientAdvance.autorizado && (
-                    <Button
-                      size="sm"
-                      className="mt-3 inline-flex items-center gap-2 rounded-full bg-sky-600 text-white hover:bg-sky-700"
-                      onClick={() => handleAuthorizeAdvance(clientAdvance.solicitado)}
-                      disabled={isAuthorizing}
-                    >
-                      {isAuthorizing ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Autorizando…
-                        </>
-                      ) : (
-                        'Autorizar solicitud'
+                <div className="group relative overflow-hidden rounded-2xl border border-sky-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  />
+                  <div className="relative z-10 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                          Alcance del cliente
+                        </p>
+                        <div className="mt-3 space-y-1.5 text-sm text-foreground/60">
+                          <p>
+                            {clientAdvance.solicitado > 0
+                              ? `Solicitado · ${requestedStageName ?? `Etapa ${clientAdvance.solicitado}`}`
+                              : 'Sin solicitudes vigentes'}
+                          </p>
+                          <p>
+                            {clientAdvance.autorizado > 0
+                              ? `Autorizado · ${authorizedStageName ?? `Etapa ${clientAdvance.autorizado}`}`
+                              : 'Aprobación pendiente'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 via-sky-500/10 to-transparent text-sky-600">
+                        <Clock className="h-5 w-5" />
+                      </div>
+                    </div>
+
+                    {(profile.role === 'admin_firma' || profile.role === 'analista') &&
+                      clientAdvance.solicitado > clientAdvance.autorizado && (
+                        <Button
+                          size="sm"
+                          className="inline-flex items-center gap-2 rounded-full px-4"
+                          onClick={() => handleAuthorizeAdvance(clientAdvance.solicitado)}
+                          disabled={isAuthorizing}
+                        >
+                          {isAuthorizing ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Autorizando…
+                            </>
+                          ) : (
+                            'Autorizar solicitud'
+                          )}
+                        </Button>
                       )}
-                    </Button>
-                    )}
+                  </div>
                 </div>
               )}
 
               {(honorarioTotal !== null || caseData.tarifa_referencia) && (
-                <div className="bg-indigo-50 rounded-lg p-4">
-                  <h3 className="font-medium text-indigo-900 mb-2 flex items-center">
-                    <Wallet className="h-4 w-4 mr-2" />
-                    Honorarios
-                  </h3>
-                  <div className="space-y-1 text-sm text-indigo-800">
-                    {caseData.modalidad_cobro && (
-                      <p className="uppercase text-xs tracking-wide text-indigo-600">
-                        {caseData.modalidad_cobro}
-                      </p>
-                    )}
-                    {honorarioTotal !== null && (
-                      <p className="font-semibold">Total: {formatUf(honorarioTotal)}</p>
-                    )}
-                    {honorarioTotal !== null && (
-                      <p>Pagado: {formatUf(honorarioPagado)}</p>
-                    )}
-                    {honorarioPendiente !== null && (
-                      <p>Pendiente: {formatUf(honorarioPendiente)}</p>
-                    )}
-                    {caseData.honorario_variable_porcentaje && (
-                      <p>
-                        Variable: {caseData.honorario_variable_porcentaje}%
-                        {caseData.honorario_variable_base
-                          ? ` (${caseData.honorario_variable_base})`
-                          : ''}
-                      </p>
-                    )}
-                    {caseData.tarifa_referencia && (
-                      <p className="text-xs text-indigo-600">
-                        Tarifa: {caseData.tarifa_referencia}
-                      </p>
-                    )}
+                <div className="group relative overflow-hidden rounded-2xl border border-violet-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  />
+                  <div className="relative z-10 space-y-3 text-sm text-foreground/65">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                          Honorarios
+                        </p>
+                        <div className="mt-3 space-y-1.5">
+                          {caseData.modalidad_cobro && (
+                            <p className="text-xs uppercase tracking-[0.2em] text-foreground/50">
+                              {caseData.modalidad_cobro}
+                            </p>
+                          )}
+                          {honorarioTotal !== null && (
+                            <p className="text-base font-semibold text-foreground">
+                              Total · {formatUf(honorarioTotal)}
+                            </p>
+                          )}
+                          {honorarioTotal !== null && <p>Pagado · {formatUf(honorarioPagado)}</p>}
+                          {honorarioPendiente !== null && <p>Pendiente · {formatUf(honorarioPendiente)}</p>}
+                          {caseData.honorario_variable_porcentaje && (
+                            <p>
+                              Variable · {caseData.honorario_variable_porcentaje}%
+                              {caseData.honorario_variable_base ? ` (${caseData.honorario_variable_base})` : ''}
+                            </p>
+                          )}
+                          {caseData.tarifa_referencia && (
+                            <p className="text-xs text-foreground/45">Tarifa base · {caseData.tarifa_referencia}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 via-violet-500/10 to-transparent text-violet-600">
+                        <Wallet className="h-5 w-5" />
+                      </div>
+                    </div>
                     {caseData.honorario_notas && (
-                      <p className="text-xs text-indigo-700 whitespace-pre-wrap">
+                      <p className="rounded-2xl bg-white/60 p-3 text-xs text-foreground/55 shadow-inner">
                         {caseData.honorario_notas}
                       </p>
                     )}
@@ -733,35 +842,37 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
 
             {/* Contraparte */}
             {caseData.contraparte && (
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <h3 className="font-medium text-gray-900 mb-2">Contraparte</h3>
-                <p className="text-gray-700">{caseData.contraparte}</p>
+              <div className="mt-8 rounded-3xl border border-white/30 bg-white/75 p-6 shadow-inner">
+                <h3 className="text-lg font-semibold text-foreground mb-2">Contraparte</h3>
+                <p className="text-sm text-foreground/65">{caseData.contraparte}</p>
               </div>
             )}
 
             {/* Observaciones */}
             {caseData.observaciones && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-medium text-gray-900 mb-2">Observaciones</h3>
-                <p className="text-gray-700 whitespace-pre-wrap">{caseData.observaciones}</p>
+              <div className="mt-6 rounded-3xl border border-white/30 bg-white/75 p-6 shadow-inner">
+                <h3 className="text-lg font-semibold text-foreground mb-2">Observaciones</h3>
+                <p className="text-sm text-foreground/65 whitespace-pre-wrap">
+                  {caseData.observaciones}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Tabs de navegación */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
+        <div className="mb-8 flex justify-center">
+          <nav className="flex items-center gap-2 rounded-full border border-white/40 bg-white/70 px-2 py-1 text-sm font-medium shadow-sm backdrop-blur-xl">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 transition-all ${
                     activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'bg-foreground text-white shadow-md'
+                      : 'text-foreground/55 hover:bg-white/60 hover:text-foreground'
                   }`}
                 >
                   <Icon className="h-4 w-4" />

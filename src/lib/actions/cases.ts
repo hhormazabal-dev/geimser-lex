@@ -135,7 +135,6 @@ export async function createCase(input: CreateCaseInput) {
       cliente_principal_id: sOrNull((caseInput as any).cliente_principal_id),
       descripcion_inicial: sOrNull(caseInput.descripcion_inicial),
       documentacion_recibida: sOrNull(caseInput.documentacion_recibida),
-      objetivo_cliente: sOrNull(caseInput.objetivo_cliente),
 
       created_at: nowIso,
       updated_at: nowIso,
@@ -204,7 +203,6 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       // 🔴 El schema exige string → nunca dejamos undefined
       descripcion_inicial: extracted.descripcion_inicial ?? 'Caso creado desde brief.',
       documentacion_recibida: extracted.documentacion_recibida ?? undefined,
-      objetivo_cliente: extracted.objetivo_cliente ?? undefined,
       observaciones: extracted.observaciones ?? `Caso creado desde brief:\n\n${validated.brief}`,
       valor_estimado: extracted.valor_estimado ?? undefined,
       honorario_total_uf: extracted.honorario_total_uf ?? undefined,
@@ -314,7 +312,6 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       ...(rest.contraparte !== undefined && { contraparte: rest.contraparte }),
       ...(rest.descripcion_inicial !== undefined && { descripcion_inicial: rest.descripcion_inicial }),
       ...(rest.documentacion_recibida !== undefined && { documentacion_recibida: rest.documentacion_recibida }),
-      ...(rest.objetivo_cliente !== undefined && { objetivo_cliente: rest.objetivo_cliente }),
       ...(rest.observaciones !== undefined && { observaciones: rest.observaciones }),
       ...(rest.valor_estimado !== undefined && { valor_estimado: nOrNull(rest.valor_estimado) }),
       ...(rest.honorario_total_uf !== undefined && { honorario_total_uf: nOrNull(rest.honorario_total_uf) }),
@@ -814,22 +811,22 @@ export async function getCaseById(caseId: string) {
       })(),
       supabase
         .from('case_stages')
-        .select('*, responsable:profiles(id, nombre)')
+        .select('*, responsable:profiles!case_stages_responsable_id_fkey(id, nombre)')
         .eq('case_id', caseId)
         .order('orden', { ascending: true }),
       supabase
         .from('notes')
-        .select('*, author:profiles(id, nombre)')
+        .select('*, author:profiles!notes_author_id_fkey(id, nombre)')
         .eq('case_id', caseId)
         .order('created_at', { ascending: false }),
       supabase
         .from('documents')
-        .select('*, uploader:profiles(id, nombre)')
+        .select('*, uploader:profiles!documents_uploader_id_fkey(id, nombre)')
         .eq('case_id', caseId)
         .order('created_at', { ascending: false }),
       supabase
         .from('info_requests')
-        .select('*, creador:profiles(id, nombre)')
+        .select('*, creador:profiles!info_requests_creador_id_fkey(id, nombre)')
         .eq('case_id', caseId)
         .order('created_at', { ascending: false }),
       supabase
@@ -839,7 +836,7 @@ export async function getCaseById(caseId: string) {
         .order('created_at', { ascending: false }),
       supabase
         .from('case_clients')
-        .select('client:profiles(id, nombre, email, telefono)')
+        .select('client:profiles!case_clients_client_profile_id_fkey(id, nombre, email, telefono)')
         .eq('case_id', caseId)
         .order('created_at', { ascending: true }),
     ]);
