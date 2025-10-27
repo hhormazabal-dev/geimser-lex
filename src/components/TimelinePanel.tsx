@@ -118,6 +118,7 @@ export function TimelinePanel({
   const prevStageCountRef = useRef<number>(0);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
+  const [hasAutoAligned, setHasAutoAligned] = useState(false);
 
   const updateScrollControls = useCallback(() => {
     const track = stageTrackRef.current;
@@ -680,22 +681,30 @@ export function TimelinePanel({
 
   useEffect(() => {
     if (isLoading) return;
-    if (filteredStages.length === 0) {
-      prevStageCountRef.current = 0;
-      return;
-    }
     const track = stageTrackRef.current;
     if (!track) return;
+
+    if (filteredStages.length === 0) {
+      prevStageCountRef.current = 0;
+      setHasAutoAligned(false);
+      return;
+    }
 
     const targetIndex = filteredStages.findIndex((stage) => stage.estado !== 'completado');
     const indexToReveal = targetIndex === -1 ? filteredStages.length - 1 : targetIndex;
     const targetChild = track.children.item(indexToReveal) as HTMLElement | null;
-    if (targetChild) {
-      const behavior = prevStageCountRef.current === 0 ? 'auto' : 'smooth';
-      track.scrollTo({ left: targetChild.offsetLeft - 24, behavior });
+
+    const lengthChanged = prevStageCountRef.current !== filteredStages.length;
+    if ((lengthChanged || !hasAutoAligned) && targetChild) {
+      track.scrollTo({
+        left: Math.max(0, targetChild.offsetLeft - 24),
+        behavior: hasAutoAligned ? 'smooth' : 'auto',
+      });
+      setHasAutoAligned(true);
     }
+
     prevStageCountRef.current = filteredStages.length;
-  }, [filteredStages, isLoading]);
+  }, [filteredStages, isLoading, hasAutoAligned]);
 
   useEffect(() => {
     if (showAddForm && etapasRequierenPago.length > 0) {

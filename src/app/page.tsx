@@ -4,9 +4,7 @@ import {
   ArrowRight,
   CalendarClock,
   DollarSign,
-  FileText,
   FolderKanban,
-  MessageCircle,
   ShieldCheck,
   Sparkles,
   Upload,
@@ -25,91 +23,75 @@ export default async function Home() {
   const primaryCtaHref = isAuthenticated ? '/dashboard' : '/login';
   const primaryCtaLabel = isAuthenticated ? 'Ir al panel' : 'Iniciar sesión';
 
-  const featureHighlights = [
+  const uspHighlights = [
     {
-      title: 'Casos y cronologías inteligentes',
-      description:
-        'Centraliza audiencias, etapas y responsables con un timeline visual que mantiene a todo el equipo alineado.',
       icon: Workflow,
+      title: 'Expedientes sincronizados',
+      description:
+        'Cada caso combina timeline, audiencias, responsables y recordatorios en un solo tablero accionable.',
     },
     {
-      title: 'Clientes, contrapartes y equipos',
-      description:
-        'Administra datos de contacto, roles y permisos en segundos. Controla quién puede ver cada parte del expediente.',
       icon: Users,
+      title: 'Colaboración con contexto',
+      description:
+        'Clientes, contrapartes y equipo comparten la misma versión del expediente con permisos granulares.',
     },
     {
-      title: 'Documentos y evidencia segura',
-      description:
-        'Carga archivos, clasifícalos por visibilidad y comparte enlaces de forma controlada con clientes o el tribunal.',
       icon: Upload,
+      title: 'Documentos bajo control',
+      description:
+        'Sube evidencia, clasifícala por visibilidad y comparte enlaces seguros sin correos ni carpetas duplicadas.',
     },
     {
-      title: 'Honorarios, pagos y auditoría',
-      description:
-        'Define hitos con cobro prepago o variable, registra pagos parciales y deja todo trazado en el historial.',
       icon: DollarSign,
+      title: 'Cobranza sin fricción',
+      description:
+        'Configura hitos con prepago o variable, registra abonos y deja todo trazado para auditorías internas.',
     },
   ] as const;
 
-  const workflowSteps = [
+  const journeySteps = [
     {
-      title: '1. Crea el perfil del cliente',
-      description:
-        'Ve a “Clientes → Nuevo cliente”. Ingresa datos de contacto, RUT y notas clave para que el equipo tenga contexto inmediato.',
       icon: Users,
+      title: '1. Levanta al cliente y su historia',
+      description:
+        'Crea el perfil, registra datos críticos y anota objetivos. El equipo comienza con contexto y sin pedir correcciones.',
+      callout: 'Panel → Clientes → Nuevo cliente',
     },
     {
-      title: '2. Registra un nuevo caso',
-      description:
-        'En “Casos → Nuevo caso” selecciona al cliente, define materia, tribunal y asigna responsables. El caso queda listo para trabajarse.',
       icon: FolderKanban,
+      title: '2. Activa el caso con timeline y responsables',
+      description:
+        'Define materia, tribunal y etapas clave. El timeline reparte trabajo, plazos y costos desde el día uno.',
+      callout: 'Panel → Casos → Nuevo caso',
     },
     {
-      title: '3. Construye el timeline del expediente',
-      description:
-        'Dentro del caso, abre la pestaña “Timeline”. Agrega etapas con fechas, responsables, costos y visibilidad para el cliente cuando corresponda.',
       icon: CalendarClock,
-    },
-    {
-      title: '4. Comparte documentos y coordina solicitudes',
+      title: '3. Coordina ejecución y comunicación',
       description:
-        'Desde las pestañas “Documentos” y “Solicitudes” puedes subir archivos, pedir antecedentes y mantener la conversación centralizada.',
-      icon: MessageCircle,
-    },
-    {
-      title: '5. Supervisa honorarios y próximos pasos',
-      description:
-        'Revisa el bloque de honorarios del caso para ver montos pagados, pendientes o variables, y usa las alertas para no dejar pasar ninguna audiencia.',
-      icon: FileText,
+        'Documentos, solicitudes, mensajes y pagos ocurren dentro del expediente. Nada se pierde en chats externos.',
+      callout: 'Caso → pestañas Documentos / Timeline / Solicitudes',
     },
   ] as const;
 
-  const quickActions = [
+  const quickStart = [
     {
-      label: 'Crear cliente',
-      description: 'Panel → Clientes → Nuevo cliente',
+      label: 'Registrar primer cliente',
+      description: 'Define contacto, notas y permisos.',
       icon: Users,
+      href: isAuthenticated ? '/dashboard/clients/new' : '/login',
     },
     {
-      label: 'Registrar caso',
-      description: 'Panel → Casos → Nuevo caso',
+      label: 'Crear el caso inicial',
+      description: 'Asigna materia, responsables y flujo de trabajo.',
       icon: FolderKanban,
+      href: isAuthenticated ? '/dashboard/cases/new' : '/login',
     },
     {
-      label: 'Añadir etapa',
-      description: 'Dentro del caso → Timeline → Nueva etapa',
+      label: 'Diseñar timeline y cobros',
+      description: 'Agrega etapas con fechas, responsables y pagos.',
       icon: Workflow,
-    },
-    {
-      label: 'Subir documento',
-      description: 'Caso → Documentos → Subir archivo',
-      icon: Upload,
-    },
-    {
-      label: 'Solicitar información',
-      description: 'Caso → Solicitudes → Nueva solicitud',
-      icon: MessageCircle,
+      href: isAuthenticated ? '/dashboard/cases' : '/login',
     },
   ] as const;
 
@@ -122,20 +104,20 @@ export default async function Home() {
       </div>
 
       <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-20 px-6 pb-24 pt-20 sm:px-8 lg:px-10">
-        <section className="grid gap-12 md:grid-cols-[1.3fr_1fr] md:items-center">
-          <div className="space-y-8">
+        <section className="grid gap-12 lg:grid-cols-[1.4fr_1fr] lg:items-center">
+          <div className="space-y-10">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/70 px-4 py-1 text-xs font-medium uppercase tracking-[0.3em] text-foreground/60 shadow-sm backdrop-blur">
               <Sparkles className="h-3.5 w-3.5 text-amber-500" />
               LexChile · Suite Operativa
             </span>
-            <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              Tu estudio con un control total del expediente laboral, civil y comercial.
-            </h1>
-            <p className="max-w-2xl text-lg text-foreground/65">
-              Centraliza clientes, casos, documentos, timeline, solicitudes y honorarios en una
-              plataforma diseñada para equipos legales modernos. Sigue los pasos sugeridos y pon tu
-              operación en piloto automático con un look &amp; feel de clase mundial.
-            </p>
+            <div className="space-y-5">
+              <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+                El expediente completo en un solo lugar. Timeline, clientes y cobros siempre sincronizados.
+              </h1>
+              <p className="max-w-2xl text-lg text-foreground/65">
+                Centraliza audiencias, documentos, solicitudes y honorarios. Todo el equipo sabe qué sigue, quién lo ejecuta y cómo se cobra.
+              </p>
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="rounded-full px-6 text-base font-semibold shadow-lg">
                 <Link href={primaryCtaHref}>{primaryCtaLabel}</Link>
@@ -147,37 +129,33 @@ export default async function Home() {
                 className="rounded-full border border-white/40 px-6 text-base text-foreground/70 hover:text-foreground"
               >
                 <Link href="#workflow">
-                  Ver guía rápida
+                  Cómo funciona
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </div>
             <div className="flex items-center gap-3 text-sm text-foreground/50">
               <ShieldCheck className="h-4 w-4 text-emerald-500" />
-              <span>
-                Auditoría completa, permisos por rol y migraciones listas para Supabase.
-              </span>
+              <span>Roles con permisos granulares, auditoría en tiempo real y stack montado sobre Supabase.</span>
             </div>
           </div>
 
-          <Card className="rounded-3xl border border-white/40 bg-white/80 shadow-xl backdrop-blur">
-            <CardContent className="space-y-6 px-8 py-10">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Atajos para ponerte en marcha
-                </h2>
-                <p className="mt-1 text-sm text-foreground/55">
-                  Los módulos principales del studio están listos. Sigue esta checklist para tu
-                  primera causa.
+          <Card className="rounded-3xl border border-white/40 bg-white/85 shadow-xl backdrop-blur">
+            <CardContent className="space-y-6 px-8 py-9">
+              <div className="space-y-2">
+                <h2 className="text-lg font-semibold text-foreground">Primeros pasos sugeridos</h2>
+                <p className="text-sm text-foreground/55">
+                  Tres acciones rápidas para que la plataforma genere valor desde el primer expediente.
                 </p>
               </div>
               <div className="space-y-4">
-                {quickActions.map((item) => {
+                {quickStart.map((item) => {
                   const Icon = item.icon;
                   return (
-                    <div
+                    <Link
                       key={item.label}
-                      className="flex items-start gap-3 rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-sm text-foreground/75 shadow-sm"
+                      href={item.href}
+                      className="flex items-start gap-3 rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-sm text-foreground/75 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
                     >
                       <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent text-blue-600">
                         <Icon className="h-4 w-4" />
@@ -186,7 +164,7 @@ export default async function Home() {
                         <p className="font-medium text-foreground">{item.label}</p>
                         <p className="text-xs text-foreground/55">{item.description}</p>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -196,7 +174,7 @@ export default async function Home() {
                 className="w-full rounded-full border-white/40 bg-white/60 text-sm font-semibold text-foreground/80 hover:bg-white"
               >
                 <Link href={primaryCtaHref}>
-                  {isAuthenticated ? 'Ir al dashboard' : 'Ingresar para continuar'}
+                  {isAuthenticated ? 'Abrir dashboard' : 'Ingresar ahora'}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -205,30 +183,21 @@ export default async function Home() {
         </section>
 
         <section className="space-y-8">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-foreground/45">Qué puedes hacer</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
-                Módulos listos para operar como un estudio boutique.
-              </h2>
-            </div>
-            <p className="max-w-xl text-sm text-foreground/55 md:text-right">
-              Cada bloque está integrado con auditoría, RLS y el diseño cuidado que viste en los
-              detalles de caso. Personaliza colores o textos cuando quieras, la base UX ya está hecha.
+          <header className="space-y-2">
+            <h2 className="text-2xl font-semibold text-foreground">Beneficios que impactan tu operación</h2>
+            <p className="text-foreground/55">
+              Conecta información, equipo y clientes en torno a un expediente vivo y accionable.
             </p>
-          </div>
-          <div className="grid gap-5 md:grid-cols-2">
-            {featureHighlights.map((feature) => {
+          </header>
+          <div className="grid gap-6 md:grid-cols-2">
+            {uspHighlights.map((feature) => {
               const Icon = feature.icon;
               return (
-                <Card
-                  key={feature.title}
-                  className="group rounded-3xl border border-white/40 bg-white/75 shadow-lg backdrop-blur transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl"
-                >
-                  <CardContent className="flex gap-5 px-7 py-6">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/15 via-blue-500/5 to-transparent text-blue-600">
+                <Card key={feature.title} className="h-full rounded-3xl border border-white/40 bg-white/80 shadow-md backdrop-blur">
+                  <CardContent className="space-y-4 px-6 py-7">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/15 via-blue-500/5 to-transparent text-blue-600">
                       <Icon className="h-5 w-5" />
-                    </div>
+                    </span>
                     <div className="space-y-2">
                       <h3 className="text-lg font-semibold text-foreground">{feature.title}</h3>
                       <p className="text-sm text-foreground/60">{feature.description}</p>
@@ -240,73 +209,70 @@ export default async function Home() {
           </div>
         </section>
 
-        <section id="workflow" className="space-y-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-foreground/45">Guía exprés</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
-                Así creas un caso completo de principio a fin.
-              </h2>
-            </div>
-            <p className="max-w-xl text-sm text-foreground/55 md:text-right">
-              Sigue estos pasos en orden para que tu primera causa se vea impecable. Las vistas y
-              formularios ya respetan el estilo Glass UI que viste en el detalle de caso.
+        <section id="workflow" className="space-y-8">
+          <header className="space-y-2">
+            <h2 className="text-2xl font-semibold text-foreground">Un recorrido claro para tu equipo</h2>
+            <p className="text-foreground/55">
+              Tres hitos para pasar de “tenemos archivos sueltos” a una operación jurídicamente orquestada.
             </p>
-          </div>
-
-          <div className="space-y-4">
-            {workflowSteps.map((step) => {
+          </header>
+          <div className="grid gap-6 lg:grid-cols-3">
+            {journeySteps.map((step) => {
               const Icon = step.icon;
               return (
-                <div
-                  key={step.title}
-                  className="flex gap-4 rounded-3xl border border-white/30 bg-white/80 px-6 py-5 text-sm text-foreground/70 shadow-sm backdrop-blur transition-all duration-150 hover:border-white/40"
-                >
-                  <div className="mt-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent text-emerald-600">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-base font-semibold text-foreground">{step.title}</p>
-                    <p className="text-sm text-foreground/60">{step.description}</p>
-                  </div>
-                </div>
+                <Card key={step.title} className="rounded-3xl border border-white/40 bg-white/80 shadow-md backdrop-blur">
+                  <CardContent className="space-y-4 px-6 py-7">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/15 via-indigo-500/5 to-transparent text-indigo-600">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <div className="space-y-2">
+                      <h3 className="text-base font-semibold text-foreground">{step.title}</h3>
+                      <p className="text-sm text-foreground/60">{step.description}</p>
+                    </div>
+                    <p className="text-xs font-medium uppercase tracking-[0.24em] text-foreground/45">
+                      {step.callout}
+                    </p>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
         </section>
 
-        <section className="grid gap-6 rounded-3xl border border-white/40 bg-white/80 px-8 py-10 text-center text-foreground shadow-xl backdrop-blur-lg md:px-12">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500/15 via-blue-500/5 to-transparent text-blue-600">
-            <Sparkles className="h-7 w-7" />
-          </div>
-          <div className="space-y-3">
-            <h2 className="text-3xl font-semibold tracking-tight">
-              ¿Listo para trabajar como los grandes estudios?
-            </h2>
-            <p className="mx-auto max-w-2xl text-sm text-foreground/60">
-              Integra más módulos cuando quieras: analítica, reportes o flujos automáticos ya están
-              preparados en la arquitectura. Mientras tanto, usa esta home como tu punto de partida de
-              operaciones diarias.
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" className="rounded-full px-6 text-base font-semibold shadow-lg">
-              <Link href={primaryCtaHref}>{primaryCtaLabel}</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="rounded-full border-white/40 px-6 text-base text-foreground/75 hover:bg-white/80"
-            >
-              <Link href="mailto:soporte@lexchile.cl">
-                Contactar al equipo
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
+        <section className="space-y-6">
+          <Card className="rounded-3xl border border-white/40 bg-white/85 shadow-xl backdrop-blur">
+            <CardContent className="grid gap-8 px-7 py-8 md:grid-cols-[1.4fr_1fr] md:items-center">
+              <div className="space-y-3">
+                <h2 className="text-2xl font-semibold text-foreground">Prepárate para tu próximo expediente</h2>
+                <p className="text-sm text-foreground/60">
+                  Crea clientes, registra causas y arma el timeline. Al ingresar, continuaremos exactamente donde quedaste.
+                </p>
+                <Button asChild className="rounded-full px-6 text-sm font-semibold shadow-md">
+                  <Link href={primaryCtaHref}>
+                    {primaryCtaLabel}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+              <ul className="space-y-3 text-sm text-foreground/65">
+                <li className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                  Roles y bitácora de auditoría siempre activos.
+                </li>
+                <li className="flex items-center gap-2">
+                  <FolderKanban className="h-4 w-4 text-blue-600" />
+                  Importa datos desde plantillas o tu gestor actual.
+                </li>
+                <li className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  Timeline visual, solicitudes y cobros listos desde el día uno.
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
         </section>
       </div>
     </main>
   );
+
 }
