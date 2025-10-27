@@ -22,6 +22,7 @@ import {
 import { getStageTemplatesByMateria } from '@/lib/validators/stages';
 import type { StageTemplate } from '@/lib/validators/stages';
 import { findLegalFeeItemById } from '@/lib/pricing/legalFees';
+import { ZodError } from 'zod';
 
 import type {
   Case,
@@ -43,6 +44,16 @@ function stripUndefined<T extends Record<string, any>>(obj: T | undefined): Part
   for (const [k, v] of Object.entries(obj)) if (v !== undefined) out[k] = v;
   return out as Partial<T>;
 }
+
+const formatZodError = (error: ZodError) => {
+  const rawMessages = error.issues
+    .map((issue) => issue.message?.trim())
+    .filter((message): message is string => Boolean(message));
+  const uniqueMessages = Array.from(new Set(rawMessages));
+  const meaningfulMessages = uniqueMessages.filter((message) => message.toLowerCase() !== 'required');
+  const messages = meaningfulMessages.length ? meaningfulMessages : uniqueMessages;
+  return messages.length ? messages.join(' ') : 'Datos incompletos o inválidos. Revisa el formulario.';
+};
 
 async function getSB() {
   // si existe service key => usar cliente de servicio (bypassa RLS para jobs controlados)
@@ -85,12 +96,30 @@ export async function createCase(input: CreateCaseInput) {
 
     const supabase = await getSB();
     const nowIso = new Date().toISOString();
+    const numeroCausaClean = caseInput.numero_causa?.trim() ?? null;
+
+    if (numeroCausaClean) {
+      const { data: existing, error: numeroError } = await supabase
+        .from('cases')
+        .select('id')
+        .eq('numero_causa', numeroCausaClean)
+        .limit(1)
+        .maybeSingle();
+
+      if (numeroError && numeroError.code !== 'PGRST116') throw numeroError;
+      if (existing) {
+        return {
+          success: false,
+          error: 'Ya existe un expediente registrado con ese número de causa.',
+        };
+      }
+    }
 
     const baseData: CaseInsert = {
       caratulado: caseInput.caratulado,
       nombre_cliente: caseInput.nombre_cliente,
 
-      numero_causa: sOrNull(caseInput.numero_causa),
+      numero_causa: numeroCausaClean,
       materia: sOrNull(caseInput.materia),
       tribunal: sOrNull(caseInput.tribunal),
       region: sOrNull(caseInput.region),
@@ -172,7 +201,12 @@ export async function createCase(input: CreateCaseInput) {
     return { success: true, case: newCase };
   } catch (error) {
     console.error('Error in createCase:', error);
-    return { success: false, error: (error as Error).message };
+    if (error instanceof ZodError) {
+      return { success: false, error: formatZodError(error) };
+    }
+    const message =
+      (error as { message?: string })?.message ?? 'Ocurrió un error inesperado al crear el caso.';
+    return { success: false, error: message };
   }
 }
 
@@ -305,7 +339,12 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       ...(rest.materia !== undefined && { materia: rest.materia }),
       ...(rest.etapa_actual !== undefined && { etapa_actual: rest.etapa_actual }),
       ...(rest.fecha_inicio !== undefined && { fecha_inicio: rest.fecha_inicio }),
-      ...(rest.numero_causa !== undefined && { numero_causa: rest.numero_causa }),
+      ...(rest.numero_causa !== undefined && {
+        numero_causa:
+          typeof rest.numero_causa === 'string' && rest.numero_causa.trim().length > 0
+            ? rest.numero_causa.trim()
+            : null,
+      }),
       ...(rest.tribunal !== undefined && { tribunal: rest.tribunal }),
       ...(rest.region !== undefined && { region: rest.region }),
       ...(rest.comuna !== undefined && { comuna: rest.comuna }),
@@ -352,6 +391,27 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
     if (rest.estado !== undefined) updatePayload.estado = rest.estado;
     if (rest.prioridad !== undefined) updatePayload.prioridad = rest.prioridad;
     if (rest.workflow_state !== undefined) updatePayload.workflow_state = parseWorkflow(rest.workflow_state);
+
+    if (rest.numero_causa !== undefined) {
+      const trimmedNumero = typeof rest.numero_causa === 'string' ? rest.numero_causa.trim() : null;
+      if (trimmedNumero && trimmedNumero !== (existingCase.numero_causa ?? null)) {
+        const { data: existingNumero, error: numeroError } = await supabase
+          .from('cases')
+          .select('id')
+          .eq('numero_causa', trimmedNumero)
+          .neq('id', caseId)
+          .limit(1)
+          .maybeSingle();
+
+        if (numeroError && numeroError.code !== 'PGRST116') throw numeroError;
+        if (existingNumero) {
+          return {
+            success: false,
+            error: 'Ya existe otro expediente con ese número de causa.',
+          };
+        }
+      }
+    }
 
     if (marcar_validado !== undefined) {
       updatePayload.validado_at = marcar_validado ? (rest.validado_at ?? existingCase.validado_at ?? nowIso) : null;
