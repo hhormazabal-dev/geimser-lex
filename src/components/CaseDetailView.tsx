@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useTransition, useCallback, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -497,12 +498,15 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             <div className="flex items-center space-x-3">
               {canEdit && (
                 <Button
+                  asChild
                   size="sm"
                   variant="ghost"
                   className="rounded-full border border-white/40 px-4 text-sm font-medium text-foreground/70 hover:text-foreground"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar Caso
+                  <Link href={`/cases/${caseData.id}/edit`}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar Caso
+                  </Link>
                 </Button>
               )}
               <div className="text-right">
