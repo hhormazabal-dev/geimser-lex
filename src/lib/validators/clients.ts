@@ -19,3 +19,11 @@ export const createClientSchema = z.object({
 });
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;
+
+export const assignClientToCaseSchema = z.object({
+  client_id: z.string().uuid('ID de cliente inválido'),
+  case_id: z.string().uuid('ID de caso inválido'),
+  set_as_principal: z.boolean().optional(),
+});
+
+export type AssignClientToCaseInput = z.infer<typeof assignClientToCaseSchema>;
