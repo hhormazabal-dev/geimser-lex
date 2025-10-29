@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,24 +27,96 @@ import type { Profile, Case } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
 import LogoutButton from '@/components/LogoutButton';
 
+type CaseFieldsForClient = Pick<
+  Case,
+  | 'id'
+  | 'caratulado'
+  | 'numero_causa'
+  | 'estado'
+  | 'prioridad'
+  | 'etapa_actual'
+  | 'honorario_moneda'
+  | 'honorario_total_uf'
+  | 'honorario_pagado_uf'
+  | 'modalidad_cobro'
+  | 'valor_estimado'
+  | 'fecha_inicio'
+  | 'updated_at'
+  | 'tribunal'
+  | 'materia'
+  | 'observaciones'
+  | 'contraparte'
+>;
+
+export type ClientPortalCase = CaseFieldsForClient & {
+  abogado_responsable: Case['abogado_responsable'];
+  abogado_responsable_profile?: {
+    id: string;
+    nombre: string | null;
+    email?: string | null;
+    telefono?: string | null;
+  } | null;
+};
+
 interface ClientDashboardProps {
-  profile: Profile & { email?: string | null };
-  cases: Case[];
+  profile: Pick<Profile, 'id' | 'nombre' | 'email'> & { email?: string | null };
+  cases: ClientPortalCase[];
 }
 
 export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
-  const [selectedCase, setSelectedCase] = useState<Case | null>(cases[0] || null);
+  const [selectedCase, setSelectedCase] = useState<ClientPortalCase | null>(cases[0] || null);
   const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'documents' | 'notes' | 'messages' | 'requests'>('overview');
-  const lawyerData =
-    selectedCase &&
-    typeof (selectedCase as any).abogado_responsable === 'object' &&
-    (selectedCase as any).abogado_responsable !== null
-      ? ((selectedCase as any).abogado_responsable as {
-          nombre?: string | null;
-          telefono?: string | null;
-          email?: string | null;
-        })
-      : null;
+  const lawyerData = selectedCase?.abogado_responsable_profile
+    ? {
+        nombre: selectedCase.abogado_responsable_profile.nombre ?? null,
+        telefono: selectedCase.abogado_responsable_profile.telefono ?? null,
+        email: selectedCase.abogado_responsable_profile.email ?? null,
+      }
+    : null;
+
+  useEffect(() => {
+    if (!cases.length) {
+      setSelectedCase(null);
+      return;
+    }
+
+    setSelectedCase((prev) => {
+      if (!prev) return cases[0] ?? null;
+      const next = cases.find((item) => item.id === prev.id);
+      return next ?? cases[0] ?? null;
+    });
+  }, [cases]);
+
+  const summary = useMemo(() => {
+    if (!cases.length) {
+      return {
+        totalCases: 0,
+        activeCases: 0,
+        closedCases: 0,
+        ufTotals: { total: 0, paid: 0, pending: 0, hasMixedCurrencies: false },
+      };
+    }
+
+    const totalCases = cases.length;
+    const activeCases = cases.filter((item) => item.estado === 'activo').length;
+    const closedCases = cases.filter((item) => item.estado === 'terminado' || item.estado === 'archivado').length;
+    const ufCases = cases.filter((item) => (item.honorario_moneda ?? 'UF') === 'UF');
+    const totalUf = ufCases.reduce((acc, item) => acc + (item.honorario_total_uf ?? 0), 0);
+    const paidUf = ufCases.reduce((acc, item) => acc + (item.honorario_pagado_uf ?? 0), 0);
+    const pendingUf = Math.max(totalUf - paidUf, 0);
+
+    return {
+      totalCases,
+      activeCases,
+      closedCases,
+      ufTotals: {
+        total: totalUf,
+        paid: paidUf,
+        pending: pendingUf,
+        hasMixedCurrencies: ufCases.length > 0 && ufCases.length !== cases.length,
+      },
+    };
+  }, [cases]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -90,6 +162,21 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
     { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
   ] as const;
 
+  const formatUf = (value?: number | null) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+    return `${new Intl.NumberFormat('es-CL', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)} UF`;
+  };
+
+  const getPaymentProgress = (caseItem: ClientPortalCase) => {
+    const total = caseItem.honorario_total_uf ?? 0;
+    if (!total || total <= 0) return 0;
+    const paid = caseItem.honorario_pagado_uf ?? 0;
+    return Math.min(100, Math.round((paid / total) * 100));
+  };
+
   return (
     <div className='min-h-screen bg-gray-50'>
       {/* Header */}
@@ -122,6 +209,45 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
       </div>
 
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+        <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8'>
+          <Card className='bg-white shadow-sm'>
+            <CardContent className='pt-6'>
+              <p className='text-xs uppercase tracking-wide text-gray-500'>Casos totales</p>
+              <p className='mt-2 text-3xl font-semibold text-gray-900'>{summary.totalCases}</p>
+              <p className='mt-1 text-sm text-gray-500'>
+                {summary.activeCases} activos · {summary.closedCases} cerrados
+              </p>
+            </CardContent>
+          </Card>
+          <Card className='bg-white shadow-sm'>
+            <CardContent className='pt-6'>
+              <p className='text-xs uppercase tracking-wide text-gray-500'>Honorarios comprometidos</p>
+              <p className='mt-2 text-3xl font-semibold text-gray-900'>{formatUf(summary.ufTotals.total)}</p>
+              <p className='mt-1 text-sm text-gray-500'>Suma de casos en UF</p>
+            </CardContent>
+          </Card>
+          <Card className='bg-white shadow-sm'>
+            <CardContent className='pt-6'>
+              <p className='text-xs uppercase tracking-wide text-gray-500'>Pagado a la fecha</p>
+              <p className='mt-2 text-3xl font-semibold text-emerald-600'>{formatUf(summary.ufTotals.paid)}</p>
+              <p className='mt-1 text-sm text-gray-500'>Incluye abonos registrados</p>
+            </CardContent>
+          </Card>
+          <Card className='bg-white shadow-sm'>
+            <CardContent className='pt-6'>
+              <p className='text-xs uppercase tracking-wide text-gray-500'>Saldo pendiente</p>
+              <p className='mt-2 text-3xl font-semibold text-orange-600'>{formatUf(summary.ufTotals.pending)}</p>
+              <p className='mt-1 text-sm text-gray-500'>Por pagar según registro</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {summary.ufTotals.hasMixedCurrencies && (
+          <div className='mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>
+            Algunos expedientes están configurados en otra moneda. Los totales se muestran solo en UF.
+          </div>
+        )}
+
         <div className='grid grid-cols-1 lg:grid-cols-4 gap-8'>
           {/* Sidebar - Lista de casos */}
           <div className='lg:col-span-1'>
@@ -152,6 +278,27 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                             {caseItem.etapa_actual}
                           </p>
                         )}
+                        <div className='text-xs text-gray-500'>
+                          {caseItem.honorario_total_uf !== null ? (
+                            <>
+                              <p>{formatUf(caseItem.honorario_total_uf)} total</p>
+                              <p className='mt-1 flex items-center justify-between'>
+                                <span>Pagado</span>
+                                <span className='font-medium text-gray-800'>
+                                  {formatUf(caseItem.honorario_pagado_uf)}
+                                </span>
+                              </p>
+                              <div className='mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-200'>
+                                <div
+                                  className='h-full rounded-full bg-blue-500 transition-all'
+                                  style={{ width: `${getPaymentProgress(caseItem)}%` }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <p className='text-gray-400'>Honorarios por definir</p>
+                          )}
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -179,46 +326,64 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                         <h2 className='text-2xl font-bold text-gray-900 mb-2'>
                           {selectedCase.caratulado}
                         </h2>
-                        <div className='flex items-center space-x-4 text-sm text-gray-600'>
-                          {selectedCase.numero_causa && (
-                            <span>Causa: {selectedCase.numero_causa}</span>
-                          )}
-                          {selectedCase.materia && (
-                            <span>Materia: {selectedCase.materia}</span>
-                          )}
-                          {selectedCase.tribunal && (
-                            <span>Tribunal: {selectedCase.tribunal}</span>
-                          )}
+                        <div className='flex flex-wrap items-center gap-2 text-sm text-gray-600'>
+                          {selectedCase.numero_causa && <span>Causa: {selectedCase.numero_causa}</span>}
+                          {selectedCase.materia && <span>Materia: {selectedCase.materia}</span>}
+                          {selectedCase.tribunal && <span>Tribunal: {selectedCase.tribunal}</span>}
                         </div>
                       </div>
                       <div className='flex flex-col items-end space-y-2'>
                         {getStatusBadge(selectedCase.estado || 'activo')}
-                        {selectedCase.etapa_actual && (
-                          <Badge variant='outline'>
-                            {selectedCase.etapa_actual}
-                          </Badge>
-                        )}
+                        {selectedCase.etapa_actual && <Badge variant='outline'>{selectedCase.etapa_actual}</Badge>}
                       </div>
                     </div>
 
+                    {selectedCase.honorario_total_uf !== null && (
+                      <>
+                        <div className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
+                          <div className='rounded-lg border border-blue-100 bg-blue-50/70 p-4 text-center'>
+                            <p className='text-xs font-medium uppercase tracking-wide text-blue-600'>Honorario total</p>
+                            <p className='mt-2 text-lg font-semibold text-blue-900'>{formatUf(selectedCase.honorario_total_uf)}</p>
+                          </div>
+                          <div className='rounded-lg border border-emerald-100 bg-emerald-50/70 p-4 text-center'>
+                            <p className='text-xs font-medium uppercase tracking-wide text-emerald-600'>Pagado</p>
+                            <p className='mt-2 text-lg font-semibold text-emerald-900'>{formatUf(selectedCase.honorario_pagado_uf)}</p>
+                          </div>
+                          <div className='rounded-lg border border-orange-100 bg-orange-50/70 p-4 text-center'>
+                            <p className='text-xs font-medium uppercase tracking-wide text-orange-600'>Saldo pendiente</p>
+                            <p className='mt-2 text-lg font-semibold text-orange-900'>
+                              {formatUf(Math.max((selectedCase.honorario_total_uf ?? 0) - (selectedCase.honorario_pagado_uf ?? 0), 0))}
+                            </p>
+                            <p className='mt-2 text-xs text-orange-600'>Avance {getPaymentProgress(selectedCase)}%</p>
+                          </div>
+                        </div>
+                        <div className='mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200'>
+                          <div
+                            className='h-full rounded-full bg-blue-500 transition-all'
+                            style={{ width: `${getPaymentProgress(selectedCase)}%` }}
+                          />
+                        </div>
+                      </>
+                    )}
+
                     {/* Información del abogado */}
                     {lawyerData && (
-                      <div className='bg-gray-50 rounded-lg p-4'>
-                        <h3 className='font-medium text-gray-900 mb-2 flex items-center'>
-                          <User className='h-4 w-4 mr-2' />
+                      <div className='mt-4 rounded-lg bg-gray-50 p-4'>
+                        <h3 className='mb-2 flex items-center font-medium text-gray-900'>
+                          <User className='mr-2 h-4 w-4' />
                           Abogado Responsable
                         </h3>
                         <div className='space-y-1 text-sm text-gray-600'>
                           <p>{lawyerData.nombre ?? 'Por confirmar'}</p>
                           {lawyerData.telefono && (
                             <p className='flex items-center'>
-                              <Phone className='h-3 w-3 mr-1' />
+                              <Phone className='mr-1 h-3 w-3' />
                               {lawyerData.telefono}
                             </p>
                           )}
                           {lawyerData.email && (
                             <p className='flex items-center'>
-                              <Mail className='h-3 w-3 mr-1' />
+                              <Mail className='mr-1 h-3 w-3' />
                               {lawyerData.email}
                             </p>
                           )}
@@ -227,34 +392,28 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                     )}
 
                     {/* Información adicional */}
-                    <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mt-4'>
+                    <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-3'>
                       {selectedCase.fecha_inicio && (
-                        <div className='text-center p-3 bg-blue-50 rounded-lg'>
-                          <Calendar className='h-5 w-5 mx-auto mb-1 text-blue-600' />
-                          <p className='text-xs text-blue-600 font-medium'>Fecha Inicio</p>
-                          <p className='text-sm text-blue-900'>
-                            {formatDate(selectedCase.fecha_inicio)}
-                          </p>
+                        <div className='rounded-lg bg-blue-50 p-3 text-center'>
+                          <Calendar className='mx-auto mb-1 h-5 w-5 text-blue-600' />
+                          <p className='text-xs font-medium text-blue-600'>Fecha Inicio</p>
+                          <p className='text-sm text-blue-900'>{formatDate(selectedCase.fecha_inicio)}</p>
                         </div>
                       )}
-                      
+
                       {selectedCase.valor_estimado && (
-                        <div className='text-center p-3 bg-green-50 rounded-lg'>
-                          <span className='text-lg mb-1 block'>💰</span>
-                          <p className='text-xs text-green-600 font-medium'>Valor Estimado</p>
-                          <p className='text-sm text-green-900'>
-                            {formatCurrency(selectedCase.valor_estimado)}
-                          </p>
+                        <div className='rounded-lg bg-green-50 p-3 text-center'>
+                          <span className='mb-1 block text-lg'>💰</span>
+                          <p className='text-xs font-medium text-green-600'>Valor Estimado</p>
+                          <p className='text-sm text-green-900'>{formatCurrency(selectedCase.valor_estimado)}</p>
                         </div>
                       )}
 
                       {selectedCase.contraparte && (
-                        <div className='text-center p-3 bg-orange-50 rounded-lg'>
-                          <User className='h-5 w-5 mx-auto mb-1 text-orange-600' />
-                          <p className='text-xs text-orange-600 font-medium'>Contraparte</p>
-                          <p className='text-sm text-orange-900'>
-                            {selectedCase.contraparte}
-                          </p>
+                        <div className='rounded-lg bg-orange-50 p-3 text-center'>
+                          <User className='mx-auto mb-1 h-5 w-5 text-orange-600' />
+                          <p className='text-xs font-medium text-orange-600'>Contraparte</p>
+                          <p className='text-sm text-orange-900'>{selectedCase.contraparte}</p>
                         </div>
                       )}
                     </div>
