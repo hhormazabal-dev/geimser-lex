@@ -63,6 +63,21 @@ interface ClientDashboardProps {
   cases: ClientPortalCase[];
 }
 
+const CASE_META_PREFIX = '<!--case-form-meta:';
+const CASE_META_SUFFIX = '-->';
+
+function cleanObservaciones(value?: string | null): string {
+  if (!value) return '';
+  const start = value.indexOf(CASE_META_PREFIX);
+  if (start === -1) {
+    return value.trim();
+  }
+  const end = value.indexOf(CASE_META_SUFFIX, start);
+  const before = value.slice(0, start);
+  const after = end >= 0 ? value.slice(end + CASE_META_SUFFIX.length) : '';
+  return `${before} ${after}`.trim();
+}
+
 export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
   const [selectedCase, setSelectedCase] = useState<ClientPortalCase | null>(cases[0] || null);
   const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'documents' | 'notes' | 'messages' | 'requests'>('overview');
@@ -117,6 +132,11 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
       },
     };
   }, [cases]);
+
+  const observacionesTexto = useMemo(
+    () => cleanObservaciones(selectedCase?.observaciones ?? null),
+    [selectedCase?.observaciones]
+  );
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -447,14 +467,14 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                 <div className='mt-6'>
                   {activeTab === 'overview' && (
                     <div className='space-y-6'>
-                      {selectedCase.observaciones && (
+                      {observacionesTexto && (
                         <Card>
                           <CardHeader>
                             <CardTitle>Observaciones del Caso</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <p className='text-gray-700 whitespace-pre-wrap'>
-                              {selectedCase.observaciones}
+                              {observacionesTexto}
                             </p>
                           </CardContent>
                         </Card>

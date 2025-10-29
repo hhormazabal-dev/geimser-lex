@@ -753,72 +753,63 @@ export function TimelinePanel({
       </CardHeader>
       <CardContent className='space-y-6'>
         {etapasRequierenPago.length > 0 && (
-          <div
-            className={cn(
-              'grid grid-cols-1 gap-4 rounded-2xl border border-sky-200/60 bg-white/90 p-5 text-sm text-foreground/70 shadow-sm backdrop-blur',
-              clientMode ? 'md:grid-cols-4' : 'md:grid-cols-3'
-            )}
-          >
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Honorario distribuido</p>
-              <p className="text-lg font-semibold text-foreground">{formatUf(totalCostoEtapas)}</p>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">Honorario distribuido</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900">{formatUf(totalCostoEtapas)}</p>
             </div>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Pagado</p>
-              <p className="text-lg font-semibold text-foreground">{formatUf(totalPagadoEtapas)}</p>
+            <div className="rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">Pagado</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900">{formatUf(totalPagadoEtapas)}</p>
             </div>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Etapas liberadas</p>
-              <p className="text-lg font-semibold text-foreground">
+            <div className="rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">Etapas liberadas</p>
+              <p className="mt-3 text-2xl font-semibold text-slate-900">
                 {etapasPagadas} / {etapasRequierenPago.length}
               </p>
               {etapasPendientesPago > 0 && (
-                <p className="text-xs leading-5 text-sky-600">
+                <p className="mt-3 text-xs leading-5 text-sky-600">
                   Faltan {etapasPendientesPago} pago(s) para completar el plan.
                 </p>
               )}
             </div>
             {clientMode && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">
-                  Solicitadas por el cliente
-                </p>
-                <p className="text-lg font-semibold text-foreground">{etapasSolicitadas}</p>
+              <div className="rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm">
+                <p className="text-sm font-medium text-slate-500">Solicitadas por el cliente</p>
+                <p className="mt-3 text-2xl font-semibold text-slate-900">{etapasSolicitadas}</p>
               </div>
             )}
           </div>
         )}
 
         {clientMode && (
-          <div className="rounded-2xl border border-white/40 bg-white/80 px-5 py-5 text-sm text-foreground/65 shadow-sm backdrop-blur">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Alcance solicitado</p>
-                <p className="text-base font-semibold text-foreground mt-1">
-                  {clientProgress.solicitado > 0
-                    ? requestedStageLabel ?? `Etapa ${clientProgress.solicitado}`
-                    : 'Aún no definido'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Autorizado por el estudio</p>
-                <p className="text-base font-semibold text-foreground mt-1">
-                  {clientProgress.autorizado > 0
-                    ? authorizedStageLabel ?? `Etapa ${clientProgress.autorizado}`
-                    : 'Pendiente'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Etapas solicitadas</p>
-                <p className="text-base font-semibold text-foreground mt-1">
-                  {etapasSolicitadas} / {etapasRequierenPago.length}
-                </p>
-              </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">Alcance solicitado</p>
+              <p className="mt-3 text-base font-semibold text-slate-900">
+                {clientProgress.solicitado > 0
+                  ? requestedStageLabel ?? `Etapa ${clientProgress.solicitado}`
+                  : 'Aún no definido'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">Autorizado por el estudio</p>
+              <p className="mt-3 text-base font-semibold text-slate-900">
+                {clientProgress.autorizado > 0
+                  ? authorizedStageLabel ?? `Etapa ${clientProgress.autorizado}`
+                  : 'Pendiente'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">Etapas solicitadas</p>
+              <p className="mt-3 text-base font-semibold text-slate-900">
+                {etapasSolicitadas} / {etapasRequierenPago.length}
+              </p>
             </div>
             {clientProgress.solicitado > clientProgress.autorizado && (
-              <p className="mt-4 text-xs text-foreground/50">
+              <div className="sm:col-span-3 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-700 shadow-sm">
                 Estamos revisando tu solicitud para avanzar. Te notificaremos cuando esté aprobada.
-              </p>
+              </div>
             )}
           </div>
         )}
