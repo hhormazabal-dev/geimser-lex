@@ -755,30 +755,32 @@ export function TimelinePanel({
         {etapasRequierenPago.length > 0 && (
           <div
             className={cn(
-              'grid grid-cols-1 gap-4 rounded-2xl border border-sky-200/60 bg-white/80 p-5 text-sm text-foreground/70 shadow-sm backdrop-blur',
+              'grid grid-cols-1 gap-4 rounded-2xl border border-sky-200/60 bg-white/90 p-5 text-sm text-foreground/70 shadow-sm backdrop-blur',
               clientMode ? 'md:grid-cols-4' : 'md:grid-cols-3'
             )}
           >
-            <div className="space-y-1">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Honorario distribuido</p>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Honorario distribuido</p>
               <p className="text-lg font-semibold text-foreground">{formatUf(totalCostoEtapas)}</p>
             </div>
-            <div className="space-y-1">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Pagado</p>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Pagado</p>
               <p className="text-lg font-semibold text-foreground">{formatUf(totalPagadoEtapas)}</p>
             </div>
-            <div className="space-y-1">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Etapas liberadas</p>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Etapas liberadas</p>
               <p className="text-lg font-semibold text-foreground">
                 {etapasPagadas} / {etapasRequierenPago.length}
               </p>
               {etapasPendientesPago > 0 && (
-                <p className="text-xs text-sky-600">Faltan {etapasPendientesPago} pago(s) para completar el plan.</p>
+                <p className="text-xs leading-5 text-sky-600">
+                  Faltan {etapasPendientesPago} pago(s) para completar el plan.
+                </p>
               )}
             </div>
             {clientMode && (
-              <div className="space-y-1">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">
                   Solicitadas por el cliente
                 </p>
                 <p className="text-lg font-semibold text-foreground">{etapasSolicitadas}</p>
@@ -791,7 +793,7 @@ export function TimelinePanel({
           <div className="rounded-2xl border border-white/40 bg-white/80 px-5 py-5 text-sm text-foreground/65 shadow-sm backdrop-blur">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Alcance solicitado</p>
+                <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Alcance solicitado</p>
                 <p className="text-base font-semibold text-foreground mt-1">
                   {clientProgress.solicitado > 0
                     ? requestedStageLabel ?? `Etapa ${clientProgress.solicitado}`
@@ -799,7 +801,7 @@ export function TimelinePanel({
                 </p>
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Autorizado por el estudio</p>
+                <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Autorizado por el estudio</p>
                 <p className="text-base font-semibold text-foreground mt-1">
                   {clientProgress.autorizado > 0
                     ? authorizedStageLabel ?? `Etapa ${clientProgress.autorizado}`
@@ -807,7 +809,7 @@ export function TimelinePanel({
                 </p>
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground/45">Etapas solicitadas</p>
+                <p className="text-xs font-semibold uppercase leading-4 text-foreground/55">Etapas solicitadas</p>
                 <p className="text-base font-semibold text-foreground mt-1">
                   {etapasSolicitadas} / {etapasRequierenPago.length}
                 </p>
