@@ -75,6 +75,15 @@ function parseWorkflow(v: unknown): Workflow {
   return WF_DEFAULT;
 }
 
+function normalizeAudienceType(
+  value: CreateCaseInput['audiencia_inicial_tipo'],
+): 'preparatoria' | 'juicio' | undefined {
+  if (!value) return undefined;
+  if (value.startsWith('preparatoria')) return 'preparatoria';
+  if (value.startsWith('juicio')) return 'juicio';
+  return undefined;
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                    CRUD                                    */
 /* -------------------------------------------------------------------------- */
@@ -180,9 +189,10 @@ export async function createCase(input: CreateCaseInput) {
     await upsertPrimaryClient(newCase.id, baseData.cliente_principal_id);
     await createInitialStages(newCase);
 
-    if (audiencia_inicial_tipo) {
+    const normalizedAudience = normalizeAudienceType(audiencia_inicial_tipo);
+    if (normalizedAudience) {
       await applyInitialAudiencePreferences(newCase, {
-        audienciaTipo: audiencia_inicial_tipo,
+        audienciaTipo: normalizedAudience,
         ...(audiencia_inicial_requiere_testigos !== undefined && {
           requiereTestigos: audiencia_inicial_requiere_testigos ? true : false,
         }),
@@ -443,9 +453,10 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       diff_json: { from: existingCase, to: updatedCase },
     });
 
-    if (audiencia_inicial_tipo) {
+    const normalizedAudience = normalizeAudienceType(audiencia_inicial_tipo);
+    if (normalizedAudience) {
       await applyInitialAudiencePreferences(updatedCase as Case, {
-        audienciaTipo: audiencia_inicial_tipo,
+        audienciaTipo: normalizedAudience,
         ...(audiencia_inicial_requiere_testigos !== undefined && {
           requiereTestigos: audiencia_inicial_requiere_testigos ? true : false,
         }),

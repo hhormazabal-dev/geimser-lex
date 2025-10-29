@@ -142,7 +142,9 @@ export function getStageTemplatesByMateria(materia: string): StageTemplate[] {
 
 export const STAGE_AUDIENCE_TYPES = [
   { value: 'preparatoria', label: 'Audiencia preparatoria' },
+  { value: 'preparatoria_sin_fecha', label: 'Audiencia preparatoria (sin fecha)' },
   { value: 'juicio', label: 'Audiencia de juicio' },
+  { value: 'juicio_sin_fecha', label: 'Audiencia de juicio (sin fecha)' },
 ] as const;
 
 export const STAGE_STATUSES = [

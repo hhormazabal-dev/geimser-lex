@@ -73,7 +73,9 @@ const baseCaseSchema = z.object({
     .string()
     .max(1000, 'El identificador de tarifa no puede exceder 1000 caracteres')
     .optional(),
-  audiencia_inicial_tipo: z.enum(['preparatoria', 'juicio']).optional(),
+  audiencia_inicial_tipo: z
+    .enum(['preparatoria', 'juicio', 'preparatoria_sin_fecha', 'juicio_sin_fecha'])
+    .optional(),
   audiencia_inicial_requiere_testigos: z.boolean().optional(),
   alcance_cliente_solicitado: z
     .number()
