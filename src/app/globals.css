@@ -89,6 +89,7 @@
       'zero' on,
       'ss01' on,
       'ss02' on;
+    scrollbar-gutter: stable both-edges;
   }
 }
 

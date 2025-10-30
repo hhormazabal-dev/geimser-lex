@@ -148,7 +148,7 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
     <div className="space-y-2">
       <p className="text-sm font-semibold text-foreground">¿Necesitas soporte?</p>
       <p className="text-xs leading-relaxed text-foreground/70">
-        Escríbenos a <span className="font-medium text-primary">soporte@xelchile.cl</span> o agenda una asesoría
+        Escríbenos a <span className="font-medium text-primary">soporte@altiusignite.com</span> o agenda una asesoría
         onboarding desde tu dashboard.
       </p>
     </div>
@@ -162,13 +162,20 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
 
   return (
     <div className="relative isolate min-h-screen bg-transparent">
+      {/* Fondo difuminado */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.14),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.12),_transparent_50%)]" />
-      <div className="absolute inset-x-0 top-0 -z-10 mx-auto h-32 w-full max-w-5xl rounded-full bg-white/50 blur-3xl opacity-70" />
+      <div className="absolute inset-x-0 top-0 -z-10 mx-auto h-32 w-full max-w-[1600px] rounded-full bg-white/50 blur-3xl opacity-70" />
+
+      {/* Layout general */}
       <div className="relative flex min-h-screen flex-col lg:flex-row">
         <AppSidebar items={sidebarItems} profile={sidebarProfile} footer={footerHint} />
+
         <main className="relative flex-1 lg:pl-0">
           <div className="pb-12 pt-8 sm:pt-10 lg:pt-0">
-            <div className="mx-auto w-full max-w-5xl px-4 sm:px-5 lg:px-8">{children}</div>
+            {/* ← AQUÍ SE CORRIGE EL ANCHO */}
+            <div className="mx-auto w-full max-w-[1600px] px-6 lg:px-8">
+              {children}
+            </div>
           </div>
         </main>
       </div>

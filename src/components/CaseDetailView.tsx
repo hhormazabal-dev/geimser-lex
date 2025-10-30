@@ -890,7 +890,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         {/* Contenido de las tabs */}
         <div>
           {activeTab === 'overview' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,4.5fr)_minmax(0,2.5fr)] xl:items-start">
               <div className="space-y-6">
                 <TimelinePanel
                   caseId={caseData.id}

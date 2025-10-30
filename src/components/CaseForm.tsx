@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Controller, useController, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -648,6 +648,17 @@ export function CaseForm({
     setIsAddingClient(false);
   };
 
+  const handleCreateClientClick = () => {
+    void onCreateClient();
+  };
+
+  const handleNewClientKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      void onCreateClient();
+    }
+  };
+
   useEffect(() => {
     if (!audienciaInicialTipo) {
       setValue('audiencia_inicial_requiere_testigos', false);
@@ -851,8 +862,10 @@ export function CaseForm({
                     <p className='text-sm text-red-600'>{errors.cliente_principal_id.message}</p>
                   )}
                   {isAddingClient && (
-                    <form
-                      onSubmit={onCreateClient}
+                    <div
+                      role='group'
+                      aria-label='Formulario para crear cliente'
+                      onKeyDown={handleNewClientKeyDown}
                       className='mt-4 space-y-3 rounded-md border border-gray-200 bg-gray-50 p-4'
                     >
                       <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
@@ -919,7 +932,11 @@ export function CaseForm({
                         >
                           Cancelar
                         </Button>
-                        <Button type='submit' disabled={isCreatingClient}>
+                        <Button
+                          type='button'
+                          onClick={handleCreateClientClick}
+                          disabled={isCreatingClient}
+                        >
                           {isCreatingClient ? (
                             <>
                               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -930,7 +947,7 @@ export function CaseForm({
                           )}
                         </Button>
                       </div>
-                    </form>
+                    </div>
                   )}
                 </div>
 
@@ -1418,15 +1435,15 @@ export function CaseForm({
               <p className='text-sm text-gray-500'>Describe el contexto y los objetivos del cliente para una correcta asignación.</p>
             </div>
 
-            <div className='space-y-2'>
-              <Label htmlFor='descripcion_inicial'>Solicitudes del Demandante *</Label>
-              <Textarea
-                id='descripcion_inicial'
-                rows={5}
-                placeholder='Detalla qué solicita el demandante, expectativas y objetivos clave.'
-                {...register('descripcion_inicial')}
-                disabled={isLoading}
-              />
+              <div className='space-y-2'>
+                <Label htmlFor='descripcion_inicial'>Solicitudes del Demandante *</Label>
+                <Textarea
+                  id='descripcion_inicial'
+                  rows={15}
+                  placeholder='Detalla qué solicita el demandante, expectativas y objetivos clave.'
+                  {...register('descripcion_inicial')}
+                  disabled={isLoading}
+                />
               {errors.descripcion_inicial && (
                 <p className='text-sm text-red-600'>{errors.descripcion_inicial.message}</p>
               )}

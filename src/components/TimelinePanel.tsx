@@ -714,7 +714,7 @@ export function TimelinePanel({
 
   if (isLoading) {
     return (
-      <Card className='shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)]'>
+      <Card className='w-full shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)]'>
         <CardHeader>
           <CardTitle className='flex items-center gap-2'>
             <Clock className='h-5 w-5' />
@@ -731,7 +731,7 @@ export function TimelinePanel({
   }
 
   return (
-    <Card className='shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)]'>
+    <Card className='w-full shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)] lg:col-span-full'>
       <CardHeader>
         <div className='flex items-center justify-between'>
           <CardTitle className='flex items-center gap-2'>
@@ -753,30 +753,30 @@ export function TimelinePanel({
       </CardHeader>
       <CardContent className='space-y-6'>
         {etapasRequierenPago.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">Honorario distribuido</p>
-              <p className="mt-3 text-2xl font-semibold text-slate-900">{formatUf(totalCostoEtapas)}</p>
+          <div className='grid gap-5 sm:grid-cols-2 xl:grid-cols-4'>
+            <div className='rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/30 px-7 py-6 shadow-sm'>
+              <p className='text-sm font-medium text-slate-500'>Honorario distribuido</p>
+              <p className='mt-5 text-3xl font-semibold text-slate-900 tracking-tight'>{formatUf(totalCostoEtapas)}</p>
             </div>
-            <div className="rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">Pagado</p>
-              <p className="mt-3 text-2xl font-semibold text-slate-900">{formatUf(totalPagadoEtapas)}</p>
+            <div className='rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/30 px-7 py-6 shadow-sm'>
+              <p className='text-sm font-medium text-slate-500'>Pagado</p>
+              <p className='mt-5 text-3xl font-semibold text-slate-900 tracking-tight'>{formatUf(totalPagadoEtapas)}</p>
             </div>
-            <div className="rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">Etapas liberadas</p>
-              <p className="mt-3 text-2xl font-semibold text-slate-900">
+            <div className='rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/30 px-7 py-6 shadow-sm'>
+              <p className='text-sm font-medium text-slate-500'>Etapas liberadas</p>
+              <p className='mt-5 text-3xl font-semibold text-slate-900 tracking-tight'>
                 {etapasPagadas} / {etapasRequierenPago.length}
               </p>
               {etapasPendientesPago > 0 && (
-                <p className="mt-3 text-xs leading-5 text-sky-600">
+                <p className='mt-3 text-xs leading-5 text-sky-600'>
                   Faltan {etapasPendientesPago} pago(s) para completar el plan.
                 </p>
               )}
             </div>
             {clientMode && (
-              <div className="rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm">
-                <p className="text-sm font-medium text-slate-500">Solicitadas por el cliente</p>
-                <p className="mt-3 text-2xl font-semibold text-slate-900">{etapasSolicitadas}</p>
+              <div className='rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/30 px-7 py-6 shadow-sm'>
+                <p className='text-sm font-medium text-slate-500'>Solicitadas por el cliente</p>
+                <p className='mt-5 text-3xl font-semibold text-slate-900 tracking-tight'>{etapasSolicitadas}</p>
               </div>
             )}
           </div>
@@ -1131,10 +1131,12 @@ export function TimelinePanel({
 
         {/* Timeline de etapas */}
         <div className='space-y-4'>
-          <div className='flex flex-wrap items-center justify-between gap-3'>
-            <p className='text-sm text-foreground/60'>Arrastra horizontalmente para revisar el avance del caso.</p>
+          <div className='flex flex-wrap items-center justify-between gap-3 lg:items-end'>
+            <p className='text-sm text-foreground/60'>
+              Revisa el avance completo: arrastra en pantallas pequeñas o navega la grilla en escritorio.
+            </p>
             {filteredStages.length > 0 && (
-              <div className='hidden md:flex items-center gap-2'>
+              <div className='flex items-center gap-2 lg:hidden'>
                 <Button
                   type='button'
                   variant='ghost'
@@ -1160,16 +1162,16 @@ export function TimelinePanel({
               </div>
             )}
           </div>
-          <div className='relative'>
+          <div className='relative lg:rounded-3xl lg:border lg:border-white/40 lg:bg-white/60 lg:p-6 lg:shadow-inner'>
             {filteredStages.length > 0 && (
               <>
-                <div className='pointer-events-none absolute inset-y-0 left-0 hidden w-16 bg-gradient-to-r from-white via-white/80 to-transparent md:block' />
-                <div className='pointer-events-none absolute inset-y-0 right-0 hidden w-16 bg-gradient-to-l from-white via-white/80 to-transparent md:block' />
+                <div className='pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-white via-white/80 to-transparent lg:hidden' />
+                <div className='pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white via-white/80 to-transparent lg:hidden' />
               </>
             )}
             <div
               ref={stageTrackRef}
-              className='flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory'
+              className='flex gap-4 overflow-x-auto pb-4 pl-2 pr-10 scroll-smooth snap-x snap-mandatory sm:pl-4 sm:pr-14 lg:grid lg:[grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] lg:gap-4 lg:overflow-visible lg:p-0 lg:snap-none'
             >
               {filteredStages.map((stage, index) => {
                 const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
@@ -1199,7 +1201,10 @@ export function TimelinePanel({
                   : null;
 
                 return (
-                  <div key={stage.id} className='snap-center shrink-0 basis-full min-w-[280px] sm:basis-[60%] lg:basis-[380px]'>
+                  <div
+                    key={stage.id}
+                    className='snap-start shrink-0 basis-full min-w-[300px] sm:min-w-[320px] md:min-w-[360px] lg:min-w-0 lg:w-full'
+                  >
                     <Card className={cardStateClasses}>
                       <CardContent className='flex h-full flex-col gap-5 p-6'>
                         <div className='flex flex-col gap-4'>

@@ -74,8 +74,8 @@ export default function RootLayout({
       >
         <div className="relative min-h-screen">
           <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.18),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(96,165,250,0.2),_transparent_50%)]" />
-          <div className="relative min-h-screen">
-            <div className="absolute inset-x-0 top-0 mx-auto h-32 w-full max-w-5xl rounded-full bg-white/40 blur-3xl opacity-70" />
+        <div className="relative min-h-screen">
+          <div className="absolute inset-x-0 top-0 mx-auto h-32 w-full max-w-[1760px] rounded-full bg-white/40 blur-3xl opacity-70" />
             <main className="relative z-10 min-h-screen pb-10 pt-6">
               {children}
             </main>

@@ -63,19 +63,11 @@ interface ClientDashboardProps {
   cases: ClientPortalCase[];
 }
 
-const CASE_META_PREFIX = '<!--case-form-meta:';
-const CASE_META_SUFFIX = '-->';
+const CASE_META_REGEX = /<!--case-form-meta:[\s\S]*?-->/g;
 
 function cleanObservaciones(value?: string | null): string {
   if (!value) return '';
-  const start = value.indexOf(CASE_META_PREFIX);
-  if (start === -1) {
-    return value.trim();
-  }
-  const end = value.indexOf(CASE_META_SUFFIX, start);
-  const before = value.slice(0, start);
-  const after = end >= 0 ? value.slice(end + CASE_META_SUFFIX.length) : '';
-  return `${before} ${after}`.trim();
+  return value.replace(CASE_META_REGEX, '').trim();
 }
 
 export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
@@ -201,7 +193,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
     <div className='min-h-screen bg-gray-50'>
       {/* Header */}
       <div className='bg-white shadow-sm border-b'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+        <div className='mx-auto w-full max-w-[1760px] px-4 lg:px-6'>
           <div className='flex items-center justify-between h-16'>
             <div className='flex items-center space-x-4'>
               <Scale className='h-8 w-8 text-blue-600' />
@@ -228,9 +220,9 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
         </div>
       </div>
 
-      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8'>
-          <Card className='bg-white shadow-sm'>
+      <div className='mx-auto w-full max-w-[1760px] px-4 lg:px-6 py-8'>
+        <div className='grid grid-cols-1 gap-4 md:grid-cols-6 lg:grid-cols-12'>
+          <Card className='bg-white shadow-sm col-span-1 md:col-span-3 lg:col-span-3'>
             <CardContent className='pt-6'>
               <p className='text-xs uppercase tracking-wide text-gray-500'>Casos totales</p>
               <p className='mt-2 text-3xl font-semibold text-gray-900'>{summary.totalCases}</p>
@@ -239,21 +231,21 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
               </p>
             </CardContent>
           </Card>
-          <Card className='bg-white shadow-sm'>
+          <Card className='bg-white shadow-sm col-span-1 md:col-span-3 lg:col-span-3'>
             <CardContent className='pt-6'>
               <p className='text-xs uppercase tracking-wide text-gray-500'>Honorarios comprometidos</p>
               <p className='mt-2 text-3xl font-semibold text-gray-900'>{formatUf(summary.ufTotals.total)}</p>
               <p className='mt-1 text-sm text-gray-500'>Suma de casos en UF</p>
             </CardContent>
           </Card>
-          <Card className='bg-white shadow-sm'>
+          <Card className='bg-white shadow-sm col-span-1 md:col-span-3 lg:col-span-3'>
             <CardContent className='pt-6'>
               <p className='text-xs uppercase tracking-wide text-gray-500'>Pagado a la fecha</p>
               <p className='mt-2 text-3xl font-semibold text-emerald-600'>{formatUf(summary.ufTotals.paid)}</p>
               <p className='mt-1 text-sm text-gray-500'>Incluye abonos registrados</p>
             </CardContent>
           </Card>
-          <Card className='bg-white shadow-sm'>
+          <Card className='bg-white shadow-sm col-span-1 md:col-span-3 lg:col-span-3'>
             <CardContent className='pt-6'>
               <p className='text-xs uppercase tracking-wide text-gray-500'>Saldo pendiente</p>
               <p className='mt-2 text-3xl font-semibold text-orange-600'>{formatUf(summary.ufTotals.pending)}</p>
@@ -268,10 +260,10 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
           </div>
         )}
 
-        <div className='grid grid-cols-1 lg:grid-cols-4 gap-8'>
+        <div className='grid grid-cols-1 gap-6 lg:grid-cols-[272px_minmax(0,1fr)_300px] lg:gap-8'>
           {/* Sidebar - Lista de casos */}
-          <div className='lg:col-span-1'>
-            <Card>
+          <div className='lg:sticky lg:top-24 lg:h-[calc(100dvh-6rem)] lg:overflow-auto'>
+            <Card className='h-full'>
               <CardHeader>
                 <CardTitle className='text-lg'>Mis Casos</CardTitle>
               </CardHeader>
@@ -335,9 +327,9 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
           </div>
 
           {/* Contenido principal */}
-          <div className='lg:col-span-3'>
+          <div className='w-full min-w-0'>
             {selectedCase ? (
-              <div className='space-y-6'>
+              <div className='space-y-6 min-w-0'>
                 {/* Header del caso */}
                 <Card>
                   <CardContent className='pt-6'>
@@ -464,9 +456,9 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                 </div>
 
                 {/* Contenido de las tabs */}
-                <div className='mt-6'>
+                <div className='mt-6 min-w-0'>
                   {activeTab === 'overview' && (
-                    <div className='space-y-6'>
+                    <div className='space-y-6 min-w-0'>
                       {observacionesTexto && (
                         <Card>
                           <CardHeader>
@@ -479,37 +471,34 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                           </CardContent>
                         </Card>
                       )}
-                      
-                      <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className='text-lg'>Progreso Reciente</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <TimelinePanel 
-                              caseId={selectedCase.id}
-                              caseMateria={selectedCase.materia ?? 'General'}
-                              canManageStages={false}
-                              showPrivateStages={false}
-                            />
-                          </CardContent>
-                        </Card>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className='text-lg'>Progreso Reciente</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <TimelinePanel 
+                            caseId={selectedCase.id}
+                            caseMateria={selectedCase.materia ?? 'General'}
+                            canManageStages={false}
+                            showPrivateStages={false}
+                          />
+                        </CardContent>
+                      </Card>
 
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className='text-lg'>Documentos Recientes</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <DocumentsPanel 
-                              caseId={selectedCase.id}
-                              canUpload={false}
-                              canEdit={false}
-                              canDelete={false}
-                              showPrivateDocuments={false}
-                            />
-                          </CardContent>
-                        </Card>
-                      </div>
+                      <Card className='lg:hidden'>
+                        <CardHeader>
+                          <CardTitle className='text-lg'>Documentos Recientes</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <DocumentsPanel 
+                            caseId={selectedCase.id}
+                            canUpload={false}
+                            canEdit={false}
+                            canDelete={false}
+                            showPrivateDocuments={false}
+                          />
+                        </CardContent>
+                      </Card>
                     </div>
                   )}
 
@@ -551,7 +540,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                   )}
 
                   {activeTab === 'requests' && (
-                    <InfoRequestsPanel 
+                    <InfoRequestsPanel
                       caseId={selectedCase.id}
                       canCreateRequests={true}
                       canRespondRequests={false}
@@ -572,6 +561,26 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                       Selecciona un caso de la lista para ver su información detallada
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Rail derecho */}
+          <div className='hidden lg:flex lg:flex-col lg:gap-6 lg:sticky lg:top-24 lg:h-[calc(100dvh-6rem)] lg:overflow-auto'>
+            {selectedCase && (
+              <Card className='w-full'>
+                <CardHeader>
+                  <CardTitle className='text-lg'>Documentos Recientes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <DocumentsPanel 
+                    caseId={selectedCase.id}
+                    canUpload={false}
+                    canEdit={false}
+                    canDelete={false}
+                    showPrivateDocuments={false}
+                  />
                 </CardContent>
               </Card>
             )}
