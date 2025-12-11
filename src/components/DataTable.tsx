@@ -130,7 +130,7 @@ export function DataTable({
               <Input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder='Buscar casos o clientes'
+                placeholder='Buscar por caratulado o N° de causa'
                 className='border-0 bg-transparent p-0 text-sm focus-visible:ring-0'
               />
               <Button type='submit' size='sm' variant='secondary'>

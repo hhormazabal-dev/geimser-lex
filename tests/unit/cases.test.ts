@@ -328,7 +328,7 @@ describe('Cases Server Actions', () => {
       await getCases({ search: 'test search' });
 
       expect(mockQuery.or).toHaveBeenCalledWith(
-        'caratulado.ilike.%test search%,numero_causa.ilike.%test search%,nombre_cliente.ilike.%test search%'
+        'caratulado.ilike.%test search%,numero_causa.ilike.%test search%'
       );
     });
   });

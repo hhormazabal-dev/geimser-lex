@@ -813,9 +813,8 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
     if (validatedFilters.fecha_inicio_hasta) query = query.lte('fecha_inicio', validatedFilters.fecha_inicio_hasta);
     if (validatedFilters.search) {
       const s = validatedFilters.search;
-      query = query.or(
-        `caratulado.ilike.%${s}%,nombre_cliente.ilike.%${s}%,numero_causa.ilike.%${s}%`
-      );
+      // Búsqueda centrada en identificadores únicos del expediente
+      query = query.or(`caratulado.ilike.%${s}%,numero_causa.ilike.%${s}%`);
     }
 
     const from = (validatedFilters.page - 1) * validatedFilters.limit;
