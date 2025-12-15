@@ -90,7 +90,8 @@ function normalizeAudienceType(
 
 export async function createCase(input: CreateCaseInput) {
   try {
-    const profile = await requireAuth(['abogado', 'analista']);
+    // admin_firma debe tener al menos los mismos permisos que abogado/analista
+    const profile = await requireAuth(['admin_firma', 'abogado', 'analista']);
     const parsed = createCaseSchema.parse(input);
     const {
       marcar_validado,
@@ -227,7 +228,8 @@ export async function createCase(input: CreateCaseInput) {
 
 export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
   try {
-    const profile = await requireAuth('abogado');
+    // Permitir también a admin_firma generar casos desde briefs
+    const profile = await requireAuth(['admin_firma', 'abogado']);
     const validated = createCaseFromBriefSchema.parse(input);
 
     const extracted = await extractCaseDataFromBrief(validated.brief);
