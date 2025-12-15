@@ -136,6 +136,11 @@ export async function createCase(input: CreateCaseInput) {
       rut_cliente: sOrNull(caseInput.rut_cliente),
       contraparte: sOrNull(caseInput.contraparte),
       etapa_actual: sOrNull(caseInput.etapa_actual),
+      sentencia_estado: caseInput.sentencia_estado ?? 'no_registra',
+      sentencia_fecha:
+        caseInput.sentencia_fecha && caseInput.sentencia_fecha.trim().length > 0
+          ? caseInput.sentencia_fecha
+          : null,
 
       fecha_inicio: caseInput.fecha_inicio ?? null,
       abogado_responsable:
@@ -362,6 +367,13 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       ...(rest.descripcion_inicial !== undefined && { descripcion_inicial: rest.descripcion_inicial }),
       ...(rest.documentacion_recibida !== undefined && { documentacion_recibida: rest.documentacion_recibida }),
       ...(rest.observaciones !== undefined && { observaciones: rest.observaciones }),
+      ...(rest.sentencia_estado !== undefined && { sentencia_estado: rest.sentencia_estado }),
+      ...(rest.sentencia_fecha !== undefined && {
+        sentencia_fecha:
+          rest.sentencia_fecha && rest.sentencia_fecha.trim().length > 0
+            ? rest.sentencia_fecha
+            : null,
+      }),
       ...(rest.valor_estimado !== undefined && { valor_estimado: nOrNull(rest.valor_estimado) }),
       ...(rest.honorario_total_uf !== undefined && { honorario_total_uf: nOrNull(rest.honorario_total_uf) }),
       ...(rest.honorario_pagado_uf !== undefined && {

@@ -14,6 +14,7 @@ import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
+import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
 import { useToast } from '@/hooks/use-toast';
 import { authorizeCaseAdvance, assignLawyer, listAvailableLawyers } from '@/lib/actions/cases';
 import { createCaseCounterparty, deleteCaseCounterparty } from '@/lib/actions/counterparties';
@@ -37,6 +38,19 @@ import {
 } from 'lucide-react';
 import type { Profile, Case, CaseStage, CaseCounterparty } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
+
+const SENTENCE_STATUS_LABELS: Record<string, string> = CASE_SENTENCE_STATUSES.reduce(
+  (acc, item) => {
+    acc[item.value] = item.label;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
+function getSentenceStatusLabel(status?: string | null): string {
+  if (!status || status === 'no_registra') return 'Sin sentencia registrada';
+  return SENTENCE_STATUS_LABELS[status] ?? 'Sin sentencia registrada';
+}
 
 interface CaseDetailViewProps {
   case: Omit<Case, 'abogado_responsable'> & {
@@ -563,6 +577,12 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                     {caseData.etapa_actual}
                   </Badge>
                 )}
+                {caseData.sentencia_estado && caseData.sentencia_estado !== 'no_registra' && (
+                  <span className="text-xs text-foreground/60">
+                    Sentencia: {getSentenceStatusLabel(caseData.sentencia_estado)}
+                    {caseData.sentencia_fecha && <> · {formatDate(caseData.sentencia_fecha)}</>}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -701,6 +721,11 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         {caseData.fecha_inicio && (
                           <p>
                             Inicio · <span className="font-medium text-foreground">{formatDate(caseData.fecha_inicio)}</span>
+                          </p>
+                        )}
+                        {caseData.sentencia_fecha && (
+                          <p>
+                            Sentencia · <span className="font-medium text-foreground">{formatDate(caseData.sentencia_fecha)}</span>
                           </p>
                         )}
                         {caseData.fecha_termino && (

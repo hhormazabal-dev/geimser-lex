@@ -50,6 +50,11 @@ const baseCaseSchema = z.object({
   etapa_actual: z.string().default('Ingreso Demanda'),
   estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado']).default('activo'),
   fecha_inicio: z.string().optional(),
+  sentencia_estado: z
+    .enum(['no_registra', 'pendiente', 'programada', 'dictada'])
+    .default('no_registra')
+    .optional(),
+  sentencia_fecha: z.string().optional(),
   abogado_responsable: z.string().uuid('ID de abogado inválido').optional(),
   analista_id: z.string().uuid('ID de analista inválido').optional(),
   cliente_principal_id: z.string().uuid('ID de cliente inválido'),
@@ -158,6 +163,18 @@ export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
       path: ['alcance_cliente_autorizado'],
     });
   }
+
+  if (
+    data.sentencia_estado &&
+    (data.sentencia_estado === 'programada' || data.sentencia_estado === 'dictada') &&
+    (!data.sentencia_fecha || data.sentencia_fecha.trim().length === 0)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Debes indicar la fecha de la sentencia.',
+      path: ['sentencia_fecha'],
+    });
+  }
 });
 
 export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx) => {
@@ -184,6 +201,18 @@ export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx)
       code: z.ZodIssueCode.custom,
       message: 'El alcance autorizado no puede superar al alcance solicitado por el cliente.',
       path: ['alcance_cliente_autorizado'],
+    });
+  }
+
+  if (
+    data.sentencia_estado &&
+    (data.sentencia_estado === 'programada' || data.sentencia_estado === 'dictada') &&
+    (!data.sentencia_fecha || data.sentencia_fecha.trim().length === 0)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Debes indicar la fecha de la sentencia.',
+      path: ['sentencia_fecha'],
     });
   }
 });
@@ -247,6 +276,13 @@ export const CASE_WORKFLOW_STATES = [
   { value: 'en_revision', label: 'Revisión interna' },
   { value: 'activo', label: 'Activo' },
   { value: 'cerrado', label: 'Cerrado' },
+] as const;
+
+export const CASE_SENTENCE_STATUSES = [
+  { value: 'no_registra', label: 'Sin sentencia registrada' },
+  { value: 'pendiente', label: 'Sentencia pendiente' },
+  { value: 'programada', label: 'Sentencia programada con fecha' },
+  { value: 'dictada', label: 'Sentencia dictada' },
 ] as const;
 
 export const CASE_MATERIAS = [

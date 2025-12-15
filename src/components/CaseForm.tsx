@@ -19,6 +19,7 @@ import {
   CASE_STATUSES,
   CASE_PRIORITIES,
   CASE_WORKFLOW_STATES,
+  CASE_SENTENCE_STATUSES,
   CASE_MATERIAS,
   REGIONES_CHILE,
 } from '@/lib/validators/case';
@@ -202,6 +203,8 @@ export function CaseForm({
         nombre_cliente: existingCase.nombre_cliente,
         contraparte: existingCase.contraparte || '',
         etapa_actual: existingCase.etapa_actual || 'Ingreso Demanda',
+        sentencia_estado: (existingCase as any).sentencia_estado ?? 'no_registra',
+        sentencia_fecha: (existingCase as any).sentencia_fecha ?? '',
         estado: (existingCase.estado || 'activo') as CreateCaseInput['estado'],
         fecha_inicio: existingCase.fecha_inicio || new Date().toISOString().split('T')[0],
         abogado_responsable: existingLawyerId || defaultLawyerId,
@@ -236,6 +239,8 @@ export function CaseForm({
         nombre_cliente: '',
         contraparte: '',
         etapa_actual: 'Ingreso Demanda',
+        sentencia_estado: 'no_registra',
+        sentencia_fecha: '',
         estado: 'activo',
         fecha_inicio: new Date().toISOString().split('T')[0],
         abogado_responsable: defaultLawyerId,
@@ -1125,6 +1130,47 @@ export function CaseForm({
                 </Button>
               </div>
               <p className='text-xs text-gray-500'>Guarda el estado de la notificación para el seguimiento interno. Se añadirá automáticamente a las observaciones.</p>
+            </div>
+
+            <div className='space-y-2'>
+              <h3 className='text-sm font-semibold text-gray-900'>Sentencia</h3>
+              <p className='text-xs text-gray-500'>
+                Registra si el caso ya cuenta con una sentencia pendiente o con fecha.
+              </p>
+            </div>
+
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='sentencia_estado'>Estado de sentencia</Label>
+                <select
+                  id='sentencia_estado'
+                  className='form-input'
+                  {...register('sentencia_estado')}
+                  disabled={isLoading}
+                >
+                  {CASE_SENTENCE_STATUSES.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {errors.sentencia_estado && (
+                  <p className='text-sm text-red-600'>{errors.sentencia_estado.message}</p>
+                )}
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='sentencia_fecha'>Fecha de sentencia</Label>
+                <Input
+                  id='sentencia_fecha'
+                  type='date'
+                  {...register('sentencia_fecha')}
+                  disabled={isLoading}
+                />
+                {errors.sentencia_fecha && (
+                  <p className='text-sm text-red-600'>{errors.sentencia_fecha.message}</p>
+                )}
+              </div>
             </div>
 
             <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>

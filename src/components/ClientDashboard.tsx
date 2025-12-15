@@ -10,6 +10,7 @@ import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
+import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
 import { 
   Scale, 
   FileText, 
@@ -35,6 +36,8 @@ type CaseFieldsForClient = Pick<
   | 'estado'
   | 'prioridad'
   | 'etapa_actual'
+  | 'sentencia_estado'
+  | 'sentencia_fecha'
   | 'honorario_moneda'
   | 'honorario_total_uf'
   | 'honorario_pagado_uf'
@@ -68,6 +71,19 @@ const CASE_META_REGEX = /<!--case-form-meta:[\s\S]*?-->/g;
 function cleanObservaciones(value?: string | null): string {
   if (!value) return '';
   return value.replace(CASE_META_REGEX, '').trim();
+}
+
+const SENTENCE_STATUS_LABELS: Record<string, string> = CASE_SENTENCE_STATUSES.reduce(
+  (acc, item) => {
+    acc[item.value] = item.label;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
+function getSentenceStatusLabel(status?: string | null): string {
+  if (!status || status === 'no_registra') return 'Sin sentencia registrada';
+  return SENTENCE_STATUS_LABELS[status] ?? 'Sin sentencia registrada';
 }
 
 export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
@@ -338,16 +354,24 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                         <h2 className='text-2xl font-bold text-gray-900 mb-2'>
                           {selectedCase.caratulado}
                         </h2>
-                        <div className='flex flex-wrap items-center gap-2 text-sm text-gray-600'>
-                          {selectedCase.numero_causa && <span>Causa: {selectedCase.numero_causa}</span>}
-                          {selectedCase.materia && <span>Materia: {selectedCase.materia}</span>}
-                          {selectedCase.tribunal && <span>Tribunal: {selectedCase.tribunal}</span>}
-                        </div>
+                      <div className='flex flex-wrap items-center gap-2 text-sm text-gray-600'>
+                        {selectedCase.numero_causa && <span>Causa: {selectedCase.numero_causa}</span>}
+                        {selectedCase.materia && <span>Materia: {selectedCase.materia}</span>}
+                        {selectedCase.tribunal && <span>Tribunal: {selectedCase.tribunal}</span>}
                       </div>
-                      <div className='flex flex-col items-end space-y-2'>
-                        {getStatusBadge(selectedCase.estado || 'activo')}
-                        {selectedCase.etapa_actual && <Badge variant='outline'>{selectedCase.etapa_actual}</Badge>}
-                      </div>
+                    </div>
+                    <div className='flex flex-col items-end space-y-2'>
+                      {getStatusBadge(selectedCase.estado || 'activo')}
+                      {selectedCase.etapa_actual && <Badge variant='outline'>{selectedCase.etapa_actual}</Badge>}
+                      {selectedCase.sentencia_estado && selectedCase.sentencia_estado !== 'no_registra' && (
+                        <span className='text-xs text-gray-600'>
+                          Sentencia: {getSentenceStatusLabel(selectedCase.sentencia_estado)}
+                          {selectedCase.sentencia_fecha && (
+                            <> · {formatDate(selectedCase.sentencia_fecha)}</>
+                          )}
+                        </span>
+                      )}
+                    </div>
                     </div>
 
                     {selectedCase.honorario_total_uf !== null && (
@@ -426,6 +450,21 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                           <User className='mx-auto mb-1 h-5 w-5 text-orange-600' />
                           <p className='text-xs font-medium text-orange-600'>Contraparte</p>
                           <p className='text-sm text-orange-900'>{selectedCase.contraparte}</p>
+                        </div>
+                      )}
+
+                      {selectedCase.sentencia_estado && selectedCase.sentencia_estado !== 'no_registra' && (
+                        <div className='rounded-lg bg-purple-50 p-3 text-center'>
+                          <Calendar className='mx-auto mb-1 h-5 w-5 text-purple-600' />
+                          <p className='text-xs font-medium text-purple-600'>Sentencia</p>
+                          <p className='text-sm text-purple-900'>
+                            {getSentenceStatusLabel(selectedCase.sentencia_estado)}
+                          </p>
+                          {selectedCase.sentencia_fecha && (
+                            <p className='mt-1 text-xs text-purple-700'>
+                              {formatDate(selectedCase.sentencia_fecha)}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

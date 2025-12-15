@@ -22,6 +22,7 @@ export type UserRole = PublicEnums['user_role'];
 export type CaseStatus = PublicEnums['case_status'];
 export type CasePriority = PublicEnums['case_priority'];
 export type CaseWorkflowState = PublicEnums['case_workflow_state'];
+export type CaseSentenceStatus = PublicEnums['case_sentence_status'];
 export type StageStatus = PublicEnums['stage_status'];
 export type StagePaymentStatus = PublicEnums['stage_payment_status'];
 export type NoteType = PublicEnums['note_type'];

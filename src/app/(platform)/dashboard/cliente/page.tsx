@@ -36,6 +36,8 @@ export default async function ClientDashboardPage() {
           estado,
           prioridad,
           etapa_actual,
+          sentencia_estado,
+          sentencia_fecha,
           honorario_moneda,
           honorario_total_uf,
           honorario_pagado_uf,
