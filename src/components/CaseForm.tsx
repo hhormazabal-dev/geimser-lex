@@ -211,7 +211,7 @@ export function CaseForm({
     estado: 'Estado del expediente',
     prioridad: 'Prioridad',
     valor_estimado: 'Valor estimado',
-    abogado_responsable: 'Abogado responsable',
+    abogado_responsable: 'Abogado patrocinante',
     analista_id: 'Analista',
     sentencia_estado: 'Estado de sentencia',
     sentencia_fecha: 'Fecha de sentencia',
@@ -1060,15 +1060,15 @@ export function CaseForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className='space-y-8'>
-          <section className='space-y-4'>
-            <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Partes</h2>
-              <p className='text-sm text-gray-500'>Identifica al cliente, a quién representas y la contraparte.</p>
-            </div>
-
-            <div className='space-y-6'>
-              <div className='space-y-2'>
-                <Label>Demandantes *</Label>
+	          <section className='space-y-4'>
+	            <div>
+	              <h2 className='text-lg font-semibold text-gray-900'>Partes</h2>
+	              <p className='text-sm text-gray-500'>Identifica al cliente, a quién representas y la contraparte.</p>
+	            </div>
+	
+	            <div className='space-y-6'>
+	              <div className='space-y-2'>
+	                <Label>Demandantes *</Label>
                 <p className='text-xs text-gray-500'>Ingresa un demandante por fila. El primero queda registrado como titular del expediente.</p>
                 <div className='space-y-2'>
                   {demandantes.map((demandante, index) => (
@@ -1125,13 +1125,48 @@ export function CaseForm({
                 {errors.rut_cliente && (
                   <p className='text-sm text-red-600'>{errors.rut_cliente.message}</p>
                 )}
-              </div>
-
-              <div className='grid gap-4 md:grid-cols-2'>
-                <div className='space-y-2'>
-                  <div className='flex items-center justify-between gap-2'>
-                    <Label htmlFor='cliente_principal_id'>Cliente principal *</Label>
-                    <Button
+	              </div>
+	
+	              <div className='grid gap-4 md:grid-cols-2'>
+	                <div className='space-y-2'>
+	                  <Label htmlFor='abogado_responsable'>Abogado patrocinante</Label>
+	                  <Controller
+	                    control={control}
+	                    name='abogado_responsable'
+	                    render={({ field }) => (
+	                      <select
+	                        id='abogado_responsable'
+	                        className='form-input'
+	                        value={field.value || ''}
+	                        onChange={(event) => field.onChange(event.target.value || undefined)}
+	                        disabled={isLoading || lawyers.length === 0}
+	                      >
+	                        <option value=''>Selecciona un abogado</option>
+	                        {lawyers.map(lawyer => (
+	                          <option key={lawyer.id} value={lawyer.id}>
+	                            {lawyer.nombre}
+	                          </option>
+	                        ))}
+	                      </select>
+	                    )}
+	                  />
+	                  {lawyers.length === 0 && (
+	                    <p className='text-xs text-gray-500'>
+	                      No hay abogados disponibles. Un administrador debe registrarlos.
+	                    </p>
+	                  )}
+	                  <p className='text-xs text-gray-500'>
+	                    Queda registrado en `cases.abogado_responsable` (FK a perfiles) como abogado patrocinante del expediente.
+	                  </p>
+	                  {errors.abogado_responsable && (
+	                    <p className='text-sm text-red-600'>{errors.abogado_responsable.message}</p>
+	                  )}
+	                </div>
+	
+	                <div className='space-y-2'>
+	                  <div className='flex items-center justify-between gap-2'>
+	                    <Label htmlFor='cliente_principal_id'>Cliente principal *</Label>
+	                    <Button
                       type='button'
                       variant='ghost'
                       size='sm'
@@ -2033,76 +2068,44 @@ export function CaseForm({
             </div>
           </section>
 
-          <section className='space-y-4'>
-            <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Asignación y workflow</h2>
-              <p className='text-sm text-gray-500'>Define quién liderará el caso y el estado interno del expediente.</p>
-            </div>
-
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='abogado_responsable'>Abogado responsable</Label>
-                <Controller
-                  control={control}
-                  name='abogado_responsable'
-                  render={({ field }) => (
-                    <select
-                      id='abogado_responsable'
-                      className='form-input'
-                      value={field.value || ''}
-                      onChange={(event) => field.onChange(event.target.value || undefined)}
-                      disabled={isLoading || lawyers.length === 0}
-                    >
-                      <option value=''>Selecciona un abogado</option>
-                      {lawyers.map(lawyer => (
-                        <option key={lawyer.id} value={lawyer.id}>
-                          {lawyer.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                />
-                {lawyers.length === 0 && (
-                  <p className='text-xs text-gray-500'>No hay abogados disponibles. Un administrador debe registrarlos.</p>
-                )}
-                {errors.abogado_responsable && (
-                  <p className='text-sm text-red-600'>{errors.abogado_responsable.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='workflow_state'>Estado interno</Label>
-                <select
-                  id='workflow_state'
-                  className='form-input'
-                  {...register('workflow_state')}
-                  disabled={isLoading}
-                >
-                  {CASE_WORKFLOW_STATES.map(state => (
-                    <option key={state.value} value={state.value}>
-                      {state.label}
-                    </option>
-                  ))}
-                </select>
-                {errors.workflow_state && (
-                  <p className='text-sm text-red-600'>{errors.workflow_state.message}</p>
-                )}
-              </div>
-            </div>
+	          <section className='space-y-4'>
+	            <div>
+	              <h2 className='text-lg font-semibold text-gray-900'>Asignación y workflow</h2>
+	              <p className='text-sm text-gray-500'>Define el estado interno del expediente y la revisión previa a la asignación.</p>
+	            </div>
+	
+	            <div className='space-y-2'>
+	              <Label htmlFor='workflow_state'>Estado interno</Label>
+	              <select
+	                id='workflow_state'
+	                className='form-input'
+	                {...register('workflow_state')}
+	                disabled={isLoading}
+	              >
+	                {CASE_WORKFLOW_STATES.map(state => (
+	                  <option key={state.value} value={state.value}>
+	                    {state.label}
+	                  </option>
+	                ))}
+	              </select>
+	              {errors.workflow_state && (
+	                <p className='text-sm text-red-600'>{errors.workflow_state.message}</p>
+	              )}
+	            </div>
 
             <div className='rounded-md border border-gray-200 bg-gray-50 p-4'>
-              <label className='flex items-start space-x-3'>
-                <input
-                  type='checkbox'
-                  className='mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
-                  {...register('marcar_validado')}
-                  disabled={isLoading}
-                />
-                <span>
-                  <span className='font-medium text-gray-900'>Marcar caso como validado y listo para asignación</span>
-                  <p className='text-sm text-gray-500 mt-1'>Al validar el caso se notificará al abogado responsable y al cliente principal, y se activará el timeline automático.</p>
-                </span>
-              </label>
+	              <label className='flex items-start space-x-3'>
+	                <input
+	                  type='checkbox'
+	                  className='mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+	                  {...register('marcar_validado')}
+	                  disabled={isLoading}
+	                />
+	                <span>
+	                  <span className='font-medium text-gray-900'>Marcar caso como validado y listo para asignación</span>
+	                  <p className='text-sm text-gray-500 mt-1'>Al validar el caso se notificará al abogado patrocinante y al cliente principal, y se activará el timeline automático.</p>
+	                </span>
+	              </label>
               {errors.marcar_validado && (
                 <p className='text-sm text-red-600 mt-2'>{errors.marcar_validado.message}</p>
               )}

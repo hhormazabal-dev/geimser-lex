@@ -115,7 +115,7 @@ function validateWorkflowCommon(data: Partial<BaseCaseSchema>, ctx: z.Refinement
     if (!data.abogado_responsable) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Debes asignar un abogado responsable para validar el caso',
+        message: 'Debes asignar un abogado patrocinante para validar el caso',
         path: ['abogado_responsable'],
       });
     }
