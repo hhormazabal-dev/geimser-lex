@@ -1,8 +1,27 @@
 /** @type {import('next').NextConfig} */
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
 const nextConfig = {
+  outputFileTracingRoot: projectRoot,
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000', '*.vercel.app'],
+      allowedOrigins: [
+        'localhost:3000',
+        'localhost:3001',
+        'localhost:3002',
+        'localhost:3003',
+        'localhost:3004',
+        'localhost:3005',
+        'localhost:3006',
+        'localhost:3007',
+        'localhost:3008',
+        'localhost:3009',
+        'localhost:3010',
+        '*.vercel.app',
+      ],
     },
   },
   images: {

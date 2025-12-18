@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { Controller, useController, useForm } from 'react-hook-form';
+import { Controller, useController, useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +57,13 @@ const OBSERVACIONES_META_PREFIX = '<!--case-form-meta:';
 const OBSERVACIONES_META_SUFFIX = '-->';
 
 const generateRowId = () => `party-${Math.random().toString(36).slice(2, 9)}`;
+
+const normalizeText = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
 function createPartyRow(overrides?: Partial<PartyRow>): PartyRow {
   return {
@@ -178,11 +184,44 @@ export function CaseForm({
   const [clientOptions, setClientOptions] = useState<LightweightProfile[]>(clients);
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
-  const router = useRouter();
   const { toast } = useToast();
 
   const isAbogado = currentProfile.role === 'abogado';
   const defaultLawyerId = isAbogado ? currentProfile.id : undefined;
+
+  const toOptionalNumber = (value: unknown) => {
+    if (value === '' || value === null || value === undefined) return undefined;
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  const focusFirstError = (formErrors: FieldErrors<CreateCaseInput>) => {
+    const firstField = Object.keys(formErrors ?? {})[0];
+    if (!firstField) return;
+
+    const candidate =
+      document.getElementById(firstField) ??
+      (document.querySelector(`[name="${firstField}"]`) as HTMLElement | null);
+    if (!candidate) return;
+
+    candidate.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (
+      candidate instanceof HTMLInputElement ||
+      candidate instanceof HTMLTextAreaElement ||
+      candidate instanceof HTMLSelectElement
+    ) {
+      candidate.focus();
+    }
+  };
+
+  const onInvalid = (formErrors: FieldErrors<CreateCaseInput>) => {
+    focusFirstError(formErrors);
+    toast({
+      title: 'Revisa el formulario',
+      description: 'Hay campos con errores o incompletos. Corrígelos y vuelve a intentar.',
+      variant: 'destructive',
+    });
+  };
 
   const existingLawyerId = existingCase
     ? (existingCase as any).abogado_responsable_id ||
@@ -331,6 +370,12 @@ export function CaseForm({
   }, [demandados, contraparteField]);
 
   const clientePrincipalId = watch('cliente_principal_id');
+  const caratuladoValue = watch('caratulado');
+  const materiaValue = watch('materia');
+  const descripcionInicialValue = watch('descripcion_inicial');
+  const regionValue = watch('region');
+  const comunaValue = watch('comuna');
+  const tribunalValue = watch('tribunal');
   const marcarValidado = watch('marcar_validado');
   const workflowState = watch('workflow_state');
   const modalidadCobro = watch('modalidad_cobro');
@@ -338,6 +383,7 @@ export function CaseForm({
   const honorarioTotal = watch('honorario_total_uf');
   const audienciaInicialTipo = watch('audiencia_inicial_tipo');
   const audienciaInicialRequiereTestigos = watch('audiencia_inicial_requiere_testigos');
+  const sentenciaEstado = watch('sentencia_estado');
   const honorarioPagado = watch('honorario_pagado_uf');
   const honorarioPendiente =
     typeof honorarioTotal === 'number' && !Number.isNaN(honorarioTotal)
@@ -345,6 +391,20 @@ export function CaseForm({
       : undefined;
   const newClientRut = watchNewClient('rut');
   const { ref: newClientRutRef, ...newClientRutField } = registerNewClient('rut');
+
+  const step1Done = Boolean(clientePrincipalId) && Boolean(demandantes[0]?.nombre.trim());
+  const step2Done = Boolean(caratuladoValue?.trim()) && Boolean(materiaValue?.trim());
+  const step3Done = (descripcionInicialValue ?? '').trim().length >= 20;
+  const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
+  const showSentenciaFecha = sentenciaEstado === 'programada' || sentenciaEstado === 'dictada';
+
+  const [comunaOptions, setComunaOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [tribunalOptions, setTribunalOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedComunaCode, setSelectedComunaCode] = useState('');
+  const [selectedTribunalId, setSelectedTribunalId] = useState('');
+  const [isLoadingComunas, setIsLoadingComunas] = useState(false);
+  const [isLoadingTribunales, setIsLoadingTribunales] = useState(false);
+  const [pjudError, setPjudError] = useState<string | null>(null);
 
   const updateDemandanteNombre = (id: string, value: string) => {
     setDemandantes(prev =>
@@ -408,6 +468,145 @@ export function CaseForm({
       setIsAddingClient(true);
     }
   }, [clients]);
+
+  useEffect(() => {
+    if (!clientePrincipalId) return;
+    const selectedClient = clientOptions.find((client) => client.id === clientePrincipalId);
+    if (!selectedClient) return;
+
+    setDemandantes((prev) => {
+      const firstRow = prev[0] ?? createPartyRow();
+      const nextFirstRow: PartyRow = {
+        ...firstRow,
+        nombre: firstRow.nombre.trim().length > 0 ? firstRow.nombre : selectedClient.nombre,
+        rut:
+          firstRow.rut.trim().length > 0
+            ? firstRow.rut
+            : selectedClient.rut
+              ? formatRUT(selectedClient.rut)
+              : firstRow.rut,
+      };
+
+      const didChange =
+        nextFirstRow.nombre !== firstRow.nombre || nextFirstRow.rut !== firstRow.rut;
+      if (!didChange) return prev;
+
+      return [nextFirstRow, ...prev.slice(1)];
+    });
+  }, [clientePrincipalId, clientOptions]);
+
+  useEffect(() => {
+    if (existingCase) return;
+    if ((caratuladoValue ?? '').trim().length > 0) return;
+    const demandante = demandantes[0]?.nombre.trim() ?? '';
+    const demandado = demandados[0]?.nombre.trim() ?? '';
+    if (!demandante || !demandado) return;
+    setValue('caratulado', `${demandante} c/ ${demandado}`, { shouldDirty: true });
+  }, [existingCase, caratuladoValue, demandantes, demandados, setValue]);
+
+  useEffect(() => {
+    if (!regionValue) {
+      setComunaOptions([]);
+      setSelectedComunaCode('');
+      setTribunalOptions([]);
+      setSelectedTribunalId('');
+      setPjudError(null);
+      return;
+    }
+
+    let canceled = false;
+    setIsLoadingComunas(true);
+    setPjudError(null);
+
+    fetch(`/api/pjud/cities?region=${encodeURIComponent(regionValue)}`)
+      .then(async (res) => {
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) {
+          throw new Error(json?.error ?? 'No se pudieron cargar comunas.');
+        }
+        return json.comunas as Array<{ code: string; name: string }>;
+      })
+      .then((comunas) => {
+        if (canceled) return;
+        setComunaOptions(comunas ?? []);
+      })
+      .catch((err) => {
+        if (canceled) return;
+        setComunaOptions([]);
+        setPjudError(err instanceof Error ? err.message : 'No se pudieron cargar comunas.');
+      })
+      .finally(() => {
+        if (canceled) return;
+        setIsLoadingComunas(false);
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [regionValue]);
+
+  useEffect(() => {
+    if (!regionValue) return;
+    if (!comunaValue) return;
+    if (selectedComunaCode) return;
+    if (comunaOptions.length === 0) return;
+
+    const target = normalizeText(comunaValue);
+    const match = comunaOptions.find((option) => normalizeText(option.name) === target);
+    if (match) {
+      setSelectedComunaCode(match.code);
+    }
+  }, [comunaOptions, comunaValue, regionValue, selectedComunaCode]);
+
+  useEffect(() => {
+    if (!selectedComunaCode) {
+      setTribunalOptions([]);
+      setSelectedTribunalId('');
+      return;
+    }
+
+    let canceled = false;
+    setIsLoadingTribunales(true);
+    setPjudError(null);
+
+    fetch(`/api/pjud/courts?comunaCode=${encodeURIComponent(selectedComunaCode)}`)
+      .then(async (res) => {
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) {
+          throw new Error(json?.error ?? 'No se pudieron cargar tribunales.');
+        }
+        return json.tribunales as Array<{ id: string; name: string }>;
+      })
+      .then((tribunales) => {
+        if (canceled) return;
+        setTribunalOptions(tribunales ?? []);
+      })
+      .catch((err) => {
+        if (canceled) return;
+        setTribunalOptions([]);
+        setPjudError(err instanceof Error ? err.message : 'No se pudieron cargar tribunales.');
+      })
+      .finally(() => {
+        if (canceled) return;
+        setIsLoadingTribunales(false);
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [selectedComunaCode]);
+
+  useEffect(() => {
+    if (!tribunalValue) return;
+    if (selectedTribunalId) return;
+    if (tribunalOptions.length === 0) return;
+
+    const target = normalizeText(tribunalValue);
+    const match = tribunalOptions.find((option) => normalizeText(option.name) === target);
+    if (match) {
+      setSelectedTribunalId(match.id);
+    }
+  }, [selectedTribunalId, tribunalOptions, tribunalValue]);
 
   const resetFileSelection = () => {
     setSelectedFiles([]);
@@ -558,7 +757,23 @@ export function CaseForm({
           resetFileSelection();
         }
 
-        router.push(createdCaseId ? `/cases/${createdCaseId}` : '/cases');
+        if (existingCase) {
+          window.location.assign(`/cases/${existingCase.id}`);
+          return;
+        }
+
+        if (!createdCaseId) {
+          console.error('[CaseForm] createCase() returned success but no case.id', result);
+          toast({
+            title: 'Caso creado, pero sin identificador',
+            description:
+              'No pudimos obtener el ID del caso recién creado para redirigir. Ve al listado de casos y verifica si aparece.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        window.location.assign(`/cases/${createdCaseId}`);
       } else {
         toast({
           title: 'Error',
@@ -680,87 +895,56 @@ export function CaseForm({
           <div className='flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em]'>
             <span
               className={`rounded-full px-3 py-1 transition ${
-                clientePrincipalId
+                1 < currentStep
                   ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-500'
+                  : currentStep === 1
+                    ? 'bg-slate-100 text-slate-600'
+                    : 'bg-slate-100 text-slate-400'
               }`}
             >
-              Paso 1 · Cliente
+              Paso 1 · Partes
             </span>
             <span
               className={`rounded-full px-3 py-1 ${
-                clientePrincipalId ? 'bg-slate-100 text-slate-600' : 'bg-slate-100 text-slate-400'
+                2 < currentStep
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : currentStep === 2
+                    ? 'bg-slate-100 text-slate-600'
+                    : 'bg-slate-100 text-slate-400'
               }`}
             >
-              Paso 2 · Datos del caso
+              Paso 2 · Carátula
+            </span>
+            <span
+              className={`rounded-full px-3 py-1 ${
+                3 < currentStep
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : currentStep === 3
+                    ? 'bg-slate-100 text-slate-600'
+                    : 'bg-slate-100 text-slate-400'
+              }`}
+            >
+              Paso 3 · Antecedentes
+            </span>
+            <span
+              className={`rounded-full px-3 py-1 ${
+                currentStep === 4 ? 'bg-slate-100 text-slate-600' : 'bg-slate-100 text-slate-400'
+              }`}
+            >
+              Paso 4 · Revisión
             </span>
           </div>
           <p className='text-sm text-slate-500'>
-            Primero registra al cliente desde el directorio o créalo aquí para seleccionarlo como titular del expediente. Luego completa la información legal del caso y agrega las contrapartes necesarias.
+            Completa el expediente en el mismo orden en que se arma un caso: partes, carátula/competencia, antecedentes y luego el estado procesal y la asignación interna.
           </p>
         </div>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className='space-y-8'>
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className='space-y-8'>
           <section className='space-y-4'>
             <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Datos del caso</h2>
-              <p className='text-sm text-gray-500'>Completa la información general del expediente.</p>
-            </div>
-
-            <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-              <div className='space-y-2'>
-                <Label htmlFor='numero_causa'>Número de Causa</Label>
-                <Input
-                  id='numero_causa'
-                  placeholder='C-1234-2024'
-                  {...register('numero_causa')}
-                  disabled={isLoading}
-                />
-                {errors.numero_causa && (
-                  <p className='text-sm text-red-600'>{errors.numero_causa.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='caratulado'>Caratulado *</Label>
-                <Input
-                  id='caratulado'
-                  placeholder='Pérez con Empresa ABC'
-                  {...register('caratulado')}
-                  disabled={isLoading}
-                />
-                {errors.caratulado && (
-                  <p className='text-sm text-red-600'>{errors.caratulado.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div className='space-y-2'>
-              <Label htmlFor='materia'>Competencia *</Label>
-              <select
-                id='materia'
-                className='form-input'
-                {...register('materia')}
-                disabled={isLoading}
-              >
-                <option value=''>Seleccionar competencia</option>
-                {CASE_MATERIAS.map(materia => (
-                  <option key={materia} value={materia}>
-                    {materia}
-                  </option>
-                ))}
-              </select>
-              {errors.materia && (
-                <p className='text-sm text-red-600'>{errors.materia.message}</p>
-              )}
-            </div>
-          </section>
-
-          <section className='space-y-4'>
-            <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Cliente y contraparte</h2>
-              <p className='text-sm text-gray-500'>Identifica a las partes involucradas.</p>
+              <h2 className='text-lg font-semibold text-gray-900'>Partes</h2>
+              <p className='text-sm text-gray-500'>Identifica al cliente, a quién representas y la contraparte.</p>
             </div>
 
             <div className='space-y-6'>
@@ -774,6 +958,7 @@ export function CaseForm({
                       className='flex flex-col gap-2 md:flex-row md:items-center'
                     >
                       <Input
+                        id={index === 0 ? 'nombre_cliente' : undefined}
                         value={demandante.nombre}
                         onChange={(event) => updateDemandanteNombre(demandante.id, event.target.value)}
                         placeholder={index === 0 ? 'Demandante principal' : 'Demandante adicional'}
@@ -786,7 +971,7 @@ export function CaseForm({
                         }
                       />
                       <Input
-                        id={`demandante-rut-${demandante.id}`}
+                        id={index === 0 ? 'rut_cliente' : `demandante-rut-${demandante.id}`}
                         value={demandante.rut}
                         onChange={(event) => updateDemandanteRut(demandante.id, event.target.value)}
                         placeholder='RUT (opcional)'
@@ -965,18 +1150,19 @@ export function CaseForm({
                         key={demandado.id}
                         className='flex flex-col gap-2 md:flex-row md:items-center'
                       >
-                      <Input
-                        value={demandado.nombre}
-                        onChange={(event) => updateDemandadoNombre(demandado.id, event.target.value)}
-                        placeholder={index === 0 ? 'Persona o entidad demandada' : 'Otra parte demandada'}
-                        disabled={isLoading}
-                        className='md:flex-1'
-                        aria-label={
-                          index === 0
-                            ? 'Nombre del demandado principal'
-                            : `Nombre de demandado ${index + 1}`
-                        }
-                      />
+                        <Input
+                          id={index === 0 ? 'contraparte' : undefined}
+                          value={demandado.nombre}
+                          onChange={(event) => updateDemandadoNombre(demandado.id, event.target.value)}
+                          placeholder={index === 0 ? 'Persona o entidad demandada' : 'Otra parte demandada'}
+                          disabled={isLoading}
+                          className='md:flex-1'
+                          aria-label={
+                            index === 0
+                              ? 'Nombre del demandado principal'
+                              : `Nombre de demandado ${index + 1}`
+                          }
+                        />
                         <Input
                           id={`demandado-rut-${demandado.id}`}
                           value={demandado.rut}
@@ -1020,19 +1206,219 @@ export function CaseForm({
 
           <section className='space-y-4'>
             <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Detalle procesal</h2>
-              <p className='text-sm text-gray-500'>Ingresa la información requerida por Supabase para seguimiento.</p>
+              <h2 className='text-lg font-semibold text-gray-900'>Carátula y competencia</h2>
+              <p className='text-sm text-gray-500'>Completa la identificación jurídica del expediente.</p>
+            </div>
+
+            <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+              <div className='space-y-2'>
+                <Label htmlFor='caratulado'>Caratulado *</Label>
+                <Input
+                  id='caratulado'
+                  placeholder='Pérez c/ Empresa ABC'
+                  {...register('caratulado')}
+                  disabled={isLoading}
+                />
+                {errors.caratulado && (
+                  <p className='text-sm text-red-600'>{errors.caratulado.message}</p>
+                )}
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='numero_causa'>RIT/ROL (N° de causa)</Label>
+                <Input
+                  id='numero_causa'
+                  placeholder='C-1234-2024 (si ya existe)'
+                  {...register('numero_causa')}
+                  disabled={isLoading}
+                />
+                {errors.numero_causa && (
+                  <p className='text-sm text-red-600'>{errors.numero_causa.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='materia'>Competencia *</Label>
+              <select
+                id='materia'
+                className='form-input'
+                {...register('materia')}
+                disabled={isLoading}
+              >
+                <option value=''>Seleccionar competencia</option>
+                {CASE_MATERIAS.map(materia => (
+                  <option key={materia} value={materia}>
+                    {materia}
+                  </option>
+                ))}
+              </select>
+              {errors.materia && (
+                <p className='text-sm text-red-600'>{errors.materia.message}</p>
+              )}
+            </div>
+          </section>
+
+          <section className='space-y-4'>
+            <div>
+              <h2 className='text-lg font-semibold text-gray-900'>Antecedentes y pretensiones</h2>
+              <p className='text-sm text-gray-500'>Resume hechos, lo que se busca obtener y el contexto relevante.</p>
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='descripcion_inicial'>Hechos y pretensiones *</Label>
+              <Textarea
+                id='descripcion_inicial'
+                rows={12}
+                placeholder='Describe el caso: hechos relevantes, pretensión, urgencias y próximos actos.'
+                {...register('descripcion_inicial')}
+                disabled={isLoading}
+              />
+              {errors.descripcion_inicial && (
+                <p className='text-sm text-red-600'>{errors.descripcion_inicial.message}</p>
+              )}
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='documentacion_recibida'>Documentación recibida</Label>
+              <Textarea
+                id='documentacion_recibida'
+                rows={4}
+                placeholder='Lista breve: contrato, finiquito, correos, escrituras, sentencias previas, etc.'
+                {...register('documentacion_recibida')}
+                disabled={isLoading}
+              />
+              {errors.documentacion_recibida && (
+                <p className='text-sm text-red-600'>{errors.documentacion_recibida.message}</p>
+              )}
+            </div>
+          </section>
+
+          {!existingCase && (
+            <section className='space-y-4'>
+              <div>
+                <h2 className='text-lg font-semibold text-gray-900'>Documentos de respaldo</h2>
+                <p className='text-sm text-gray-500'>
+                  Adjunta antecedentes relevantes para el equipo. Tamaño máximo de 20 MB por archivo.
+                </p>
+              </div>
+
+              <div className='space-y-3'>
+                <div className='space-y-2'>
+                  <Label htmlFor='case_documents'>Archivos</Label>
+                  <div className='space-y-3 rounded-md border border-dashed border-muted-foreground/40 p-4'>
+                    <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                      <div className='flex items-center gap-2 text-sm text-gray-600'>
+                        <UploadCloud className='h-4 w-4 text-gray-500' />
+                        <span>Selecciona uno o más archivos de hasta 20 MB cada uno.</span>
+                      </div>
+                      {selectedFiles.length > 0 && (
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          onClick={resetFileSelection}
+                          disabled={isLoading}
+                        >
+                          <X className='mr-2 h-4 w-4' />
+                          Limpiar selección
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      id='case_documents'
+                      type='file'
+                      multiple
+                      onChange={handleFilesSelected}
+                      disabled={isLoading}
+                      ref={fileInputRef}
+                    />
+                    <p className='text-xs text-gray-500'>
+                      Se aceptan archivos PDF, Word, imágenes y texto. Máximo 20 MB por archivo.
+                    </p>
+                  </div>
+                </div>
+
+                {selectedFiles.length > 0 && (
+                  <ul className='space-y-2'>
+                    {selectedFiles.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.lastModified}-${index}`}
+                        className='flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm'
+                      >
+                        <div className='flex items-center gap-2'>
+                          <Paperclip className='h-4 w-4 text-gray-500' />
+                          <div>
+                            <p className='font-medium text-gray-900'>{file.name}</p>
+                            <p className='text-xs text-gray-500'>{formatFileSize(file.size)}</p>
+                          </div>
+                        </div>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          onClick={() => removeSelectedFile(index)}
+                          disabled={isLoading}
+                          aria-label={`Quitar ${file.name}`}
+                        >
+                          <Trash2 className='h-4 w-4 text-gray-500' />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+          )}
+
+          <section className='space-y-4'>
+            <div>
+              <h2 className='text-lg font-semibold text-gray-900'>Estado procesal</h2>
+              <p className='text-sm text-gray-500'>Completa el tribunal, etapa y estado del expediente (si aplica).</p>
             </div>
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='tribunal'>Tribunal</Label>
-                <Input
-                  id='tribunal'
-                  placeholder='1° Juzgado Civil de Santiago'
-                  {...register('tribunal')}
-                  disabled={isLoading}
-                />
+                {pjudError ? (
+                  <Input
+                    id='tribunal'
+                    placeholder='Ingresa el tribunal (ej: 1° Juzgado Civil de Santiago)'
+                    {...register('tribunal')}
+                    disabled={isLoading}
+                  />
+                ) : (
+                  <select
+                    id='tribunal'
+                    className='form-input'
+                    value={selectedTribunalId}
+                    onChange={(event) => {
+                      const id = event.target.value;
+                      setSelectedTribunalId(id);
+                      const selected = tribunalOptions.find((option) => option.id === id);
+                      setValue('tribunal', selected?.name ?? '', { shouldDirty: true, shouldValidate: true });
+                    }}
+                    disabled={isLoading || isLoadingTribunales || !selectedComunaCode}
+                  >
+                    <option value=''>
+                      {!selectedComunaCode
+                        ? 'Selecciona comuna primero'
+                        : isLoadingTribunales
+                          ? 'Cargando tribunales...'
+                          : 'Seleccionar tribunal'}
+                    </option>
+                    {tribunalOptions.map((tribunal) => (
+                      <option key={tribunal.id} value={tribunal.id}>
+                        {tribunal.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {pjudError && (
+                  <p className='text-xs text-amber-700'>
+                    No se pudo cargar el directorio PJUD. Puedes ingresar el tribunal manualmente.
+                  </p>
+                )}
                 {errors.tribunal && (
                   <p className='text-sm text-red-600'>{errors.tribunal.message}</p>
                 )}
@@ -1045,6 +1431,14 @@ export function CaseForm({
                   className='form-input'
                   {...register('region')}
                   disabled={isLoading}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setValue('region', value, { shouldDirty: true, shouldValidate: true });
+                    setValue('comuna', '', { shouldDirty: true, shouldValidate: true });
+                    setValue('tribunal', '', { shouldDirty: true, shouldValidate: true });
+                    setSelectedComunaCode('');
+                    setSelectedTribunalId('');
+                  }}
                 >
                   <option value=''>Seleccionar región</option>
                   {REGIONES_CHILE.map(region => (
@@ -1061,13 +1455,47 @@ export function CaseForm({
 
             <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
               <div className='space-y-2'>
-                <Label htmlFor='comuna'>Comuna</Label>
-                <Input
-                  id='comuna'
-                  placeholder='Santiago'
-                  {...register('comuna')}
-                  disabled={isLoading}
-                />
+                <Label htmlFor='comuna'>Comuna (asiento del tribunal)</Label>
+                {pjudError && regionValue ? (
+                  <Input
+                    id='comuna'
+                    placeholder='Ingresa comuna'
+                    {...register('comuna')}
+                    disabled={isLoading}
+                  />
+                ) : (
+                  <select
+                    id='comuna'
+                    className='form-input'
+                    value={selectedComunaCode}
+                    onChange={(event) => {
+                      const code = event.target.value;
+                      setSelectedComunaCode(code);
+                      setSelectedTribunalId('');
+                      setTribunalOptions([]);
+                      const selected = comunaOptions.find((option) => option.code === code);
+                      setValue('comuna', selected?.name ?? '', { shouldDirty: true, shouldValidate: true });
+                      setValue('tribunal', '', { shouldDirty: true, shouldValidate: true });
+                    }}
+                    disabled={isLoading || !regionValue || isLoadingComunas || comunaOptions.length === 0}
+                  >
+                    <option value=''>
+                      {regionValue
+                        ? isLoadingComunas
+                          ? 'Cargando comunas...'
+                          : 'Seleccionar comuna'
+                        : 'Selecciona región primero'}
+                    </option>
+                    {comunaOptions.map((comuna) => (
+                      <option key={comuna.code} value={comuna.code}>
+                        {comuna.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!regionValue && (
+                  <p className='text-xs text-gray-500'>Selecciona una región para listar sus comunas.</p>
+                )}
                 {errors.comuna && (
                   <p className='text-sm text-red-600'>{errors.comuna.message}</p>
                 )}
@@ -1092,7 +1520,7 @@ export function CaseForm({
                   id='valor_estimado'
                   type='number'
                   placeholder='5000000'
-                  {...register('valor_estimado', { valueAsNumber: true })}
+                  {...register('valor_estimado', { setValueAs: toOptionalNumber })}
                   disabled={isLoading}
                 />
                 {errors.valor_estimado && (
@@ -1102,11 +1530,11 @@ export function CaseForm({
             </div>
 
             <div className='space-y-2'>
-              <Label>Notificación</Label>
+              <Label>Notificación de la demanda</Label>
               <div className='flex flex-wrap gap-2'>
                 {([
                   { value: 'realizada', label: 'Realizada' },
-                  { value: 'no_realizada', label: 'No realizada' },
+                  { value: 'no_realizada', label: 'Pendiente' },
                 ] as const).map(option => (
                   <Button
                     key={option.value}
@@ -1129,17 +1557,19 @@ export function CaseForm({
                   Sin registrar
                 </Button>
               </div>
-              <p className='text-xs text-gray-500'>Guarda el estado de la notificación para el seguimiento interno. Se añadirá automáticamente a las observaciones.</p>
+              <p className='text-xs text-gray-500'>
+                Se añadirá automáticamente a las observaciones al guardar.
+              </p>
             </div>
 
             <div className='space-y-2'>
               <h3 className='text-sm font-semibold text-gray-900'>Sentencia</h3>
               <p className='text-xs text-gray-500'>
-                Registra si el caso ya cuenta con una sentencia pendiente o con fecha.
+                Registra si el caso cuenta con sentencia programada o dictada (y su fecha).
               </p>
             </div>
 
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='sentencia_estado'>Estado de sentencia</Label>
                 <select
@@ -1165,8 +1595,13 @@ export function CaseForm({
                   id='sentencia_fecha'
                   type='date'
                   {...register('sentencia_fecha')}
-                  disabled={isLoading}
+                  disabled={isLoading || !showSentenciaFecha}
                 />
+                {!showSentenciaFecha && (
+                  <p className='text-xs text-gray-500'>
+                    Se habilita cuando el estado es “programada” o “dictada”.
+                  </p>
+                )}
                 {errors.sentencia_fecha && (
                   <p className='text-sm text-red-600'>{errors.sentencia_fecha.message}</p>
                 )}
@@ -1175,7 +1610,7 @@ export function CaseForm({
 
             <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
               <div className='space-y-2'>
-                <Label htmlFor='estado'>Estado de Proceso</Label>
+                <Label htmlFor='estado'>Estado del expediente</Label>
                 <select
                   id='estado'
                   className='form-input'
@@ -1213,10 +1648,10 @@ export function CaseForm({
               </div>
 
               <div className='space-y-2'>
-                <Label htmlFor='etapa_actual'>Etapa actual</Label>
+                <Label htmlFor='etapa_actual'>Acto / etapa actual</Label>
                 <Input
                   id='etapa_actual'
-                  placeholder='Ingreso Demanda'
+                  placeholder='Ingreso demanda, Notificación, Contestación, Audiencia, etc.'
                   {...register('etapa_actual')}
                   disabled={isLoading}
                 />
@@ -1227,15 +1662,17 @@ export function CaseForm({
             </div>
 
             <div className='space-y-2'>
-              <Label htmlFor='observaciones'>Observaciones (Materia)</Label>
+              <Label htmlFor='observaciones'>Observaciones internas</Label>
               <Textarea
                 id='observaciones'
                 rows={4}
-                placeholder='Observaciones adicionales vinculadas a la materia, hitos internos o próximos pasos.'
+                placeholder='Próximos actos, riesgos, gestiones internas y cualquier contexto relevante.'
                 {...register('observaciones')}
                 disabled={isLoading}
               />
-              <p className='text-xs text-gray-500'>El estado de notificación se añadirá automáticamente a estas observaciones al guardar.</p>
+              <p className='text-xs text-gray-500'>
+                Si registras el estado de notificación, se añadirá automáticamente a estas observaciones al guardar.
+              </p>
               {errors.observaciones && (
                 <p className='text-sm text-red-600'>{errors.observaciones.message}</p>
               )}
@@ -1244,7 +1681,7 @@ export function CaseForm({
 
           <section className='space-y-4'>
             <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Audiencias iniciales</h2>
+              <h2 className='text-lg font-semibold text-gray-900'>Primer hito: audiencia</h2>
               <p className='text-sm text-gray-500'>
                 Define el tipo de audiencia que esperas como primer hito y si requerirá coordinación de testigos.
               </p>
@@ -1387,7 +1824,7 @@ export function CaseForm({
                   min='0'
                   step='0.01'
                   placeholder='30'
-                  {...register('honorario_total_uf', { valueAsNumber: true })}
+                  {...register('honorario_total_uf', { setValueAs: toOptionalNumber })}
                   disabled={isLoading || honorarioMoneda !== 'UF'}
                 />
                 {honorarioMoneda !== 'UF' && (
@@ -1406,7 +1843,7 @@ export function CaseForm({
                   min='0'
                   step='0.01'
                   placeholder='0'
-                  {...register('honorario_pagado_uf', { valueAsNumber: true })}
+                  {...register('honorario_pagado_uf', { setValueAs: toOptionalNumber })}
                   disabled={isLoading || honorarioMoneda !== 'UF'}
                 />
                 {errors.honorario_pagado_uf && (
@@ -1432,7 +1869,7 @@ export function CaseForm({
                   max='100'
                   step='0.1'
                   placeholder='10'
-                  {...register('honorario_variable_porcentaje', { valueAsNumber: true })}
+                  {...register('honorario_variable_porcentaje', { setValueAs: toOptionalNumber })}
                   disabled={isLoading}
                 />
                 {errors.honorario_variable_porcentaje && (
@@ -1474,104 +1911,6 @@ export function CaseForm({
               <p className='mt-1'>El cliente podrá avanzar pagando etapa por etapa. Cada fase del timeline exigirá un pago registrado para habilitar las acciones del equipo jurídico. Puedes copiar y compartir los enlaces de Payku desde el detalle del caso.</p>
             </div>
           </section>
-
-          <section className='space-y-4'>
-            <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Información inicial</h2>
-              <p className='text-sm text-gray-500'>Describe el contexto y los objetivos del cliente para una correcta asignación.</p>
-            </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='descripcion_inicial'>Solicitudes del Demandante *</Label>
-                <Textarea
-                  id='descripcion_inicial'
-                  rows={15}
-                  placeholder='Detalla qué solicita el demandante, expectativas y objetivos clave.'
-                  {...register('descripcion_inicial')}
-                  disabled={isLoading}
-                />
-              {errors.descripcion_inicial && (
-                <p className='text-sm text-red-600'>{errors.descripcion_inicial.message}</p>
-              )}
-            </div>
-          </section>
-
-          {!existingCase && (
-            <section className='space-y-4'>
-              <div>
-                <h2 className='text-lg font-semibold text-gray-900'>Documentos de respaldo</h2>
-                <p className='text-sm text-gray-500'>
-                  Adjunta antecedentes relevantes para el equipo. Tamaño máximo de 20 MB por archivo.
-                </p>
-              </div>
-
-              <div className='space-y-3'>
-                <div className='space-y-2'>
-                  <Label htmlFor='case_documents'>Archivos</Label>
-                  <div className='space-y-3 rounded-md border border-dashed border-muted-foreground/40 p-4'>
-                    <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                      <div className='flex items-center gap-2 text-sm text-gray-600'>
-                        <UploadCloud className='h-4 w-4 text-gray-500' />
-                        <span>Selecciona uno o más archivos de hasta 20 MB cada uno.</span>
-                      </div>
-                      {selectedFiles.length > 0 && (
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='sm'
-                          onClick={resetFileSelection}
-                          disabled={isLoading}
-                        >
-                          <X className='mr-2 h-4 w-4' />
-                          Limpiar selección
-                        </Button>
-                      )}
-                    </div>
-                    <Input
-                      id='case_documents'
-                      type='file'
-                      multiple
-                      onChange={handleFilesSelected}
-                      disabled={isLoading}
-                      ref={fileInputRef}
-                    />
-                    <p className='text-xs text-gray-500'>
-                      Se aceptan archivos PDF, Word, imágenes y texto. Máximo 20 MB por archivo.
-                    </p>
-                  </div>
-                </div>
-
-                {selectedFiles.length > 0 && (
-                  <ul className='space-y-2'>
-                    {selectedFiles.map((file, index) => (
-                      <li
-                        key={`${file.name}-${file.lastModified}-${index}`}
-                        className='flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm'
-                      >
-                        <div className='flex items-center gap-2'>
-                          <Paperclip className='h-4 w-4 text-gray-500' />
-                          <div>
-                            <p className='font-medium text-gray-900'>{file.name}</p>
-                            <p className='text-xs text-gray-500'>{formatFileSize(file.size)}</p>
-                          </div>
-                        </div>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='icon'
-                          onClick={() => removeSelectedFile(index)}
-                          disabled={isLoading}
-                          aria-label={`Quitar ${file.name}`}
-                        >
-                          <Trash2 className='h-4 w-4 text-gray-500' />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </section>
-          )}
 
           <section className='space-y-4'>
             <div>
