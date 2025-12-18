@@ -14,6 +14,8 @@ import {
   Users,
   UserPlus,
   Building2,
+  Inbox,
+  Bell,
   Briefcase,
   ClipboardList,
   FilePlus2,
@@ -33,6 +35,12 @@ function buildSidebarItems(role: Role): SidebarItem[] {
 	        icon: <LayoutDashboard className="h-4 w-4" />,
 	      },
 	      {
+	        href: '/dashboard/admin/inbox',
+	        label: 'Bandeja',
+	        description: 'Vencidos, bloqueos y solicitudes',
+	        icon: <Inbox className="h-4 w-4" />,
+	      },
+	      {
 	        href: '/cases',
 	        label: 'Casos de la firma',
 	        description: 'Visión global de expedientes activos',
@@ -43,6 +51,12 @@ function buildSidebarItems(role: Role): SidebarItem[] {
 	        label: 'Cartera por cliente',
 	        description: 'Clientes, casos y abogados',
 	        icon: <Building2 className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/notifications',
+	        label: 'Notificaciones',
+	        description: 'Recordatorios y alertas enviadas',
+	        icon: <Bell className="h-4 w-4" />,
 	      },
 	      {
 	        href: '/clients',
@@ -72,49 +86,73 @@ function buildSidebarItems(role: Role): SidebarItem[] {
     ];
   }
 
-  if (role === 'abogado') {
-    return [
-      {
-        href: '/dashboard/abogado',
-        label: 'Mi tablero',
-        description: 'Resumen diario y vencimientos próximos',
-        icon: <LayoutDashboard className="h-4 w-4" />,
-      },
-      {
-        href: '/cases',
-        label: 'Mis casos',
-        description: 'Gestiona expedientes asignados',
-        icon: <Briefcase className="h-4 w-4" />,
-      },
-      {
-        href: '/cases/new',
-        label: 'Registrar caso',
-        description: 'Crea un nuevo expediente para la firma',
-        icon: <FilePlus2 className="h-4 w-4" />,
-      },
-    ];
-  }
+	  if (role === 'abogado') {
+	    return [
+	      {
+	        href: '/dashboard/abogado',
+	        label: 'Mi tablero',
+	        description: 'Resumen diario y vencimientos próximos',
+	        icon: <LayoutDashboard className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/dashboard/abogado/inbox',
+	        label: 'Mi bandeja',
+	        description: 'Vencidos, bloqueos y solicitudes',
+	        icon: <Inbox className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/cases',
+	        label: 'Mis casos',
+	        description: 'Gestiona expedientes asignados',
+	        icon: <Briefcase className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/notifications',
+	        label: 'Notificaciones',
+	        description: 'Recordatorios y alertas enviadas',
+	        icon: <Bell className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/cases/new',
+	        label: 'Registrar caso',
+	        description: 'Crea un nuevo expediente para la firma',
+	        icon: <FilePlus2 className="h-4 w-4" />,
+	      },
+	    ];
+	  }
 
-  if (role === 'analista') {
-    return [
-      {
-        href: '/dashboard/analista',
-        label: 'Bandeja de analista',
-        description: 'Priorización de ingresos y validación',
-        icon: <LayoutDashboard className="h-4 w-4" />,
-      },
-      {
-        href: '/cases',
-        label: 'Casos en preparación',
-        description: 'Seguimiento de expedientes asignados',
-        icon: <ClipboardList className="h-4 w-4" />,
-      },
-      {
-        href: '/cases/new',
-        label: 'Nuevo caso',
-        description: 'Inicia la recopilación y asignación',
-        icon: <FilePlus2 className="h-4 w-4" />,
-      },
+	  if (role === 'analista') {
+	    return [
+	      {
+	        href: '/dashboard/analista',
+	        label: 'Bandeja de analista',
+	        description: 'Priorización de ingresos y validación',
+	        icon: <LayoutDashboard className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/dashboard/analista/inbox',
+	        label: 'Bandeja',
+	        description: 'Vencidos, bloqueos y solicitudes',
+	        icon: <Inbox className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/cases',
+	        label: 'Casos en preparación',
+	        description: 'Seguimiento de expedientes asignados',
+	        icon: <ClipboardList className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/notifications',
+	        label: 'Notificaciones',
+	        description: 'Recordatorios y alertas enviadas',
+	        icon: <Bell className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/cases/new',
+	        label: 'Nuevo caso',
+	        description: 'Inicia la recopilación y asignación',
+	        icon: <FilePlus2 className="h-4 w-4" />,
+	      },
       {
         href: '/clients',
         label: 'Clientes',
@@ -124,22 +162,28 @@ function buildSidebarItems(role: Role): SidebarItem[] {
     ];
   }
 
-  // cliente
-  return [
-    {
-      href: '/dashboard/cliente',
-      label: 'Portal cliente',
-      description: 'Seguimiento de tus procesos y avances',
-      icon: <LayoutDashboard className="h-4 w-4" />,
-    },
-    {
-      href: '/cases',
-      label: 'Documentos y expedientes',
-      description: 'Consulta los casos compartidos con tu firma',
-      icon: <FolderOpen className="h-4 w-4" />,
-    },
-  ];
-}
+	  // cliente
+	  return [
+	    {
+	      href: '/dashboard/cliente',
+	      label: 'Portal cliente',
+	      description: 'Seguimiento de tus procesos y avances',
+	      icon: <LayoutDashboard className="h-4 w-4" />,
+	    },
+	    {
+	      href: '/cases',
+	      label: 'Documentos y expedientes',
+	      description: 'Consulta los casos compartidos con tu firma',
+	      icon: <FolderOpen className="h-4 w-4" />,
+	    },
+	    {
+	      href: '/notifications',
+	      label: 'Notificaciones',
+	      description: 'Recordatorios y alertas enviadas',
+	      icon: <Bell className="h-4 w-4" />,
+	    },
+	  ];
+	}
 
 export default async function PlatformLayout({ children }: PlatformLayoutProps) {
   const profile = await getCurrentProfile();

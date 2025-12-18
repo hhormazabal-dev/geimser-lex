@@ -19,11 +19,22 @@ import { useToast } from '@/hooks/use-toast';
 import { authorizeCaseAdvance, assignLawyer, listAvailableLawyers } from '@/lib/actions/cases';
 import { createCaseCounterparty, deleteCaseCounterparty } from '@/lib/actions/counterparties';
 import {
+  getCasePjudLink,
+  upsertCasePjudLink,
+  listCaseEvents,
+  createManualCaseEvent,
+  type CaseEventRow,
+  type CaseExternalRefRow,
+  type PjudLinkPayload,
+} from '@/lib/actions/pjud-link';
+import {
   ArrowLeft,
   Scale,
   FileText,
   Clock,
   MessageCircle,
+  ClipboardList,
+  Link2,
   User,
   Phone,
   Mail,
@@ -76,7 +87,7 @@ interface CaseDetailViewProps {
 
 export function CaseDetailView({ case: caseData, profile, messages }: CaseDetailViewProps) {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'timeline' | 'documents' | 'notes' | 'messages' | 'requests' | 'clients'
+    'overview' | 'timeline' | 'documents' | 'activity' | 'notes' | 'messages' | 'requests' | 'clients'
   >('overview');
   const router = useRouter();
   const { toast } = useToast();
@@ -122,6 +133,106 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         ]
       : [],
   );
+
+  const [pjudLinkRow, setPjudLinkRow] = useState<CaseExternalRefRow | null>(null);
+  const [pjudLinkDraft, setPjudLinkDraft] = useState<PjudLinkPayload>({
+    rit: caseData.numero_causa ?? '',
+    tribunal: caseData.tribunal ?? '',
+    ruc: null,
+    comunaCode: null,
+    tribunalId: null,
+  });
+  const [isSavingPjudLink, setIsSavingPjudLink] = useState(false);
+
+  const [caseEvents, setCaseEvents] = useState<CaseEventRow[]>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [eventDraft, setEventDraft] = useState<{ kind: 'movement' | 'resolution' | 'deadline' | 'note'; title: string }>(
+    { kind: 'movement', title: '' },
+  );
+
+  useEffect(() => {
+    let canceled = false;
+    setIsLoadingEvents(true);
+    Promise.all([getCasePjudLink(caseData.id), listCaseEvents(caseData.id, 50)])
+      .then(([linkRes, eventsRes]) => {
+        if (canceled) return;
+        if (linkRes.success) {
+	          setPjudLinkRow(linkRes.link ?? null);
+	          if (linkRes.link?.payload) {
+	            setPjudLinkDraft((prev) => ({
+	              ...prev,
+	              ...linkRes.link!.payload,
+	              rit: linkRes.link!.payload?.rit ?? prev.rit ?? '',
+	              tribunal: linkRes.link!.payload?.tribunal ?? prev.tribunal ?? '',
+	            }));
+	          }
+	        }
+        if (eventsRes.success) {
+          setCaseEvents(eventsRes.events ?? []);
+        }
+      })
+      .catch((error) => {
+        console.error('[CaseDetailView] load integration data error', error);
+      })
+      .finally(() => {
+        if (canceled) return;
+        setIsLoadingEvents(false);
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [caseData.id]);
+
+  const handleSavePjudLink = async () => {
+    setIsSavingPjudLink(true);
+    try {
+      const payload: PjudLinkPayload = {
+        ...pjudLinkDraft,
+        rit: pjudLinkDraft.rit?.trim() ? pjudLinkDraft.rit.trim() : null,
+        tribunal: pjudLinkDraft.tribunal?.trim() ? pjudLinkDraft.tribunal.trim() : null,
+        ruc: pjudLinkDraft.ruc?.trim() ? pjudLinkDraft.ruc.trim() : null,
+      };
+      const result = await upsertCasePjudLink({ caseId: caseData.id, payload });
+      if (result.success && result.link) {
+        setPjudLinkRow(result.link);
+        toast({ title: 'Vinculación guardada', description: 'Se guardó el vínculo PJUD para el expediente.' });
+      } else {
+        toast({ title: 'No se pudo guardar', description: result.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('[CaseDetailView] handleSavePjudLink error', error);
+      toast({ title: 'Error inesperado', description: 'No se pudo guardar la vinculación.', variant: 'destructive' });
+    } finally {
+      setIsSavingPjudLink(false);
+    }
+  };
+
+  const handleCreateEvent = async () => {
+    const title = eventDraft.title.trim();
+    if (!title) return;
+    setIsCreatingEvent(true);
+    try {
+      const result = await createManualCaseEvent({
+        caseId: caseData.id,
+        kind: eventDraft.kind,
+        title,
+      });
+      if (result.success && result.event) {
+        setCaseEvents((prev) => [result.event!, ...prev]);
+        setEventDraft((prev) => ({ ...prev, title: '' }));
+        toast({ title: 'Evento registrado', description: 'Se añadió a la bitácora del expediente.' });
+      } else {
+        toast({ title: 'No se pudo registrar', description: result.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('[CaseDetailView] handleCreateEvent error', error);
+      toast({ title: 'Error inesperado', description: 'No se pudo registrar el evento.', variant: 'destructive' });
+    } finally {
+      setIsCreatingEvent(false);
+    }
+  };
   const [selectedLawyerId, setSelectedLawyerId] = useState<string>(caseData.abogado_responsable?.id ?? '');
   const [isLoadingLawyers, setIsLoadingLawyers] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
@@ -477,6 +588,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     { id: 'overview', label: 'Resumen', icon: Scale },
     { id: 'timeline', label: 'Timeline', icon: Clock },
     { id: 'documents', label: 'Documentos', icon: FileText },
+    { id: 'activity', label: 'Actividad', icon: ClipboardList },
     { id: 'notes', label: 'Notas', icon: MessageCircle },
     { id: 'messages', label: 'Mensajes', icon: MessageCircle },
     { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
@@ -989,11 +1101,170 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           {activeTab === 'documents' && (
             <DocumentsPanel
               caseId={caseData.id}
+              caseMateria={caseData.materia ?? null}
+              initialDocumentationReceived={caseData.documentacion_recibida ?? null}
+              canRequestDocuments={profile.role !== 'cliente'}
               canUpload={canManageDocuments}
               canEdit={canManageDocuments}
               canDelete={canManageDocuments}
               showPrivateDocuments={showPrivateContent}
             />
+          )}
+
+          {activeTab === 'activity' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Link2 className="h-5 w-5" />
+                    Vinculación PJUD (base)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-foreground/60">
+                    Guarda el identificador de causa (RIT/Rol/RUC) y el tribunal para habilitar sincronización futura.
+                  </p>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="pjud_rit">RIT / Rol</Label>
+                      <Input
+                        id="pjud_rit"
+                        value={pjudLinkDraft.rit ?? ''}
+                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, rit: e.target.value }))}
+                        placeholder="Ej: O-1874-2025 / C-4764-2025"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pjud_ruc">RUC (penal, opcional)</Label>
+                      <Input
+                        id="pjud_ruc"
+                        value={pjudLinkDraft.ruc ?? ''}
+                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, ruc: e.target.value }))}
+                        placeholder="Ej: 2300xxxxxx-x"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="pjud_tribunal">Tribunal</Label>
+                      <Input
+                        id="pjud_tribunal"
+                        value={pjudLinkDraft.tribunal ?? ''}
+                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, tribunal: e.target.value }))}
+                        placeholder="Ej: 1° Juzgado de Letras del Trabajo de Santiago"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-xs text-foreground/60">
+                      {pjudLinkRow?.updated_at ? (
+                        <>Última actualización: {formatDate(pjudLinkRow.updated_at)}</>
+                      ) : (
+                        <>Aún no se ha guardado vínculo PJUD.</>
+                      )}
+                      {pjudLinkRow?.last_synced_at ? ` · última sync: ${formatDate(pjudLinkRow.last_synced_at)}` : ''}
+                    </div>
+                    <Button type="button" onClick={handleSavePjudLink} disabled={isSavingPjudLink}>
+                      {isSavingPjudLink ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Guardando...
+                        </>
+                      ) : (
+                        'Guardar vínculo'
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5" />
+                      Bitácora del expediente
+                    </span>
+                    <Badge variant="outline">{caseEvents.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr_auto]">
+                    <div className="space-y-2">
+                      <Label htmlFor="event_kind">Tipo</Label>
+                      <select
+                        id="event_kind"
+                        className="form-input"
+                        value={eventDraft.kind}
+                        onChange={(e) =>
+                          setEventDraft((prev) => ({ ...prev, kind: e.target.value as any }))
+                        }
+                        disabled={isCreatingEvent}
+                      >
+                        <option value="movement">Movimiento</option>
+                        <option value="resolution">Resolución</option>
+                        <option value="deadline">Vencimiento</option>
+                        <option value="note">Nota</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="event_title">Detalle</Label>
+                      <Input
+                        id="event_title"
+                        value={eventDraft.title}
+                        onChange={(e) => setEventDraft((prev) => ({ ...prev, title: e.target.value }))}
+                        placeholder="Ej: Se tuvo por notificada la demanda / Se programó audiencia..."
+                        disabled={isCreatingEvent}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button type="button" onClick={handleCreateEvent} disabled={isCreatingEvent || !eventDraft.title.trim()}>
+                        {isCreatingEvent ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Guardando...
+                          </>
+                        ) : (
+                          'Agregar'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {isLoadingEvents ? (
+                    <div className="flex items-center gap-2 text-sm text-foreground/60">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando bitácora...
+                    </div>
+                  ) : caseEvents.length === 0 ? (
+                    <p className="text-sm text-foreground/60">Aún no hay eventos registrados.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {caseEvents.slice(0, 30).map((event) => (
+                        <div
+                          key={event.id}
+                          className="rounded-2xl border border-slate-100 bg-white px-4 py-3"
+                        >
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">{event.title}</p>
+                              <p className="text-xs text-slate-500">
+                                {event.kind} · {formatDate(event.occurred_at)}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="border-slate-200 text-slate-600 w-fit">
+                              {event.provider}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                      {caseEvents.length > 30 && (
+                        <p className="text-xs text-slate-500">Mostrando 30 de {caseEvents.length} eventos.</p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {activeTab === 'notes' && (
