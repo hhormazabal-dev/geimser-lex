@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import * as cheerio from 'cheerio';
 import { validateRUT } from '@/lib/utils';
