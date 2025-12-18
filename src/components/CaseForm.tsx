@@ -1296,8 +1296,8 @@ export function CaseForm({
                 </div>
 
                 <div className='space-y-2 md:col-span-2'>
-	                  <Label>Demandado(s) / Imputado(s)</Label>
-	                  <p className='text-xs text-gray-500'>Registra cada demandado/imputado y su RUT si ya se encuentra disponible.</p>
+	                  <Label>Demandado(s) / Acusado(s)</Label>
+	                  <p className='text-xs text-gray-500'>Registra cada demandado/acusado y su RUT si ya se encuentra disponible.</p>
                   <div className='space-y-2'>
                     {demandados.map((demandado, index) => (
                       <div

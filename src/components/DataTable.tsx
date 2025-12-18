@@ -134,7 +134,7 @@ export function DataTable({
 
   const normalizeTipoLabel = (tipo: string, materia?: string | null) => {
     const normalized = (tipo ?? '').trim().toLowerCase();
-    if (isPenal(materia)) return normalized === 'demandado' ? 'imputado' : normalized;
+    if (isPenal(materia)) return normalized === 'demandado' ? 'acusado' : normalized;
     return normalized;
   };
 
