@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ojvCausesPerLegalPerson } from '@/lib/pjud/ojv';
+import { requireAuth } from '@/lib/auth/roles';
 
 export const runtime = 'nodejs';
 
@@ -22,6 +23,8 @@ const requestSchema = z.object({
     Rut: z.string().min(1),
     Context: z.string().min(1),
     Court: z.string().min(1).optional(),
+    ContextSelect: z.string().min(1).optional(),
+    CourtSelect: z.string().min(1).optional(),
     Detail: z.boolean().optional(),
   }),
   CallbackUrl: z.string().url().optional(),
@@ -81,6 +84,8 @@ async function processOnce(body: z.infer<typeof requestSchema>) {
     rut: body.RequestData.Rut,
     contextValue: body.RequestData.Context,
     courtValue: body.RequestData.Court ?? null,
+    ...(body.RequestData.ContextSelect ? { contextSelectName: body.RequestData.ContextSelect } : {}),
+    ...(body.RequestData.CourtSelect ? { courtSelectName: body.RequestData.CourtSelect } : {}),
     detail: Boolean(body.RequestData.Detail),
   });
 
@@ -111,6 +116,12 @@ async function processOnce(body: z.infer<typeof requestSchema>) {
 export async function POST(req: Request) {
   const authErr = requireApiKey(req);
   if (authErr) return authErr;
+
+  try {
+    await requireAuth(['admin_firma', 'abogado', 'analista']);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? 'Unauthorized' }, { status: 401 });
+  }
 
   const operationId = globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()

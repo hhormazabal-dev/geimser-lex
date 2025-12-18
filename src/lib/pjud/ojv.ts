@@ -12,6 +12,8 @@ export type OJVCausesPerLegalPersonInput = {
   rut: string;
   contextValue: string;
   courtValue?: string | null;
+  contextSelectName?: string;
+  courtSelectName?: string;
   detail?: boolean;
   baseUrl?: string;
 };
@@ -279,7 +281,7 @@ async function fetchWithJar(
 }
 
 export async function ojvCausesPerLegalPerson(input: OJVCausesPerLegalPersonInput): Promise<OJVCause[]> {
-  const { rut, contextValue, courtValue, detail = false } = input;
+  const { rut, contextValue, courtValue, detail = false, contextSelectName, courtSelectName } = input;
   if (!validateRUT(rut)) throw new Error('RUT inválido.');
 
   const jar: CookieJar = new Map();
@@ -310,18 +312,30 @@ export async function ojvCausesPerLegalPerson(input: OJVCausesPerLegalPersonInpu
   const form = $landing(bestForm);
   const { actionUrl, method, fields, selects } = getFormFields($landing, form);
 
-  const contextSelectName = findSelectByOptionValue(selects, contextValue);
-  if (!contextSelectName) {
+  const availableSelectNames = new Set(selects.map((s) => s.name));
+
+  const resolvedContextSelectName = contextSelectName?.trim()
+    ? contextSelectName.trim()
+    : findSelectByOptionValue(selects, contextValue);
+  if (!resolvedContextSelectName) {
     throw new Error('PJUD: no se pudo identificar el select de competencia/contexto para el value entregado.');
   }
-  fields.set(contextSelectName, contextValue);
+  if (!availableSelectNames.has(resolvedContextSelectName)) {
+    throw new Error('PJUD: ContextSelect no existe en el formulario.');
+  }
+  fields.set(resolvedContextSelectName, contextValue);
 
   if (courtValue) {
-    const courtSelectName = findSelectByOptionValue(selects, courtValue);
-    if (!courtSelectName) {
+    const resolvedCourtSelectName = courtSelectName?.trim()
+      ? courtSelectName.trim()
+      : findSelectByOptionValue(selects, courtValue);
+    if (!resolvedCourtSelectName) {
       throw new Error('PJUD: no se pudo identificar el select de corte/tribunal para el value entregado.');
     }
-    fields.set(courtSelectName, courtValue);
+    if (!availableSelectNames.has(resolvedCourtSelectName)) {
+      throw new Error('PJUD: CourtSelect no existe en el formulario.');
+    }
+    fields.set(resolvedCourtSelectName, courtValue);
   }
 
   const fieldNames = Array.from(fields.keys());

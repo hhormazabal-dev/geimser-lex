@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ojvScrapeSearchSelects } from '@/lib/pjud/ojv';
+import { requireAuth } from '@/lib/auth/roles';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +20,12 @@ function requireApiKey(req: Request) {
 export async function GET(req: Request) {
   const authErr = requireApiKey(req);
   if (authErr) return authErr;
+
+  try {
+    await requireAuth(['admin_firma', 'abogado', 'analista']);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? 'Unauthorized' }, { status: 401 });
+  }
 
   const { searchParams } = new URL(req.url);
   const baseUrl = searchParams.get('baseUrl')?.trim() || undefined;

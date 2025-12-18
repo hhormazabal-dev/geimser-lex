@@ -19,6 +19,7 @@ import {
   Briefcase,
   ClipboardList,
   FilePlus2,
+  Gavel,
 } from 'lucide-react';
 
 interface PlatformLayoutProps {
@@ -58,6 +59,12 @@ function buildSidebarItems(role: Role): SidebarItem[] {
 	        description: 'Recordatorios y alertas enviadas',
 	        icon: <Bell className="h-4 w-4" />,
 	      },
+        {
+          href: '/pjud',
+          label: 'PJUD',
+          description: 'Consulta causas por RUT',
+          icon: <Gavel className="h-4 w-4" />,
+        },
 	      {
 	        href: '/clients',
 	        label: 'Clientes',
@@ -112,6 +119,12 @@ function buildSidebarItems(role: Role): SidebarItem[] {
 	        description: 'Recordatorios y alertas enviadas',
 	        icon: <Bell className="h-4 w-4" />,
 	      },
+        {
+          href: '/pjud',
+          label: 'PJUD',
+          description: 'Consulta causas por RUT',
+          icon: <Gavel className="h-4 w-4" />,
+        },
 	      {
 	        href: '/cases/new',
 	        label: 'Registrar caso',
@@ -147,12 +160,18 @@ function buildSidebarItems(role: Role): SidebarItem[] {
 	        description: 'Recordatorios y alertas enviadas',
 	        icon: <Bell className="h-4 w-4" />,
 	      },
+        {
+          href: '/pjud',
+          label: 'PJUD',
+          description: 'Consulta causas por RUT',
+          icon: <Gavel className="h-4 w-4" />,
+        },
 	      {
 	        href: '/cases/new',
 	        label: 'Nuevo caso',
 	        description: 'Inicia la recopilación y asignación',
 	        icon: <FilePlus2 className="h-4 w-4" />,
-	      },
+      },
       {
         href: '/clients',
         label: 'Clientes',
