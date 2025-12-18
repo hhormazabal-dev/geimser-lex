@@ -12,6 +12,7 @@ import type { Case } from '@/lib/supabase/types';
 
 type CaseWithParties = Case & {
   counterparties?: Array<{ nombre: string; tipo: string }>;
+  cliente_principal?: { id: string; nombre: string | null; rut: string | null } | null;
 };
 
 interface DataTableProps {
@@ -113,6 +114,34 @@ export function DataTable({
         {key}
       </span>
     );
+  };
+
+  const parseCounterpartiesFromText = (raw?: string | null) => {
+    if (!raw) return [] as Array<{ nombre: string; tipo: string }>;
+    return raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^(.*?)(?:\s*\(RUT[:\s]+(.+?)\))?\s*$/i);
+        const nombre = (match?.[1] ?? line).trim();
+        return { nombre, tipo: 'demandado' };
+      })
+      .filter((row) => row.nombre.length > 0);
+  };
+
+  const isPenal = (materia?: string | null) => (materia ?? '').trim().toLowerCase() === 'penal';
+
+  const normalizeTipoLabel = (tipo: string, materia?: string | null) => {
+    const normalized = (tipo ?? '').trim().toLowerCase();
+    if (isPenal(materia)) return normalized === 'demandado' ? 'imputado' : normalized;
+    return normalized;
+  };
+
+  const getPrimaryLine = (value?: string | null) => {
+    if (!value) return '';
+    const first = value.split(/\r?\n/)[0]?.trim() ?? '';
+    return first.length ? first : value.trim();
   };
 
   return (
@@ -234,8 +263,8 @@ export function DataTable({
             <thead className='bg-slate-50/80 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
               <tr>
                 <th scope='col' className='px-5 py-3 text-left'>Caso</th>
-                <th scope='col' className='px-5 py-3 text-left'>Cliente</th>
-                <th scope='col' className='px-5 py-3 text-left'>Contrapartes</th>
+                <th scope='col' className='px-5 py-3 text-left'>Cliente (empresa)</th>
+                <th scope='col' className='px-5 py-3 text-left'>Demandado(s)</th>
                 <th scope='col' className='px-5 py-3 text-left'>Estado</th>
                 <th scope='col' className='px-5 py-3 text-left'>Prioridad</th>
                 <th scope='col' className='px-5 py-3 text-left'>Etapa</th>
@@ -262,28 +291,43 @@ export function DataTable({
                   </td>
                   <td className='px-5 py-4 align-top'>
                     <div className='space-y-1'>
-                      <p className='text-sm font-medium text-slate-800'>{caseItem.nombre_cliente}</p>
-                      {caseItem.rut_cliente && <p className='text-xs text-slate-500'>{caseItem.rut_cliente}</p>}
+                      <p className='text-sm font-medium text-slate-800'>
+                        {caseItem.cliente_principal?.nombre ?? getPrimaryLine(caseItem.nombre_cliente)}
+                      </p>
+                      {(caseItem.cliente_principal?.rut ?? caseItem.rut_cliente) && (
+                        <p className='text-xs text-slate-500'>{caseItem.cliente_principal?.rut ?? caseItem.rut_cliente}</p>
+                      )}
                     </div>
                   </td>
                   <td className='px-5 py-4 align-top'>
-                    {caseItem.counterparties && caseItem.counterparties.length > 0 ? (
-                      <div className='space-y-1 text-xs text-slate-600'>
-                        {caseItem.counterparties.slice(0, 3).map((party, index) => (
-                          <div key={`${party.nombre}-${index}`} className='flex items-center gap-2'>
-                            <Badge variant='outline' className='border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-600'>
-                              {party.tipo}
-                            </Badge>
-                            <span className='text-slate-700'>{party.nombre}</span>
-                          </div>
-                        ))}
-                        {caseItem.counterparties.length > 3 && (
-                          <span className='text-[11px] font-medium text-slate-400'>+{caseItem.counterparties.length - 3} más</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className='text-xs text-slate-400'>Sin registrar</span>
-                    )}
+                    {(() => {
+                      const counterparties =
+                        caseItem.counterparties && caseItem.counterparties.length > 0
+                          ? caseItem.counterparties
+                          : parseCounterpartiesFromText(caseItem.contraparte);
+                      if (counterparties.length === 0) {
+                        return <span className='text-xs text-slate-400'>Sin registrar</span>;
+                      }
+
+                      return (
+                        <div className='space-y-1 text-xs text-slate-600'>
+                          {counterparties.slice(0, 3).map((party, index) => (
+                            <div key={`${party.nombre}-${index}`} className='flex items-center gap-2'>
+                              <Badge
+                                variant='outline'
+                                className='border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-600'
+                              >
+                                {normalizeTipoLabel(party.tipo, caseItem.materia)}
+                              </Badge>
+                              <span className='text-slate-700'>{party.nombre}</span>
+                            </div>
+                          ))}
+                          {counterparties.length > 3 && (
+                            <span className='text-[11px] font-medium text-slate-400'>+{counterparties.length - 3} más</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className='px-5 py-4 align-top'>{renderStatusBadge(caseItem.estado)}</td>
                   <td className='px-5 py-4 align-top'>{renderPriorityBadge(caseItem.prioridad)}</td>

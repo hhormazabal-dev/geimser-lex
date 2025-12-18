@@ -43,6 +43,7 @@ import type {
   MonthlyStats,
   AbogadoWorkload,
   DashboardHighlights,
+  ClientPortfolioItem,
 } from '@/lib/actions/analytics';
 import LogoutButton from '@/components/LogoutButton';
 
@@ -56,6 +57,7 @@ interface AdminDashboardProps {
     monthlyStats: MonthlyStats[];
     abogadoWorkload: AbogadoWorkload[];
     upcomingDeadlines: any[];
+    clientPortfolio: ClientPortfolioItem[];
     highlights: DashboardHighlights;
   };
 }
@@ -79,6 +81,7 @@ const GLASS_CARD =
 
 export function AdminDashboard({ profile, data }: AdminDashboardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m'>('6m');
+  const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const stats = data.stats;
 
   if (!stats) {
@@ -100,6 +103,15 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
 
   const getStatusColor = (status: string) => STATUS_COLORS[status] || '#6B7280';
   const getPriorityColor = (priority: string) => PRIORITY_COLORS[priority] || '#6B7280';
+  const classifyClientType = (name?: string | null) => {
+    const value = (name ?? '').toUpperCase();
+    if (
+      /\b(S\.?A\.?|SPA|LTDA|E\.?I\.?R\.?L\.?|S\.?P\.?A\.?|FUNDACION|CORPORACION)\b/.test(value)
+    ) {
+      return 'Empresa';
+    }
+    return 'Persona';
+  };
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-50 text-slate-900'>
@@ -153,7 +165,7 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
             <KpiCards stats={stats} highlights={data.highlights} />
           </section>
 
-          {(stats.overdueStages > 0 || data.upcomingDeadlines.length > 0) && (
+	          {(stats.overdueStages > 0 || data.upcomingDeadlines.length > 0) && (
             <section className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
               {stats.overdueStages > 0 && (
                 <Card className={`${GLASS_CARD} border-red-200`}>
@@ -197,9 +209,157 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
                 </Card>
               )}
             </section>
-          )}
+	          )}
 
-          <section className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
+	          {data.clientPortfolio.length > 0 && (
+	            <section className='space-y-4'>
+	              <div className='flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between'>
+	                <div>
+	                  <h2 className='text-base font-semibold text-slate-800'>Cartera por cliente</h2>
+	                  <p className='text-sm text-slate-500'>
+	                    Vista de control para priorizar clientes y revisar su cartera de casos (activos, urgentes y en revisión).
+	                  </p>
+	                </div>
+	                <Badge variant='outline' className='w-fit border-slate-200 text-slate-600'>
+	                  {data.clientPortfolio.length} clientes con casos
+	                </Badge>
+	              </div>
+
+	              <Card className={GLASS_CARD}>
+	                <CardHeader>
+	                  <CardTitle className='flex items-center gap-2'>
+	                    <User className='h-5 w-5 text-slate-600' />
+	                    Clientes y casos asignados
+	                  </CardTitle>
+	                </CardHeader>
+	                <CardContent>
+	                  <div className='space-y-3'>
+	                    {data.clientPortfolio.map((item) => {
+	                      const isOpen = expandedClientId === item.client.id;
+	                      const clientType = classifyClientType(item.client.nombre);
+	                      return (
+	                        <div
+	                          key={item.client.id}
+	                          className='rounded-2xl border border-slate-100 bg-white/80 px-4 py-3'
+	                        >
+	                          <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+	                            <div className='flex items-start gap-3'>
+	                              <div
+	                                className='flex h-10 w-10 items-center justify-center rounded-full text-white font-medium'
+	                                style={{ backgroundColor: stringToColor(item.client.nombre ?? 'Cliente') }}
+	                              >
+	                                {getInitials(item.client.nombre ?? 'CL')}
+	                              </div>
+	                              <div>
+	                                <p className='text-sm font-semibold text-slate-900'>
+	                                  {item.client.nombre ?? 'Cliente sin nombre'}
+	                                </p>
+	                                <div className='mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500'>
+	                                  {item.client.rut && <span>{item.client.rut}</span>}
+	                                  <Badge variant='outline' className='border-slate-200 text-slate-600'>
+	                                    {clientType}
+	                                  </Badge>
+	                                  {item.inReviewCases > 0 && (
+	                                    <Badge className='bg-amber-50 text-amber-700 border border-amber-100'>
+	                                      {item.inReviewCases} en revisión
+	                                    </Badge>
+	                                  )}
+	                                  {item.urgentCases > 0 && (
+	                                    <Badge className='bg-red-50 text-red-700 border border-red-100'>
+	                                      {item.urgentCases} urgentes
+	                                    </Badge>
+	                                  )}
+	                                  <Badge className='bg-emerald-50 text-emerald-700 border border-emerald-100'>
+	                                    {item.activeCases} activos
+	                                  </Badge>
+	                                  <Badge variant='outline' className='border-slate-200 text-slate-600'>
+	                                    {item.totalCases} total
+	                                  </Badge>
+	                                </div>
+	                              </div>
+	                            </div>
+
+	                            <div className='flex items-center gap-2'>
+	                              <Button
+	                                type='button'
+	                                size='sm'
+	                                variant='outline'
+	                                className='rounded-full'
+	                                onClick={() => setExpandedClientId(isOpen ? null : item.client.id)}
+	                              >
+	                                {isOpen ? 'Ocultar casos' : 'Ver casos'}
+	                              </Button>
+	                              <Button
+	                                asChild
+	                                size='sm'
+	                                className='rounded-full bg-slate-900 text-white hover:bg-slate-800'
+	                              >
+	                                <Link href='/cases'>
+	                                  Ir a cartera <ArrowUpRight className='ml-2 h-4 w-4' />
+	                                </Link>
+	                              </Button>
+	                            </div>
+	                          </div>
+
+	                          {isOpen && (
+	                            <div className='mt-4 space-y-2'>
+	                              {item.cases.slice(0, 8).map((caseItem) => (
+	                                <Link
+	                                  key={caseItem.id}
+	                                  href={`/cases/${caseItem.id}`}
+	                                  className='flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 transition hover:bg-slate-50'
+	                                >
+	                                  <div className='space-y-1'>
+	                                    <p className='text-sm font-medium text-slate-900'>
+	                                      {caseItem.caratulado}
+	                                    </p>
+	                                    <p className='text-xs text-slate-500'>
+	                                      {caseItem.etapa_actual ?? 'Etapa sin definir'}
+	                                      {caseItem.fecha_inicio ? ` · Inicio ${formatDate(caseItem.fecha_inicio)}` : ''}
+	                                    </p>
+	                                  </div>
+	                                  <div className='flex items-center gap-2'>
+	                                    {caseItem.prioridad && (
+	                                      <Badge
+	                                        className={`border ${
+	                                          caseItem.prioridad === 'urgente'
+	                                            ? 'border-red-100 bg-red-50 text-red-700'
+	                                            : caseItem.prioridad === 'alta'
+	                                              ? 'border-amber-100 bg-amber-50 text-amber-700'
+	                                              : 'border-slate-200 bg-slate-50 text-slate-600'
+	                                        }`}
+	                                      >
+	                                        {caseItem.prioridad}
+	                                      </Badge>
+	                                    )}
+	                                    {caseItem.estado && (
+	                                      <Badge
+	                                        variant='outline'
+	                                        className='border-slate-200 text-slate-600'
+	                                      >
+	                                        {caseItem.estado}
+	                                      </Badge>
+	                                    )}
+	                                  </div>
+	                                </Link>
+	                              ))}
+	                              {item.cases.length > 8 && (
+	                                <p className='text-xs text-slate-500'>
+	                                  Mostrando 8 de {item.cases.length} casos.
+	                                </p>
+	                              )}
+	                            </div>
+	                          )}
+	                        </div>
+	                      );
+	                    })}
+	                  </div>
+	                </CardContent>
+	              </Card>
+	            </section>
+	          )}
+
+	          <section className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
             <Card className={GLASS_CARD}>
               <CardHeader>
                 <div className='flex items-center justify-between'>

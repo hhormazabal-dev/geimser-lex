@@ -782,3 +782,102 @@ export async function getUpcomingDeadlines(): Promise<{ success: boolean; data?:
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
+
+export interface ClientPortfolioCase {
+  id: string;
+  caratulado: string;
+  estado: string | null;
+  prioridad: string | null;
+  etapa_actual: string | null;
+  fecha_inicio: string | null;
+  workflow_state: string | null;
+}
+
+export interface ClientPortfolioItem {
+  client: {
+    id: string;
+    nombre: string | null;
+    rut: string | null;
+    email: string | null;
+    telefono: string | null;
+  };
+  totalCases: number;
+  activeCases: number;
+  urgentCases: number;
+  inReviewCases: number;
+  cases: ClientPortfolioCase[];
+}
+
+/**
+ * Agrupa cartera por cliente (cliente principal) para control administrativo.
+ */
+export async function getClientPortfolio(
+  limit = 20,
+): Promise<{ success: boolean; data?: ClientPortfolioItem[]; error?: string }> {
+  try {
+    const profile = await requireAuth('admin_firma');
+    if (!profile) return { success: false, error: 'No autenticado' };
+
+    const supabase = await createServerClient();
+
+    const { data, error } = await supabase
+      .from('case_clients')
+      .select(
+        `
+        client:profiles!case_clients_client_profile_id_fkey(id, nombre, rut, email, telefono),
+        case:cases(id, caratulado, estado, prioridad, etapa_actual, fecha_inicio, workflow_state)
+      `,
+      )
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const rows = (data as Array<Record<string, any>> | null) ?? [];
+    const byClient = new Map<string, ClientPortfolioItem>();
+
+    for (const row of rows) {
+      const client = row.client as ClientPortfolioItem['client'] | null;
+      const caseRow = row.case as ClientPortfolioCase | null;
+      if (!client?.id || !caseRow?.id) continue;
+
+      const existing = byClient.get(client.id) ?? {
+        client,
+        totalCases: 0,
+        activeCases: 0,
+        urgentCases: 0,
+        inReviewCases: 0,
+        cases: [],
+      };
+
+      existing.cases.push(caseRow);
+      byClient.set(client.id, existing);
+    }
+
+    const portfolio = Array.from(byClient.values()).map((item) => {
+      const totalCases = item.cases.length;
+      const activeCases = item.cases.filter((c) => c.estado === 'activo').length;
+      const urgentCases = item.cases.filter((c) => c.prioridad === 'urgente').length;
+      const inReviewCases = item.cases.filter((c) => (c.workflow_state ?? '').toString() === 'en_revision').length;
+
+      return {
+        ...item,
+        totalCases,
+        activeCases,
+        urgentCases,
+        inReviewCases,
+        cases: item.cases.sort((a, b) => (a.caratulado ?? '').localeCompare(b.caratulado ?? '', 'es')),
+      };
+    });
+
+    portfolio.sort((a, b) => {
+      if (b.activeCases !== a.activeCases) return b.activeCases - a.activeCases;
+      if (b.urgentCases !== a.urgentCases) return b.urgentCases - a.urgentCases;
+      return b.totalCases - a.totalCases;
+    });
+
+    return { success: true, data: portfolio.slice(0, Math.max(1, limit)) };
+  } catch (error) {
+    console.error('Error getting client portfolio:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}

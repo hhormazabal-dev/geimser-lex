@@ -38,6 +38,49 @@ import type {
 const sOrNull = (v: string | undefined | null): string | null => (v ?? null);
 const nOrNull = (v: number | undefined | null): number | null => (v ?? null);
 
+type ParsedPartyRow = { nombre: string; rut: string | null };
+
+function parseSerializedPartyRows(raw?: string | null): ParsedPartyRow[] {
+  if (!raw) return [];
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^(.*?)(?:\s*\(RUT[:\s]+(.+?)\))?\s*$/i);
+      const nombre = (match?.[1] ?? line).trim();
+      const rut = (match?.[2] ?? '').trim();
+      return { nombre, rut: rut.length > 0 ? rut : null };
+    })
+    .filter((row) => row.nombre.length > 0);
+}
+
+async function syncDemandadoCounterparties(
+  supabase: Awaited<ReturnType<typeof getSB>>,
+  caseId: string,
+  contraparteRaw?: string | null,
+) {
+  const { error: deleteError } = await supabase
+    .from('case_counterparties')
+    .delete()
+    .eq('case_id', caseId)
+    .eq('tipo', 'demandado');
+  if (deleteError) throw deleteError;
+
+  const parties = parseSerializedPartyRows(contraparteRaw);
+  if (parties.length === 0) return;
+
+  const { error: insertError } = await supabase.from('case_counterparties').insert(
+    parties.map((party) => ({
+      case_id: caseId,
+      nombre: party.nombre,
+      rut: party.rut,
+      tipo: 'demandado',
+    })),
+  );
+  if (insertError) throw insertError;
+}
+
 function stripUndefined<T extends Record<string, any>>(obj: T | undefined): Partial<T> {
   if (!obj) return {};
   const out: Record<string, any> = {};
@@ -193,6 +236,7 @@ export async function createCase(input: CreateCaseInput) {
     if (error) throw error;
 
     await upsertPrimaryClient(newCase.id, baseData.cliente_principal_id);
+    await syncDemandadoCounterparties(supabase, newCase.id, baseData.contraparte);
     await createInitialStages(newCase);
 
     const normalizedAudience = normalizeAudienceType(audiencia_inicial_tipo);
@@ -459,6 +503,22 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
     if (error) throw error;
 
     await upsertPrimaryClient(caseId, rest.cliente_principal_id ?? undefined);
+
+    if (rest.contraparte !== undefined) {
+      await syncDemandadoCounterparties(supabase, caseId, rest.contraparte);
+    } else if (existingCase.contraparte) {
+      const { data: existingDemandados, error: counterpartiesError } = await supabase
+        .from('case_counterparties')
+        .select('id')
+        .eq('case_id', caseId)
+        .eq('tipo', 'demandado')
+        .limit(1)
+        .maybeSingle();
+      if (counterpartiesError) throw counterpartiesError;
+      if (!existingDemandados) {
+        await syncDemandadoCounterparties(supabase, caseId, existingCase.contraparte);
+      }
+    }
 
     await logAuditAction({
       action: 'UPDATE',
@@ -798,6 +858,7 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
     let query = supabase.from('cases').select(
       `
         *,
+        cliente_principal:profiles!cases_cliente_principal_id_fkey(id, nombre, rut),
         abogado_responsable:profiles!cases_abogado_responsable_fkey(id, nombre),
         case_stages(id, etapa, estado, fecha_programada, orden),
         counterparties:case_counterparties(nombre, tipo)

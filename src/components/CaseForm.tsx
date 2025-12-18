@@ -1068,8 +1068,8 @@ export function CaseForm({
 	
 	            <div className='space-y-6'>
 	              <div className='space-y-2'>
-	                <Label>Demandantes *</Label>
-                <p className='text-xs text-gray-500'>Ingresa un demandante por fila. El primero queda registrado como titular del expediente.</p>
+	                <Label>Parte representada (cliente) *</Label>
+	                <p className='text-xs text-gray-500'>Ingresa la parte representada por fila. La primera queda registrada como titular del expediente.</p>
                 <div className='space-y-2'>
                   {demandantes.map((demandante, index) => (
                     <div
@@ -1296,8 +1296,8 @@ export function CaseForm({
                 </div>
 
                 <div className='space-y-2 md:col-span-2'>
-                  <Label>Demandados</Label>
-                  <p className='text-xs text-gray-500'>Registra cada demandado y su RUT si ya se encuentra disponible.</p>
+	                  <Label>Demandado(s) / Imputado(s)</Label>
+	                  <p className='text-xs text-gray-500'>Registra cada demandado/imputado y su RUT si ya se encuentra disponible.</p>
                   <div className='space-y-2'>
                     {demandados.map((demandado, index) => (
                       <div

@@ -15,6 +15,7 @@ import {
   getMonthlyStats,
   getAbogadoWorkload,
   getUpcomingDeadlines,
+  getClientPortfolio,
 } from '@/lib/actions/analytics';
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default async function AdminDashboardPage() {
     monthlyResult,
     workloadResult,
     deadlinesResult,
+    portfolioResult,
   ] = await Promise.all([
     getDashboardStats(),
     getCasesByStatus(),
@@ -49,6 +51,7 @@ export default async function AdminDashboardPage() {
     getMonthlyStats(),
     getAbogadoWorkload(),
     getUpcomingDeadlines(),
+    getClientPortfolio(30),
   ]);
 
   const dashboardData = {
@@ -59,6 +62,7 @@ export default async function AdminDashboardPage() {
     monthlyStats: monthlyResult.success ? monthlyResult.data ?? [] : [],
     abogadoWorkload: workloadResult.success ? workloadResult.data ?? [] : [],
     upcomingDeadlines: deadlinesResult.success ? deadlinesResult.data ?? [] : [],
+    clientPortfolio: portfolioResult.success ? portfolioResult.data ?? [] : [],
     highlights:
       statsResult.success && statsResult.highlights
         ? statsResult.highlights
