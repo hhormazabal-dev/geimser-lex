@@ -122,11 +122,21 @@ export default async function AdminClientsPortfolioPage() {
                         <span className='text-xs font-medium text-slate-400 hidden group-open:inline'>Ocultar</span>
                       </summary>
 
-                      <div className='mt-4 space-y-4'>
-                        <div className='space-y-2'>
-                          <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
-                            Abogados patrocinantes
-                          </p>
+	                      <div className='mt-4 space-y-4'>
+	                        <div className='flex items-center justify-end'>
+	                          <Button
+	                            asChild
+	                            size='sm'
+	                            variant='outline'
+	                            className='rounded-full border-slate-200 bg-white/80 text-slate-700 hover:bg-white'
+	                          >
+	                            <Link href={`/dashboard/admin/clients/${item.client.id}`}>Abrir dashboard cliente</Link>
+	                          </Button>
+	                        </div>
+	                        <div className='space-y-2'>
+	                          <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
+	                            Abogados patrocinantes
+	                          </p>
                           {item.lawyers && item.lawyers.length > 0 ? (
                             <div className='flex flex-wrap gap-2'>
                               {item.lawyers.map((lawyer) => (
@@ -248,11 +258,21 @@ export default async function AdminClientsPortfolioPage() {
                         <span className='text-xs font-medium text-slate-400 hidden group-open:inline'>Ocultar</span>
                       </summary>
 
-                      <div className='mt-4 space-y-4'>
-                        <div className='space-y-2'>
-                          <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
-                            Abogados patrocinantes
-                          </p>
+	                      <div className='mt-4 space-y-4'>
+	                        <div className='flex items-center justify-end'>
+	                          <Button
+	                            asChild
+	                            size='sm'
+	                            variant='outline'
+	                            className='rounded-full border-slate-200 bg-white/80 text-slate-700 hover:bg-white'
+	                          >
+	                            <Link href={`/dashboard/admin/clients/${item.client.id}`}>Abrir dashboard cliente</Link>
+	                          </Button>
+	                        </div>
+	                        <div className='space-y-2'>
+	                          <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
+	                            Abogados patrocinantes
+	                          </p>
                           {item.lawyers && item.lawyers.length > 0 ? (
                             <div className='flex flex-wrap gap-2'>
                               {item.lawyers.map((lawyer) => (
@@ -319,4 +339,3 @@ export default async function AdminClientsPortfolioPage() {
     </div>
   );
 }
-

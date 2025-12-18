@@ -818,6 +818,41 @@ export interface ClientPortfolioItem {
   lawyers?: ClientPortfolioLawyer[];
 }
 
+export interface ClientDetailCase extends ClientPortfolioCase {
+  abogado_responsable: { id: string; nombre: string | null } | null;
+  nextStage: {
+    etapa: string;
+    fecha_programada: string | null;
+    estado: string;
+    orden: number | null;
+    isOverdue: boolean;
+  } | null;
+  pendingStages: number;
+  completedStages: number;
+  totalStages: number;
+  overdueStages: number;
+}
+
+export interface ClientDetailData {
+  client: {
+    id: string;
+    nombre: string | null;
+    rut: string | null;
+    email: string | null;
+    telefono: string | null;
+  };
+  stats: {
+    totalCases: number;
+    activeCases: number;
+    urgentCases: number;
+    inReviewCases: number;
+    totalLawyers: number;
+    overdueStages: number;
+  };
+  lawyers: ClientPortfolioLawyer[];
+  cases: ClientDetailCase[];
+}
+
 /**
  * Agrupa cartera por cliente (cliente principal) para control administrativo.
  */
@@ -1018,6 +1053,173 @@ export async function getClientPortfolioWithLawyers(
     return { success: true, data: portfolio.slice(0, Math.max(1, limit)) };
   } catch (error) {
     console.error('Error getting client portfolio with lawyers:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+export async function getClientDetail(
+  clientId: string,
+): Promise<{ success: boolean; data?: ClientDetailData; error?: string }> {
+  try {
+    const profile = await requireAuth('admin_firma');
+    if (!profile) return { success: false, error: 'No autenticado' };
+
+    const supabase = await createServerClient();
+
+    const { data: client, error: clientError } = await supabase
+      .from('profiles')
+      .select('id, nombre, rut, email, telefono, role')
+      .eq('id', clientId)
+      .single();
+    if (clientError || !client) return { success: false, error: 'Cliente no encontrado' };
+    if ((client as any).role !== 'cliente') {
+      return { success: false, error: 'El perfil seleccionado no corresponde a un cliente.' };
+    }
+
+    const { data: links, error: linksError } = await supabase
+      .from('case_clients')
+      .select(
+        `
+        case:cases(
+          id,
+          caratulado,
+          estado,
+          prioridad,
+          etapa_actual,
+          fecha_inicio,
+          workflow_state,
+          abogado_responsable:profiles!cases_abogado_responsable_fkey(id, nombre)
+        )
+      `,
+      )
+      .eq('client_profile_id', clientId)
+      .order('created_at', { ascending: false });
+    if (linksError) throw linksError;
+
+    const casesRaw = (links as Array<Record<string, any>> | null) ?? [];
+    const cases = casesRaw
+      .map((row) => row.case as any)
+      .filter(Boolean) as Array<
+      ClientPortfolioCase & { abogado_responsable?: { id: string; nombre: string | null } | null }
+    >;
+
+    const caseIds = cases.map((c) => c.id);
+    let stageMap = new Map<string, any[]>();
+    if (caseIds.length > 0) {
+      const { data: stageRows, error: stagesError } = await supabase
+        .from('case_stages')
+        .select('case_id, etapa, estado, fecha_programada, orden')
+        .in('case_id', caseIds)
+        .order('orden', { ascending: true });
+      if (stagesError) throw stagesError;
+
+      stageMap = (stageRows ?? []).reduce((map, stage) => {
+        const list = map.get(stage.case_id) ?? [];
+        list.push(stage);
+        map.set(stage.case_id, list);
+        return map;
+      }, new Map<string, any[]>());
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const lawyerMap = new Map<string, ClientPortfolioLawyer>();
+
+    const caseSummaries: ClientDetailCase[] = cases.map((caseItem) => {
+      const stages = stageMap.get(caseItem.id) ?? [];
+      const completedStages = stages.filter((stage) => stage.estado === 'completado');
+      const pendingStages = stages.filter((stage) => stage.estado !== 'completado');
+      const nextStage = pendingStages.length > 0 ? pendingStages[0] : null;
+      const overdueStages = pendingStages.filter((stage) => Boolean(stage.fecha_programada) && stage.fecha_programada < today)
+        .length;
+
+      const lawyer = caseItem.abogado_responsable ?? null;
+      if (lawyer?.id) {
+        const existing =
+          lawyerMap.get(lawyer.id) ??
+          ({
+            id: lawyer.id,
+            nombre: lawyer.nombre ?? null,
+            totalCases: 0,
+            activeCases: 0,
+            urgentCases: 0,
+            inReviewCases: 0,
+          } satisfies ClientPortfolioLawyer);
+        existing.totalCases += 1;
+        if (caseItem.estado === 'activo') existing.activeCases += 1;
+        if (caseItem.prioridad === 'urgente') existing.urgentCases += 1;
+        if ((caseItem.workflow_state ?? '').toString() === 'en_revision') existing.inReviewCases += 1;
+        lawyerMap.set(lawyer.id, existing);
+      }
+
+      return {
+        id: caseItem.id,
+        caratulado: caseItem.caratulado,
+        estado: caseItem.estado ?? null,
+        prioridad: caseItem.prioridad ?? null,
+        etapa_actual: caseItem.etapa_actual ?? null,
+        fecha_inicio: caseItem.fecha_inicio ?? null,
+        workflow_state: caseItem.workflow_state ?? null,
+        abogado_responsable: lawyer ? { id: lawyer.id, nombre: lawyer.nombre ?? null } : null,
+        nextStage: nextStage
+          ? {
+              etapa: nextStage.etapa,
+              fecha_programada: nextStage.fecha_programada ?? null,
+              estado: nextStage.estado ?? 'pendiente',
+              orden: nextStage.orden ?? null,
+              isOverdue: Boolean(nextStage.fecha_programada) && nextStage.fecha_programada < today,
+            }
+          : null,
+        pendingStages: pendingStages.length,
+        completedStages: completedStages.length,
+        totalStages: stages.length,
+        overdueStages,
+      };
+    });
+
+    const totalCases = caseSummaries.length;
+    const activeCases = caseSummaries.filter((c) => c.estado === 'activo').length;
+    const urgentCases = caseSummaries.filter((c) => c.prioridad === 'urgente').length;
+    const inReviewCases = caseSummaries.filter((c) => (c.workflow_state ?? '').toString() === 'en_revision').length;
+    const totalLawyers = lawyerMap.size;
+    const totalOverdueStages = caseSummaries.reduce((sum, c) => sum + c.overdueStages, 0);
+
+    const lawyers = Array.from(lawyerMap.values()).sort((a, b) => {
+      if (b.activeCases !== a.activeCases) return b.activeCases - a.activeCases;
+      if (b.totalCases !== a.totalCases) return b.totalCases - a.totalCases;
+      return (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es');
+    });
+
+    caseSummaries.sort((a, b) => {
+      if (b.overdueStages !== a.overdueStages) return b.overdueStages - a.overdueStages;
+      if (b.prioridad === 'urgente' && a.prioridad !== 'urgente') return 1;
+      if (a.prioridad === 'urgente' && b.prioridad !== 'urgente') return -1;
+      return (a.caratulado ?? '').localeCompare(b.caratulado ?? '', 'es');
+    });
+
+    return {
+      success: true,
+      data: {
+        client: {
+          id: client.id,
+          nombre: client.nombre ?? null,
+          rut: client.rut ?? null,
+          email: client.email ?? null,
+          telefono: (client as any).telefono ?? null,
+        },
+        stats: {
+          totalCases,
+          activeCases,
+          urgentCases,
+          inReviewCases,
+          totalLawyers,
+          overdueStages: totalOverdueStages,
+        },
+        lawyers,
+        cases: caseSummaries,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting client detail:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
