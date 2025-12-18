@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 const PUBLIC_PATHS = [
   '/login',
   '/api',                 // toda tu API (login/logout/callback/webhooks/etc.)
+  '/v1',                  // endpoints tipo API (services)
   '/_next',               // assets de Next
   '/favicon.ico',
   '/apple-touch-icon.png',
