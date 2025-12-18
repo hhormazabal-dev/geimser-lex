@@ -195,13 +195,119 @@ export function CaseForm({
     return Number.isFinite(parsed) ? parsed : undefined;
   };
 
+  const FIELD_LABELS: Record<string, string> = {
+    cliente_principal_id: 'Cliente principal',
+    nombre_cliente: 'Demandante(s)',
+    rut_cliente: 'RUT demandante principal',
+    caratulado: 'Carátula',
+    materia: 'Materia',
+    descripcion_inicial: 'Antecedentes / descripción inicial',
+    documentacion_recibida: 'Documentación recibida',
+    region: 'Región',
+    comuna: 'Comuna (asiento del tribunal)',
+    tribunal: 'Tribunal',
+    fecha_inicio: 'Fecha de ingreso',
+    etapa_actual: 'Acto / etapa actual',
+    estado: 'Estado del expediente',
+    prioridad: 'Prioridad',
+    valor_estimado: 'Valor estimado',
+    abogado_responsable: 'Abogado responsable',
+    analista_id: 'Analista',
+    sentencia_estado: 'Estado de sentencia',
+    sentencia_fecha: 'Fecha de sentencia',
+    honorario_total_uf: 'Honorario total',
+    honorario_pagado_uf: 'Monto pagado',
+    honorario_variable_porcentaje: 'Porcentaje variable',
+    honorario_variable_base: 'Base variable',
+    honorario_moneda: 'Moneda honorarios',
+    modalidad_cobro: 'Modalidad de cobro',
+    honorario_notas: 'Notas de honorarios',
+    tarifa_referencia: 'Tarifa referencial',
+    workflow_state: 'Estado interno (workflow)',
+  };
+
+  const FIELD_ORDER = [
+    'cliente_principal_id',
+    'nombre_cliente',
+    'rut_cliente',
+    'caratulado',
+    'materia',
+    'descripcion_inicial',
+    'documentacion_recibida',
+    'region',
+    'comuna',
+    'tribunal',
+    'fecha_inicio',
+    'etapa_actual',
+    'estado',
+    'prioridad',
+    'sentencia_estado',
+    'sentencia_fecha',
+    'abogado_responsable',
+    'analista_id',
+    'honorario_total_uf',
+    'honorario_pagado_uf',
+    'honorario_variable_porcentaje',
+    'honorario_variable_base',
+    'modalidad_cobro',
+    'honorario_moneda',
+    'tarifa_referencia',
+    'workflow_state',
+  ] as const;
+
+  const collectFormErrors = (
+    formErrors: FieldErrors<CreateCaseInput>,
+  ): Array<{ name: string; message: string }> => {
+    const collected: Array<{ name: string; message: string }> = [];
+
+    const visit = (value: unknown, path: string[]) => {
+      if (!value || typeof value !== 'object') return;
+      const maybeMessage = (value as { message?: unknown }).message;
+      if (typeof maybeMessage === 'string' && maybeMessage.trim().length > 0) {
+        collected.push({ name: path.join('.'), message: maybeMessage.trim() });
+      }
+
+      for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+        if (key === 'message' || key === 'type' || key === 'ref') continue;
+        visit(child, [...path, key]);
+      }
+    };
+
+    for (const [key, value] of Object.entries(formErrors ?? {})) {
+      visit(value, [key]);
+    }
+
+    const unique = new Map<string, { name: string; message: string }>();
+    for (const item of collected) {
+      const normalizedKey = `${item.name}:${item.message}`;
+      if (!unique.has(normalizedKey)) unique.set(normalizedKey, item);
+    }
+
+    const items = Array.from(unique.values());
+    const orderIndex = new Map<string, number>(FIELD_ORDER.map((name, index) => [name, index]));
+    items.sort((a, b) => {
+      const aKey = a.name.split('.')[0] ?? a.name;
+      const bKey = b.name.split('.')[0] ?? b.name;
+      const aOrder = orderIndex.get(aKey);
+      const bOrder = orderIndex.get(bKey);
+      if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
+      if (aOrder !== undefined) return -1;
+      if (bOrder !== undefined) return 1;
+      return aKey.localeCompare(bKey, 'es');
+    });
+
+    return items;
+  };
+
   const focusFirstError = (formErrors: FieldErrors<CreateCaseInput>) => {
-    const firstField = Object.keys(formErrors ?? {})[0];
-    if (!firstField) return;
+    const firstField = collectFormErrors(formErrors)[0]?.name?.split('.')[0];
+    const fallbackField = Object.keys(formErrors ?? {})[0];
+    const targetField = firstField || fallbackField;
+    if (!targetField) return;
 
     const candidate =
-      document.getElementById(firstField) ??
-      (document.querySelector(`[name="${firstField}"]`) as HTMLElement | null);
+      document.getElementById(targetField) ??
+      (document.querySelector(`[name="${targetField}"]`) as HTMLElement | null);
     if (!candidate) return;
 
     candidate.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -216,9 +322,22 @@ export function CaseForm({
 
   const onInvalid = (formErrors: FieldErrors<CreateCaseInput>) => {
     focusFirstError(formErrors);
+    const issues = collectFormErrors(formErrors);
+    const maxToShow = 6;
+    const visible = issues.slice(0, maxToShow);
+    const remaining = Math.max(issues.length - visible.length, 0);
+    const description = visible.length
+      ? `${visible
+          .map((issue) => {
+            const key = issue.name.split('.')[0] ?? issue.name;
+            const label = FIELD_LABELS[key] ?? key;
+            return `- ${label}: ${issue.message}`;
+          })
+          .join('\n')}${remaining > 0 ? `\n- …y ${remaining} más` : ''}`
+      : 'Hay campos con errores o incompletos. Corrígelos y vuelve a intentar.';
     toast({
       title: 'Revisa el formulario',
-      description: 'Hay campos con errores o incompletos. Corrígelos y vuelve a intentar.',
+      description,
       variant: 'destructive',
     });
   };
