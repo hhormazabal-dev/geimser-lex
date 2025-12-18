@@ -1371,64 +1371,20 @@ export function CaseForm({
             </section>
           )}
 
-          <section className='space-y-4'>
-            <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Estado procesal</h2>
-              <p className='text-sm text-gray-500'>Completa el tribunal, etapa y estado del expediente (si aplica).</p>
-            </div>
+	          <section className='space-y-4'>
+	            <div>
+	              <h2 className='text-lg font-semibold text-gray-900'>Estado procesal</h2>
+	              <p className='text-sm text-gray-500'>
+	                Completa los datos procesales en orden deductivo: región → comuna (asiento) → tribunal → etapa/hitos.
+	              </p>
+	            </div>
 
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='tribunal'>Tribunal</Label>
-                {pjudError ? (
-                  <Input
-                    id='tribunal'
-                    placeholder='Ingresa el tribunal (ej: 1° Juzgado Civil de Santiago)'
-                    {...register('tribunal')}
-                    disabled={isLoading}
-                  />
-                ) : (
-                  <select
-                    id='tribunal'
-                    className='form-input'
-                    value={selectedTribunalId}
-                    onChange={(event) => {
-                      const id = event.target.value;
-                      setSelectedTribunalId(id);
-                      const selected = tribunalOptions.find((option) => option.id === id);
-                      setValue('tribunal', selected?.name ?? '', { shouldDirty: true, shouldValidate: true });
-                    }}
-                    disabled={isLoading || isLoadingTribunales || !selectedComunaCode}
-                  >
-                    <option value=''>
-                      {!selectedComunaCode
-                        ? 'Selecciona comuna primero'
-                        : isLoadingTribunales
-                          ? 'Cargando tribunales...'
-                          : 'Seleccionar tribunal'}
-                    </option>
-                    {tribunalOptions.map((tribunal) => (
-                      <option key={tribunal.id} value={tribunal.id}>
-                        {tribunal.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {pjudError && (
-                  <p className='text-xs text-amber-700'>
-                    No se pudo cargar el directorio PJUD. Puedes ingresar el tribunal manualmente.
-                  </p>
-                )}
-                {errors.tribunal && (
-                  <p className='text-sm text-red-600'>{errors.tribunal.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='region'>Región</Label>
-                <select
-                  id='region'
-                  className='form-input'
+	            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+	              <div className='space-y-2'>
+	                <Label htmlFor='region'>Región</Label>
+	                <select
+	                  id='region'
+	                  className='form-input'
                   {...register('region')}
                   disabled={isLoading}
                   onChange={(event) => {
@@ -1447,64 +1403,110 @@ export function CaseForm({
                     </option>
                   ))}
                 </select>
-                {errors.region && (
-                  <p className='text-sm text-red-600'>{errors.region.message}</p>
-                )}
-              </div>
-            </div>
+	                {errors.region && (
+	                  <p className='text-sm text-red-600'>{errors.region.message}</p>
+	                )}
+	              </div>
 
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='comuna'>Comuna (asiento del tribunal)</Label>
-                {pjudError && regionValue ? (
-                  <Input
-                    id='comuna'
-                    placeholder='Ingresa comuna'
-                    {...register('comuna')}
-                    disabled={isLoading}
-                  />
-                ) : (
-                  <select
-                    id='comuna'
-                    className='form-input'
-                    value={selectedComunaCode}
-                    onChange={(event) => {
-                      const code = event.target.value;
-                      setSelectedComunaCode(code);
-                      setSelectedTribunalId('');
-                      setTribunalOptions([]);
-                      const selected = comunaOptions.find((option) => option.code === code);
-                      setValue('comuna', selected?.name ?? '', { shouldDirty: true, shouldValidate: true });
-                      setValue('tribunal', '', { shouldDirty: true, shouldValidate: true });
-                    }}
-                    disabled={isLoading || !regionValue || isLoadingComunas || comunaOptions.length === 0}
-                  >
-                    <option value=''>
-                      {regionValue
-                        ? isLoadingComunas
-                          ? 'Cargando comunas...'
-                          : 'Seleccionar comuna'
-                        : 'Selecciona región primero'}
-                    </option>
-                    {comunaOptions.map((comuna) => (
-                      <option key={comuna.code} value={comuna.code}>
-                        {comuna.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {!regionValue && (
-                  <p className='text-xs text-gray-500'>Selecciona una región para listar sus comunas.</p>
-                )}
-                {errors.comuna && (
-                  <p className='text-sm text-red-600'>{errors.comuna.message}</p>
-                )}
-              </div>
+	              <div className='space-y-2'>
+	                <Label htmlFor='comuna'>Comuna (asiento del tribunal)</Label>
+	                {pjudError && regionValue ? (
+	                  <Input
+	                    id='comuna'
+	                    placeholder='Ingresa comuna'
+	                    {...register('comuna')}
+	                    disabled={isLoading}
+	                  />
+	                ) : (
+	                  <select
+	                    id='comuna'
+	                    className='form-input'
+	                    value={selectedComunaCode}
+	                    onChange={(event) => {
+	                      const code = event.target.value;
+	                      setSelectedComunaCode(code);
+	                      setSelectedTribunalId('');
+	                      setTribunalOptions([]);
+	                      const selected = comunaOptions.find((option) => option.code === code);
+	                      setValue('comuna', selected?.name ?? '', { shouldDirty: true, shouldValidate: true });
+	                      setValue('tribunal', '', { shouldDirty: true, shouldValidate: true });
+	                    }}
+	                    disabled={isLoading || !regionValue || isLoadingComunas || comunaOptions.length === 0}
+	                  >
+	                    <option value=''>
+	                      {regionValue
+	                        ? isLoadingComunas
+	                          ? 'Cargando comunas...'
+	                          : 'Seleccionar comuna'
+	                        : 'Selecciona región primero'}
+	                    </option>
+	                    {comunaOptions.map((comuna) => (
+	                      <option key={comuna.code} value={comuna.code}>
+	                        {comuna.name}
+	                      </option>
+	                    ))}
+	                  </select>
+	                )}
+	                {!regionValue && (
+	                  <p className='text-xs text-gray-500'>Selecciona una región para listar sus comunas.</p>
+	                )}
+	                {errors.comuna && (
+	                  <p className='text-sm text-red-600'>{errors.comuna.message}</p>
+	                )}
+	              </div>
 
-              <div className='space-y-2'>
-                <Label htmlFor='fecha_inicio'>Fecha de Ingreso</Label>
-                <Input
-                  id='fecha_inicio'
+	              <div className='space-y-2'>
+	                <Label htmlFor='tribunal'>Tribunal</Label>
+	                {pjudError ? (
+	                  <Input
+	                    id='tribunal'
+	                    placeholder='Ingresa el tribunal (ej: 1° Juzgado Civil de Santiago)'
+	                    {...register('tribunal')}
+	                    disabled={isLoading}
+	                  />
+	                ) : (
+	                  <select
+	                    id='tribunal'
+	                    className='form-input'
+	                    value={selectedTribunalId}
+	                    onChange={(event) => {
+	                      const id = event.target.value;
+	                      setSelectedTribunalId(id);
+	                      const selected = tribunalOptions.find((option) => option.id === id);
+	                      setValue('tribunal', selected?.name ?? '', { shouldDirty: true, shouldValidate: true });
+	                    }}
+	                    disabled={isLoading || isLoadingTribunales || !selectedComunaCode}
+	                  >
+	                    <option value=''>
+	                      {!selectedComunaCode
+	                        ? 'Selecciona comuna primero'
+	                        : isLoadingTribunales
+	                          ? 'Cargando tribunales...'
+	                          : 'Seleccionar tribunal'}
+	                    </option>
+	                    {tribunalOptions.map((tribunal) => (
+	                      <option key={tribunal.id} value={tribunal.id}>
+	                        {tribunal.name}
+	                      </option>
+	                    ))}
+	                  </select>
+	                )}
+	                {pjudError && (
+	                  <p className='text-xs text-amber-700'>
+	                    No se pudo cargar el directorio PJUD. Puedes ingresar el tribunal manualmente.
+	                  </p>
+	                )}
+	                {errors.tribunal && (
+	                  <p className='text-sm text-red-600'>{errors.tribunal.message}</p>
+	                )}
+	              </div>
+	            </div>
+
+	            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+	              <div className='space-y-2'>
+	                <Label htmlFor='fecha_inicio'>Fecha de Ingreso</Label>
+	                <Input
+	                  id='fecha_inicio'
                   type='date'
                   {...register('fecha_inicio')}
                   disabled={isLoading}
@@ -1523,11 +1525,11 @@ export function CaseForm({
                   {...register('valor_estimado', { setValueAs: toOptionalNumber })}
                   disabled={isLoading}
                 />
-                {errors.valor_estimado && (
-                  <p className='text-sm text-red-600'>{errors.valor_estimado.message}</p>
-                )}
-              </div>
-            </div>
+	                {errors.valor_estimado && (
+	                  <p className='text-sm text-red-600'>{errors.valor_estimado.message}</p>
+	                )}
+	              </div>
+	            </div>
 
             <div className='space-y-2'>
               <Label>Notificación de la demanda</Label>
@@ -1559,13 +1561,93 @@ export function CaseForm({
               </div>
               <p className='text-xs text-gray-500'>
                 Se añadirá automáticamente a las observaciones al guardar.
-              </p>
-            </div>
+	              </p>
+	            </div>
 
-            <div className='space-y-2'>
-              <h3 className='text-sm font-semibold text-gray-900'>Sentencia</h3>
-              <p className='text-xs text-gray-500'>
-                Registra si el caso cuenta con sentencia programada o dictada (y su fecha).
+	            <div className='space-y-2'>
+	              <h3 className='text-sm font-semibold text-gray-900'>Primer hito: audiencia</h3>
+	              <p className='text-xs text-gray-500'>
+	                Define el tipo de audiencia que esperas como primer hito y si requerirá coordinación de testigos.
+	              </p>
+	            </div>
+
+	            <div className='grid gap-4 md:grid-cols-2'>
+	              <div className='space-y-3'>
+	                <Label>Tipo de audiencia inicial</Label>
+	                <div className='grid gap-2'>
+	                  <label
+	                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+	                      audienciaInicialTipo
+	                        ? 'border-slate-200 bg-white text-slate-700'
+	                        : 'border-slate-200 bg-slate-50 text-slate-600'
+	                    }`}
+	                  >
+	                    <input
+	                      type='radio'
+	                      value=''
+	                      className='text-slate-600'
+	                      {...register('audiencia_inicial_tipo')}
+	                    />
+	                    Sin audiencia definida por ahora
+	                  </label>
+	                  {STAGE_AUDIENCE_TYPES.map((option) => (
+	                    <label
+	                      key={option.value}
+	                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+	                        audienciaInicialTipo === option.value
+	                          ? 'border-sky-300 bg-sky-50 text-sky-700'
+	                          : 'border-slate-200 bg-white text-slate-700'
+	                      }`}
+	                    >
+	                      <input
+	                        type='radio'
+	                        value={option.value}
+	                        className='text-slate-600'
+	                        {...register('audiencia_inicial_tipo')}
+	                      />
+	                      {option.label}
+	                    </label>
+	                  ))}
+	                </div>
+	              </div>
+
+	              <div className='space-y-3'>
+	                <Label>Participación de testigos</Label>
+	                <Controller
+	                  control={control}
+	                  name='audiencia_inicial_requiere_testigos'
+	                  render={({ field }) => (
+	                    <label
+	                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+	                        audienciaInicialTipo
+	                          ? 'border-slate-200 bg-white text-slate-700'
+	                          : 'border-dashed border-slate-200 bg-slate-50 text-slate-500'
+	                      }`}
+	                    >
+	                      <input
+	                        type='checkbox'
+	                        className='rounded border-slate-300'
+	                        checked={Boolean(field.value)}
+	                        onChange={(event) => field.onChange(event.target.checked)}
+	                        onBlur={field.onBlur}
+	                        ref={field.ref}
+	                        name={field.name}
+	                        disabled={!audienciaInicialTipo}
+	                      />
+	                      Se coordinarán testigos para esta audiencia
+	                    </label>
+	                  )}
+	                />
+	                <p className='text-xs text-gray-500'>
+	                  Esta marca solo aplica si defines una audiencia inicial y se reflejará en la primera etapa del timeline.
+	                </p>
+	              </div>
+	            </div>
+
+	            <div className='space-y-2'>
+	              <h3 className='text-sm font-semibold text-gray-900'>Sentencia</h3>
+	              <p className='text-xs text-gray-500'>
+	                Registra si el caso cuenta con sentencia programada o dictada (y su fecha).
               </p>
             </div>
 
@@ -1608,11 +1690,24 @@ export function CaseForm({
               </div>
             </div>
 
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='estado'>Estado del expediente</Label>
-                <select
-                  id='estado'
+	            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+	              <div className='space-y-2'>
+	                <Label htmlFor='etapa_actual'>Acto / etapa actual</Label>
+	                <Input
+	                  id='etapa_actual'
+	                  placeholder='Ingreso demanda, Notificación, Audiencia, Sentencia, Recurso, etc.'
+	                  {...register('etapa_actual')}
+	                  disabled={isLoading}
+	                />
+	                {errors.etapa_actual && (
+	                  <p className='text-sm text-red-600'>{errors.etapa_actual.message}</p>
+	                )}
+	              </div>
+
+	              <div className='space-y-2'>
+	                <Label htmlFor='estado'>Estado del expediente</Label>
+	                <select
+	                  id='estado'
                   className='form-input'
                   {...register('estado')}
                   disabled={isLoading}
@@ -1623,13 +1718,13 @@ export function CaseForm({
                     </option>
                   ))}
                 </select>
-                {errors.estado && (
-                  <p className='text-sm text-red-600'>{errors.estado.message}</p>
-                )}
-              </div>
+	                {errors.estado && (
+	                  <p className='text-sm text-red-600'>{errors.estado.message}</p>
+	                )}
+	              </div>
 
-              <div className='space-y-2'>
-                <Label htmlFor='prioridad'>Prioridad</Label>
+	              <div className='space-y-2'>
+	                <Label htmlFor='prioridad'>Prioridad</Label>
                 <select
                   id='prioridad'
                   className='form-input'
@@ -1642,24 +1737,11 @@ export function CaseForm({
                     </option>
                   ))}
                 </select>
-                {errors.prioridad && (
-                  <p className='text-sm text-red-600'>{errors.prioridad.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='etapa_actual'>Acto / etapa actual</Label>
-                <Input
-                  id='etapa_actual'
-                  placeholder='Ingreso demanda, Notificación, Contestación, Audiencia, etc.'
-                  {...register('etapa_actual')}
-                  disabled={isLoading}
-                />
-                {errors.etapa_actual && (
-                  <p className='text-sm text-red-600'>{errors.etapa_actual.message}</p>
-                )}
-              </div>
-            </div>
+	                {errors.prioridad && (
+	                  <p className='text-sm text-red-600'>{errors.prioridad.message}</p>
+	                )}
+	              </div>
+	            </div>
 
             <div className='space-y-2'>
               <Label htmlFor='observaciones'>Observaciones internas</Label>
@@ -1676,92 +1758,12 @@ export function CaseForm({
               {errors.observaciones && (
                 <p className='text-sm text-red-600'>{errors.observaciones.message}</p>
               )}
-            </div>
-          </section>
+	            </div>
+	          </section>
 
-          <section className='space-y-4'>
-            <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Primer hito: audiencia</h2>
-              <p className='text-sm text-gray-500'>
-                Define el tipo de audiencia que esperas como primer hito y si requerirá coordinación de testigos.
-              </p>
-            </div>
-
-            <div className='grid gap-4 md:grid-cols-2'>
-              <div className='space-y-3'>
-                <Label>Tipo de audiencia inicial</Label>
-                <div className='grid gap-2'>
-                  <label
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                      audienciaInicialTipo ? 'border-slate-200 bg-white text-slate-700' : 'border-slate-200 bg-slate-50 text-slate-600'
-                    }`}
-                  >
-                    <input
-                      type='radio'
-                      value=''
-                      className='text-slate-600'
-                      {...register('audiencia_inicial_tipo')}
-                    />
-                    Sin audiencia definida por ahora
-                  </label>
-                  {STAGE_AUDIENCE_TYPES.map((option) => (
-                    <label
-                      key={option.value}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                        audienciaInicialTipo === option.value
-                          ? 'border-sky-300 bg-sky-50 text-sky-700'
-                          : 'border-slate-200 bg-white text-slate-700'
-                      }`}
-                    >
-                      <input
-                        type='radio'
-                        value={option.value}
-                        className='text-slate-600'
-                        {...register('audiencia_inicial_tipo')}
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className='space-y-3'>
-                <Label>Participación de testigos</Label>
-                <Controller
-                  control={control}
-                  name='audiencia_inicial_requiere_testigos'
-                  render={({ field }) => (
-                    <label
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                        audienciaInicialTipo
-                          ? 'border-slate-200 bg-white text-slate-700'
-                          : 'border-dashed border-slate-200 bg-slate-50 text-slate-500'
-                      }`}
-                    >
-                      <input
-                        type='checkbox'
-                        className='rounded border-slate-300'
-                        checked={Boolean(field.value)}
-                        onChange={(event) => field.onChange(event.target.checked)}
-                        onBlur={field.onBlur}
-                        ref={field.ref}
-                        name={field.name}
-                        disabled={!audienciaInicialTipo}
-                      />
-                      Se coordinarán testigos para esta audiencia
-                    </label>
-                  )}
-                />
-                <p className='text-xs text-gray-500'>
-                  Esta marca solo aplica si defines una audiencia inicial y se reflejará en la primera etapa del timeline.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className='space-y-4'>
-            <div>
-              <h2 className='text-lg font-semibold text-gray-900'>Honorarios y cobro prepago</h2>
+	          <section className='space-y-4'>
+	            <div>
+	              <h2 className='text-lg font-semibold text-gray-900'>Honorarios y cobro prepago</h2>
               <p className='text-sm text-gray-500'>Define cómo se cobrará este caso. El timeline bloqueará etapas hasta registrar el pago correspondiente.</p>
             </div>
 
