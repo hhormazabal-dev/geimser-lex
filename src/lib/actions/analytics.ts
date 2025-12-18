@@ -793,6 +793,15 @@ export interface ClientPortfolioCase {
   workflow_state: string | null;
 }
 
+export interface ClientPortfolioLawyer {
+  id: string;
+  nombre: string | null;
+  totalCases: number;
+  activeCases: number;
+  urgentCases: number;
+  inReviewCases: number;
+}
+
 export interface ClientPortfolioItem {
   client: {
     id: string;
@@ -806,6 +815,7 @@ export interface ClientPortfolioItem {
   urgentCases: number;
   inReviewCases: number;
   cases: ClientPortfolioCase[];
+  lawyers?: ClientPortfolioLawyer[];
 }
 
 /**
@@ -878,6 +888,136 @@ export async function getClientPortfolio(
     return { success: true, data: portfolio.slice(0, Math.max(1, limit)) };
   } catch (error) {
     console.error('Error getting client portfolio:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Igual que getClientPortfolio, pero además agrega abogados patrocinantes por cliente (con conteos).
+ */
+export async function getClientPortfolioWithLawyers(
+  limit = 50,
+): Promise<{ success: boolean; data?: ClientPortfolioItem[]; error?: string }> {
+  try {
+    await requireAuth('admin_firma');
+    const supabase = await createServerClient();
+
+    const { data, error } = await supabase
+      .from('case_clients')
+      .select(
+        `
+        client:profiles!case_clients_client_profile_id_fkey(id, nombre, rut, email, telefono),
+        case:cases(
+          id,
+          caratulado,
+          estado,
+          prioridad,
+          etapa_actual,
+          fecha_inicio,
+          workflow_state,
+          abogado_responsable:profiles!cases_abogado_responsable_fkey(id, nombre)
+        )
+      `,
+      )
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const rows = (data as Array<Record<string, any>> | null) ?? [];
+    const byClient = new Map<
+      string,
+      ClientPortfolioItem & { _caseIds: Set<string>; _lawyers: Map<string, ClientPortfolioLawyer> }
+    >();
+
+    for (const row of rows) {
+      const client = row.client as ClientPortfolioItem['client'] | null;
+      const caseRow = row.case as (ClientPortfolioCase & { abogado_responsable?: { id: string; nombre: string | null } | null }) | null;
+      if (!client?.id || !caseRow?.id) continue;
+
+      const existing =
+        byClient.get(client.id) ??
+        ({
+          client,
+          totalCases: 0,
+          activeCases: 0,
+          urgentCases: 0,
+          inReviewCases: 0,
+          cases: [],
+          _caseIds: new Set<string>(),
+          _lawyers: new Map<string, ClientPortfolioLawyer>(),
+        } satisfies ClientPortfolioItem & {
+          _caseIds: Set<string>;
+          _lawyers: Map<string, ClientPortfolioLawyer>;
+        });
+
+      if (!existing._caseIds.has(caseRow.id)) {
+        existing._caseIds.add(caseRow.id);
+        existing.cases.push({
+          id: caseRow.id,
+          caratulado: caseRow.caratulado,
+          estado: caseRow.estado,
+          prioridad: caseRow.prioridad,
+          etapa_actual: caseRow.etapa_actual,
+          fecha_inicio: caseRow.fecha_inicio,
+          workflow_state: caseRow.workflow_state,
+        });
+      }
+
+      const lawyer = caseRow.abogado_responsable ?? null;
+      if (lawyer?.id) {
+        const summary =
+          existing._lawyers.get(lawyer.id) ??
+          ({
+            id: lawyer.id,
+            nombre: lawyer.nombre ?? null,
+            totalCases: 0,
+            activeCases: 0,
+            urgentCases: 0,
+            inReviewCases: 0,
+          } satisfies ClientPortfolioLawyer);
+
+        summary.totalCases += 1;
+        if (caseRow.estado === 'activo') summary.activeCases += 1;
+        if (caseRow.prioridad === 'urgente') summary.urgentCases += 1;
+        if ((caseRow.workflow_state ?? '').toString() === 'en_revision') summary.inReviewCases += 1;
+        existing._lawyers.set(lawyer.id, summary);
+      }
+
+      byClient.set(client.id, existing);
+    }
+
+    const portfolio = Array.from(byClient.values()).map((item) => {
+      const totalCases = item._caseIds.size;
+      const activeCases = item.cases.filter((c) => c.estado === 'activo').length;
+      const urgentCases = item.cases.filter((c) => c.prioridad === 'urgente').length;
+      const inReviewCases = item.cases.filter((c) => (c.workflow_state ?? '').toString() === 'en_revision').length;
+
+      const lawyers = Array.from(item._lawyers.values()).sort((a, b) => {
+        if (b.activeCases !== a.activeCases) return b.activeCases - a.activeCases;
+        if (b.totalCases !== a.totalCases) return b.totalCases - a.totalCases;
+        return (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es');
+      });
+
+      return {
+        client: item.client,
+        totalCases,
+        activeCases,
+        urgentCases,
+        inReviewCases,
+        cases: item.cases.sort((a, b) => (a.caratulado ?? '').localeCompare(b.caratulado ?? '', 'es')),
+        lawyers,
+      } satisfies ClientPortfolioItem;
+    });
+
+    portfolio.sort((a, b) => {
+      if (b.activeCases !== a.activeCases) return b.activeCases - a.activeCases;
+      if (b.urgentCases !== a.urgentCases) return b.urgentCases - a.urgentCases;
+      return b.totalCases - a.totalCases;
+    });
+
+    return { success: true, data: portfolio.slice(0, Math.max(1, limit)) };
+  } catch (error) {
+    console.error('Error getting client portfolio with lawyers:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }

@@ -113,7 +113,7 @@ export default function CasesPage() {
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-50 text-slate-900'>
-      <main className='mx-auto flex max-w-5xl flex-col gap-8 px-4 pb-12 pt-6 sm:px-6 lg:px-8'>
+      <main className='mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pb-12 pt-6 sm:px-6 lg:px-8'>
         <header className='space-y-2'>
           <p className='text-[11px] uppercase tracking-[0.25em] text-slate-400'>Gestión de cartera</p>
           <h1 className='text-2xl font-semibold tracking-tight'>Casos</h1>

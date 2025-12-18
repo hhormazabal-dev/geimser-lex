@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Users,
   UserPlus,
+  Building2,
   Briefcase,
   ClipboardList,
   FilePlus2,
@@ -23,25 +24,31 @@ interface PlatformLayoutProps {
 }
 
 function buildSidebarItems(role: Role): SidebarItem[] {
-  if (role === 'admin_firma') {
-    return [
-      {
-        href: '/dashboard/admin',
-        label: 'Panel ejecutivo',
-        description: 'Indicadores clave de la firma',
-        icon: <LayoutDashboard className="h-4 w-4" />,
-      },
-      {
-        href: '/cases',
-        label: 'Casos de la firma',
-        description: 'Visión global de expedientes activos',
-        icon: <FolderOpen className="h-4 w-4" />,
-      },
-      {
-        href: '/clients',
-        label: 'Clientes',
-        description: 'Crea perfiles antes de asignar casos',
-        icon: <UserPlus className="h-4 w-4" />,
+	  if (role === 'admin_firma') {
+	    return [
+	      {
+	        href: '/dashboard/admin',
+	        label: 'Panel ejecutivo',
+	        description: 'Indicadores clave de la firma',
+	        icon: <LayoutDashboard className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/cases',
+	        label: 'Casos de la firma',
+	        description: 'Visión global de expedientes activos',
+	        icon: <FolderOpen className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/dashboard/admin/clients',
+	        label: 'Cartera por cliente',
+	        description: 'Clientes, casos y abogados',
+	        icon: <Building2 className="h-4 w-4" />,
+	      },
+	      {
+	        href: '/clients',
+	        label: 'Clientes',
+	        description: 'Crea perfiles antes de asignar casos',
+	        icon: <UserPlus className="h-4 w-4" />,
       },
       {
         href: '/dashboard/admin/users',

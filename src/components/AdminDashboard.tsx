@@ -146,19 +146,27 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
                     <p className='mt-1 text-[11px] text-slate-500 capitalize'>{profile.role.replace('_', ' ')}</p>
                   </div>
                 </div>
-                <div className='flex items-center gap-2.5'>
-                  <Button
-                    asChild
-                    size='sm'
-                    className='rounded-full border border-slate-200 bg-slate-900 px-4 text-sm font-medium text-white shadow-sm hover:bg-slate-800'
-                  >
-                    <Link href='/dashboard/admin/users'>Gestionar usuarios</Link>
-                  </Button>
-                  <LogoutButton />
-                </div>
-              </div>
-            </div>
-          </section>
+	                <div className='flex items-center gap-2.5'>
+	                  <Button
+	                    asChild
+	                    size='sm'
+	                    className='rounded-full border border-slate-200 bg-slate-900 px-4 text-sm font-medium text-white shadow-sm hover:bg-slate-800'
+	                  >
+	                    <Link href='/dashboard/admin/users'>Gestionar usuarios</Link>
+	                  </Button>
+	                  <Button
+	                    asChild
+	                    size='sm'
+	                    variant='outline'
+	                    className='rounded-full border-slate-200 bg-white/80 px-4 text-sm font-medium text-slate-700 hover:bg-white'
+	                  >
+	                    <Link href='/dashboard/admin/clients'>Cartera por cliente</Link>
+	                  </Button>
+	                  <LogoutButton />
+	                </div>
+	              </div>
+	            </div>
+	          </section>
 
           <section className='space-y-5'>
             <h2 className='text-base font-semibold text-slate-800'>Indicadores destacados</h2>
