@@ -78,6 +78,21 @@ export function PjudCausesLookup() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CausesResponseOk | null>(null);
 
+  const friendlyError = (raw: string) => {
+    const msg = raw.trim();
+    if (!msg) return 'Ocurrió un error.';
+    if (normalizeText(msg).includes('no se pudo conectar a ojv')) {
+      return `${msg} Esto suele pasar cuando el servidor (Vercel) no tiene acceso a la red de PJUD desde su región.`;
+    }
+    if (normalizeText(msg).includes('timeout conectando a ojv')) {
+      return `${msg} Intenta nuevamente o configura la ejecución en una región LATAM.`;
+    }
+    if (normalizeText(msg) === 'fetch failed') {
+      return 'No se pudo conectar a PJUD desde el servidor (fetch failed). Esto suele ser bloqueo de red/región.';
+    }
+    return msg;
+  };
+
   useEffect(() => {
     let canceled = false;
     setOptionsLoading(true);
@@ -110,7 +125,7 @@ export function PjudCausesLookup() {
       })
       .catch((e: any) => {
         if (canceled) return;
-        setOptionsError(e?.message ?? 'No se pudieron cargar opciones PJUD.');
+        setOptionsError(friendlyError(e?.message ?? 'No se pudieron cargar opciones PJUD.'));
         setSelects([]);
       })
       .finally(() => {
@@ -168,7 +183,7 @@ export function PjudCausesLookup() {
 
       setResult(json);
     } catch (e: any) {
-      setError(e?.message ?? 'No se pudo ejecutar la consulta PJUD.');
+      setError(friendlyError(e?.message ?? 'No se pudo ejecutar la consulta PJUD.'));
     } finally {
       setLoading(false);
     }
@@ -374,4 +389,3 @@ export function PjudCausesLookup() {
     </Card>
   );
 }
-

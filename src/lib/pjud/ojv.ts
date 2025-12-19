@@ -8,6 +8,8 @@ type AnyNode = any;
 export const OJV_BASE_URL =
   process.env.PJUD_OJV_BASE_URL?.trim() || 'https://oficinajudicialvirtual.pjud.cl/indexN.php';
 
+const OJV_TIMEOUT_MS = Number(process.env.PJUD_OJV_TIMEOUT_MS ?? 25_000);
+
 export type OJVCausesPerLegalPersonInput = {
   rut: string;
   contextValue: string;
@@ -269,11 +271,24 @@ async function fetchWithJar(
   url: string,
   init?: RequestInit,
 ): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OJV_TIMEOUT_MS);
+
   const headers = new Headers(init?.headers ?? {});
   const cookieHeader = jarToCookieHeader(jar);
   if (cookieHeader) headers.set('cookie', cookieHeader);
   headers.set('user-agent', headers.get('user-agent') ?? 'Mozilla/5.0 (compatible; GeimserLexBot/1.0)');
-  const resp = await fetch(url, { ...init, headers, redirect: 'follow' });
+  let resp: Response;
+  try {
+    resp = await fetch(url, { ...init, headers, redirect: 'follow', signal: controller.signal });
+  } catch (e: any) {
+    const msg = e?.name === 'AbortError'
+      ? `PJUD: timeout conectando a OJV (${OJV_TIMEOUT_MS}ms).`
+      : `PJUD: no se pudo conectar a OJV (${e?.message ?? 'fetch failed'}).`;
+    throw new Error(msg);
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const setCookies = (resp.headers as any).getSetCookie?.() as string[] | undefined;
   for (const { name, value } of parseSetCookies(setCookies)) jar.set(name, value);

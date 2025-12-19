@@ -3,6 +3,8 @@ import { ojvScrapeSearchSelects } from '@/lib/pjud/ojv';
 import { requireAuth } from '@/lib/auth/roles';
 
 export const runtime = 'nodejs';
+export const preferredRegion = ['gru1'];
+export const maxDuration = 60;
 
 function requireApiKey(req: Request) {
   const required = process.env.SERVICES_API_KEY?.trim();
