@@ -13,6 +13,7 @@ import { DocumentsPanel } from '@/components/DocumentsPanel';
 import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
+import { DailyStatementsPanel } from '@/components/DailyStatementsPanel';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
 import { useToast } from '@/hooks/use-toast';
@@ -87,7 +88,7 @@ interface CaseDetailViewProps {
 
 export function CaseDetailView({ case: caseData, profile, messages }: CaseDetailViewProps) {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'timeline' | 'documents' | 'activity' | 'notes' | 'messages' | 'requests' | 'clients'
+    'overview' | 'timeline' | 'documents' | 'activity' | 'daily' | 'notes' | 'messages' | 'requests' | 'clients'
   >('overview');
   const router = useRouter();
   const { toast } = useToast();
@@ -141,6 +142,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     ruc: null,
     comunaCode: null,
     tribunalId: null,
+    tipoJuzgado: null,
   });
   const [isSavingPjudLink, setIsSavingPjudLink] = useState(false);
 
@@ -193,6 +195,9 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         rit: pjudLinkDraft.rit?.trim() ? pjudLinkDraft.rit.trim() : null,
         tribunal: pjudLinkDraft.tribunal?.trim() ? pjudLinkDraft.tribunal.trim() : null,
         ruc: pjudLinkDraft.ruc?.trim() ? pjudLinkDraft.ruc.trim() : null,
+        comunaCode: pjudLinkDraft.comunaCode?.trim() ? pjudLinkDraft.comunaCode.trim() : null,
+        tribunalId: pjudLinkDraft.tribunalId?.trim() ? pjudLinkDraft.tribunalId.trim() : null,
+        tipoJuzgado: pjudLinkDraft.tipoJuzgado?.trim() ? pjudLinkDraft.tipoJuzgado.trim() : null,
       };
       const result = await upsertCasePjudLink({ caseId: caseData.id, payload });
       if (result.success && result.link) {
@@ -589,6 +594,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     { id: 'timeline', label: 'Timeline', icon: Clock },
     { id: 'documents', label: 'Documentos', icon: FileText },
     { id: 'activity', label: 'Actividad', icon: ClipboardList },
+    { id: 'daily', label: 'Estado Diario', icon: Calendar },
     { id: 'notes', label: 'Notas', icon: MessageCircle },
     { id: 'messages', label: 'Mensajes', icon: MessageCircle },
     { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
@@ -1143,6 +1149,28 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         placeholder="Ej: 2300xxxxxx-x"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pjud_cod_tribunal">Código tribunal (cod_tribunal)</Label>
+                      <Input
+                        id="pjud_cod_tribunal"
+                        value={pjudLinkDraft.tribunalId ?? ''}
+                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, tribunalId: e.target.value }))}
+                        placeholder="Ej: 4413301"
+                        inputMode="numeric"
+                      />
+                      <p className="text-xs text-foreground/50">Requerido para “Estado Diario”.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pjud_tipo_juzgado">Tipo juzgado (tipo_juzgado)</Label>
+                      <Input
+                        id="pjud_tipo_juzgado"
+                        value={pjudLinkDraft.tipoJuzgado ?? ''}
+                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, tipoJuzgado: e.target.value }))}
+                        placeholder="Ej: 8"
+                        inputMode="numeric"
+                      />
+                      <p className="text-xs text-foreground/50">Requerido para “Estado Diario”.</p>
+                    </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="pjud_tribunal">Tribunal</Label>
                       <Input
@@ -1265,6 +1293,13 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {activeTab === 'daily' && (
+            <DailyStatementsPanel
+              caseId={caseData.id}
+              caseNumeroCausa={caseData.numero_causa ?? null}
+            />
           )}
 
           {activeTab === 'notes' && (

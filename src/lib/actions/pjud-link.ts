@@ -9,6 +9,7 @@ export type PjudLinkPayload = {
   tribunal?: string | null;
   comunaCode?: string | null;
   tribunalId?: string | null;
+  tipoJuzgado?: string | null;
 };
 
 export type CaseExternalRefRow = {
@@ -136,4 +137,3 @@ export async function createManualCaseEvent(input: {
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
-
