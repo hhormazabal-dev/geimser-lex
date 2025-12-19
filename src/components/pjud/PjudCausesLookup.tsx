@@ -41,6 +41,9 @@ type CausesResponseErr = {
 
 type CausesResponse = CausesResponseOk | CausesResponseErr;
 
+type CompanionOptions = { baseUrl: string; selects: OJVSelect[] };
+type CompanionLookup = { rows: any[] };
+
 function normalizeText(v: string) {
   return v
     .toLowerCase()
@@ -61,9 +64,79 @@ function pickSelect(selects: OJVSelect[], keywords: string[]) {
   return scored[0]?.score ? scored[0].s : null;
 }
 
+function normalizeCauseRowFromTable(row: Record<string, any>) {
+  const keys = Object.keys(row);
+  const get = (...needles: string[]) => {
+    const found = keys.find((k) => needles.some((n) => normalizeText(k).includes(n)));
+    const v = found ? row[found] : '';
+    return typeof v === 'string' ? v : v == null ? '' : String(v);
+  };
+
+  const sourceUrl = typeof row.SourceUrl === 'string' ? row.SourceUrl : null;
+
+  return {
+    AdministrativeStatus: get('situaci', 'admin') || '',
+    CauseState: get('estado') || '',
+    Court: get('tribunal', 'juzgado', 'corte') || '',
+    Date: get('fecha') || '',
+    Labeled: get('caratul', 'caratula', 'carátul') || '',
+    Litigant: [],
+    Procedure: get('proced') || '',
+    Resource: get('recurso') || '',
+    Role: get('rol', 'rit') || '',
+    Ruc: get('ruc') || '',
+    Ubication: get('ubic') || '',
+    SourceUrl: sourceUrl,
+  };
+}
+
+declare global {
+  interface Window {
+    __PJUD_COMPANION__?: unknown;
+  }
+}
+
+const CHANNEL_REQUEST = 'PJUD_COMPANION_REQUEST';
+const CHANNEL_RESPONSE = 'PJUD_COMPANION_RESPONSE';
+
+function randomId() {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+function companionRequest<T>(action: 'PING' | 'OPTIONS' | 'LOOKUP', payload?: any, timeoutMs = 4000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const requestId = randomId();
+    const timer = window.setTimeout(() => {
+      window.removeEventListener('message', onMessage);
+      reject(new Error('Companion no disponible. Abre la extensión y presiona “Conectar a esta pestaña”.'));
+    }, timeoutMs);
+
+    function onMessage(event: MessageEvent) {
+      if (event.source !== window) return;
+      const msg = event.data;
+      if (!msg || msg.type !== CHANNEL_RESPONSE) return;
+      if (msg.requestId !== requestId) return;
+      window.clearTimeout(timer);
+      window.removeEventListener('message', onMessage);
+
+      if (msg.ok) resolve(msg.data as T);
+      else reject(new Error(msg.error ?? 'Error Companion'));
+    }
+
+    window.addEventListener('message', onMessage);
+    window.postMessage({ type: CHANNEL_REQUEST, requestId, action, payload }, '*');
+  });
+}
+
 export function PjudCausesLookup() {
   const [rut, setRut] = useState('');
   const [detail, setDetail] = useState(false);
+
+  const [companionStatus, setCompanionStatus] = useState<'unknown' | 'connected' | 'missing'>('unknown');
 
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [optionsError, setOptionsError] = useState<string | null>(null);
@@ -98,22 +171,19 @@ export function PjudCausesLookup() {
     setOptionsLoading(true);
     setOptionsError(null);
 
-    fetch('/v1/cl/services/pjud.cl/causes-per-legal-person/options')
-      .then(async (res) => {
-        const json = (await res.json().catch(() => null)) as OptionsResponse | null;
-        if (!res.ok || !json || (json as any).success !== true) {
-          const msg = (json as any)?.error ?? `No se pudieron cargar opciones PJUD (${res.status}).`;
-          throw new Error(msg);
-        }
-        return json as Extract<OptionsResponse, { success: true }>;
-      })
-      .then((json) => {
-        if (canceled) return;
-        setSelects(json.selects ?? []);
+    (async () => {
+      // 1) Intentar vía Companion (más robusto si PJUD bloquea server-side)
+      try {
+        await companionRequest<{ ok: true; version: string }>('PING', null, 800);
+        setCompanionStatus('connected');
 
+        const data = await companionRequest<CompanionOptions>('OPTIONS', null, 15000);
+        if (canceled) return;
+
+        setSelects(data.selects ?? []);
         const contextSel =
-          pickSelect(json.selects, ['compet', 'competencia', 'materia', 'jurisd']) ?? json.selects[0] ?? null;
-        const courtSel = pickSelect(json.selects, ['corte', 'tribunal', 'juzgado', 'court']);
+          pickSelect(data.selects, ['compet', 'competencia', 'materia', 'jurisd']) ?? data.selects[0] ?? null;
+        const courtSel = pickSelect(data.selects, ['corte', 'tribunal', 'juzgado', 'court']);
 
         if (contextSel?.name) setContextSelectName(contextSel.name);
         if (courtSel?.name) setCourtSelectName(courtSel.name);
@@ -122,16 +192,53 @@ export function PjudCausesLookup() {
         const crtVal = courtSel?.options?.find((o) => o.value)?.value ?? '';
         setContextValue(ctxVal);
         setCourtValue(crtVal);
-      })
-      .catch((e: any) => {
-        if (canceled) return;
-        setOptionsError(friendlyError(e?.message ?? 'No se pudieron cargar opciones PJUD.'));
-        setSelects([]);
-      })
-      .finally(() => {
-        if (canceled) return;
+
         setOptionsLoading(false);
-      });
+        return;
+      } catch {
+        setCompanionStatus('missing');
+      }
+
+      // 2) Fallback server-side
+      fetch('/v1/cl/services/pjud.cl/causes-per-legal-person/options')
+        .then(async (res) => {
+          const json = (await res.json().catch(() => null)) as OptionsResponse | null;
+          if (!res.ok || !json || (json as any).success !== true) {
+            const msg = (json as any)?.error ?? `No se pudieron cargar opciones PJUD (${res.status}).`;
+            throw new Error(msg);
+          }
+          return json as Extract<OptionsResponse, { success: true }>;
+        })
+        .then((json) => {
+          if (canceled) return;
+          setSelects(json.selects ?? []);
+
+          const contextSel =
+            pickSelect(json.selects, ['compet', 'competencia', 'materia', 'jurisd']) ?? json.selects[0] ?? null;
+          const courtSel = pickSelect(json.selects, ['corte', 'tribunal', 'juzgado', 'court']);
+
+          if (contextSel?.name) setContextSelectName(contextSel.name);
+          if (courtSel?.name) setCourtSelectName(courtSel.name);
+
+          const ctxVal = contextSel?.options?.find((o) => o.value)?.value ?? '';
+          const crtVal = courtSel?.options?.find((o) => o.value)?.value ?? '';
+          setContextValue(ctxVal);
+          setCourtValue(crtVal);
+        })
+        .catch((e: any) => {
+          if (canceled) return;
+          setOptionsError(friendlyError(e?.message ?? 'No se pudieron cargar opciones PJUD.'));
+          setSelects([]);
+        })
+        .finally(() => {
+          if (canceled) return;
+          setOptionsLoading(false);
+        });
+    })().catch((e) => {
+      if (canceled) return;
+      setOptionsError(friendlyError(e?.message ?? 'No se pudieron cargar opciones PJUD.'));
+      setOptionsLoading(false);
+    });
 
     return () => {
       canceled = true;
@@ -158,6 +265,34 @@ export function PjudCausesLookup() {
 
     setLoading(true);
     try {
+      // Preferir Companion si está conectado
+      if (companionStatus === 'connected') {
+        const lookup = await companionRequest<CompanionLookup>(
+          'LOOKUP',
+          {
+            rut,
+            contextValue,
+            courtValue: courtValue.trim().length > 0 ? courtValue : null,
+            contextSelectName: contextSelectName || null,
+            courtSelectName: courtSelectName || null,
+            detail,
+          },
+          60000,
+        );
+
+        const causes = (lookup.rows ?? []).map((row) => normalizeCauseRowFromTable(row ?? {}));
+
+        setResult({
+          OperationId: `companion_${Date.now()}`,
+          Status: 'OK',
+          Data: { Causes: causes },
+          AdditionalInformation: null,
+          Error: null,
+          LifeSpan: null,
+        });
+        return;
+      }
+
       const res = await fetch('/v1/cl/services/pjud.cl/causes-per-legal-person', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -204,6 +339,13 @@ export function PjudCausesLookup() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-6">
+        {companionStatus !== 'connected' && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Para máxima compatibilidad, instala/usa la extensión <span className="font-semibold">PJUD Companion</span>{' '}
+            y presiona “Conectar a esta pestaña”.
+          </div>
+        )}
+
         {optionsLoading && <p className="text-sm text-foreground/60">Cargando opciones de PJUD…</p>}
         {optionsError && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

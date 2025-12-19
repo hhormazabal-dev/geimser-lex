@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "PJUD Companion (Geimser Lex)",
+  "version": "0.1.0",
+  "description": "Ejecuta consultas PJUD/OJV desde el navegador del usuario y las devuelve a la plataforma.",
+  "permissions": ["tabs", "scripting", "storage", "activeTab"],
+  "host_permissions": ["https://oficinajudicialvirtual.pjud.cl/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "PJUD Companion",
+    "default_popup": "popup.html"
+  }
+}
+
