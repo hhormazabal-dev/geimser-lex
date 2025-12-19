@@ -14,28 +14,25 @@ import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { DailyStatementsPanel } from '@/components/DailyStatementsPanel';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
 import { useToast } from '@/hooks/use-toast';
 import { authorizeCaseAdvance, assignLawyer, listAvailableLawyers } from '@/lib/actions/cases';
 import { createCaseCounterparty, deleteCaseCounterparty } from '@/lib/actions/counterparties';
 import {
-  getCasePjudLink,
-  upsertCasePjudLink,
   listCaseEvents,
   createManualCaseEvent,
   type CaseEventRow,
-  type CaseExternalRefRow,
-  type PjudLinkPayload,
 } from '@/lib/actions/pjud-link';
 import {
   ArrowLeft,
   Scale,
+  FolderOpen,
   FileText,
   Clock,
   MessageCircle,
   ClipboardList,
-  Link2,
   User,
   Phone,
   Mail,
@@ -135,17 +132,6 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       : [],
   );
 
-  const [pjudLinkRow, setPjudLinkRow] = useState<CaseExternalRefRow | null>(null);
-  const [pjudLinkDraft, setPjudLinkDraft] = useState<PjudLinkPayload>({
-    rit: caseData.numero_causa ?? '',
-    tribunal: caseData.tribunal ?? '',
-    ruc: null,
-    comunaCode: null,
-    tribunalId: null,
-    tipoJuzgado: null,
-  });
-  const [isSavingPjudLink, setIsSavingPjudLink] = useState(false);
-
   const [caseEvents, setCaseEvents] = useState<CaseEventRow[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
@@ -156,20 +142,9 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   useEffect(() => {
     let canceled = false;
     setIsLoadingEvents(true);
-    Promise.all([getCasePjudLink(caseData.id), listCaseEvents(caseData.id, 50)])
-      .then(([linkRes, eventsRes]) => {
+    Promise.all([listCaseEvents(caseData.id, 50)])
+      .then(([eventsRes]) => {
         if (canceled) return;
-        if (linkRes.success) {
-	          setPjudLinkRow(linkRes.link ?? null);
-	          if (linkRes.link?.payload) {
-	            setPjudLinkDraft((prev) => ({
-	              ...prev,
-	              ...linkRes.link!.payload,
-	              rit: linkRes.link!.payload?.rit ?? prev.rit ?? '',
-	              tribunal: linkRes.link!.payload?.tribunal ?? prev.tribunal ?? '',
-	            }));
-	          }
-	        }
         if (eventsRes.success) {
           setCaseEvents(eventsRes.events ?? []);
         }
@@ -186,33 +161,6 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       canceled = true;
     };
   }, [caseData.id]);
-
-  const handleSavePjudLink = async () => {
-    setIsSavingPjudLink(true);
-    try {
-      const payload: PjudLinkPayload = {
-        ...pjudLinkDraft,
-        rit: pjudLinkDraft.rit?.trim() ? pjudLinkDraft.rit.trim() : null,
-        tribunal: pjudLinkDraft.tribunal?.trim() ? pjudLinkDraft.tribunal.trim() : null,
-        ruc: pjudLinkDraft.ruc?.trim() ? pjudLinkDraft.ruc.trim() : null,
-        comunaCode: pjudLinkDraft.comunaCode?.trim() ? pjudLinkDraft.comunaCode.trim() : null,
-        tribunalId: pjudLinkDraft.tribunalId?.trim() ? pjudLinkDraft.tribunalId.trim() : null,
-        tipoJuzgado: pjudLinkDraft.tipoJuzgado?.trim() ? pjudLinkDraft.tipoJuzgado.trim() : null,
-      };
-      const result = await upsertCasePjudLink({ caseId: caseData.id, payload });
-      if (result.success && result.link) {
-        setPjudLinkRow(result.link);
-        toast({ title: 'Vinculación guardada', description: 'Se guardó el vínculo PJUD para el expediente.' });
-      } else {
-        toast({ title: 'No se pudo guardar', description: result.error, variant: 'destructive' });
-      }
-    } catch (error) {
-      console.error('[CaseDetailView] handleSavePjudLink error', error);
-      toast({ title: 'Error inesperado', description: 'No se pudo guardar la vinculación.', variant: 'destructive' });
-    } finally {
-      setIsSavingPjudLink(false);
-    }
-  };
 
   const handleCreateEvent = async () => {
     const title = eventDraft.title.trim();
@@ -589,84 +537,114 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     }
   };
 
-  const tabs = [
-    { id: 'overview', label: 'Resumen', icon: Scale },
-    { id: 'timeline', label: 'Timeline', icon: Clock },
-    { id: 'documents', label: 'Documentos', icon: FileText },
-    { id: 'activity', label: 'Actividad', icon: ClipboardList },
-    { id: 'daily', label: 'Estado Diario', icon: Calendar },
-    { id: 'notes', label: 'Notas', icon: MessageCircle },
-    { id: 'messages', label: 'Mensajes', icon: MessageCircle },
-    { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
-    ...(canManageClients ? [{ id: 'clients', label: 'Clientes', icon: Users }] : []),
-  ] as const;
+  const tabs = useMemo(() => {
+    const base: Array<{
+      id:
+        | 'overview'
+        | 'timeline'
+        | 'documents'
+        | 'activity'
+        | 'daily'
+        | 'notes'
+        | 'messages'
+        | 'requests'
+        | 'clients';
+      label: string;
+      icon: any;
+      count?: number;
+    }> = [
+      { id: 'overview', label: 'Resumen', icon: Scale },
+      { id: 'timeline', label: 'Timeline', icon: Clock },
+      { id: 'documents', label: 'Documentos', icon: FileText },
+      { id: 'activity', label: 'Actividad', icon: ClipboardList, count: caseEvents.length },
+      { id: 'daily', label: 'Estado Diario', icon: Calendar },
+      { id: 'notes', label: 'Notas', icon: MessageCircle },
+      { id: 'messages', label: 'Mensajes', icon: MessageCircle, count: messages.length },
+      { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
+    ];
+
+    if (canManageClients) {
+      base.push({
+        id: 'clients',
+        label: 'Clientes',
+        icon: Users,
+        count: caseData.clients?.length ?? 0,
+      });
+    }
+
+    return base;
+  }, [canManageClients, caseData.clients?.length, caseEvents.length, messages.length]);
+
+  useEffect(() => {
+    const raw = window.location.hash?.replace('#', '').trim();
+    if (!raw) return;
+    const target = tabs.find((t) => t.id === raw);
+    if (target) {
+      setActiveTab(target.id as typeof activeTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const nextHash = `#${activeTab}`;
+    if (window.location.hash !== nextHash) {
+      window.history.replaceState(null, '', nextHash);
+    }
+  }, [activeTab]);
 
   return (
-    <div className="relative min-h-screen pb-16">
-      {/* Header */}
-      <div className="sticky top-0 z-40 border-b border-white/40 bg-white/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+    <div className="space-y-8 pb-12">
+      <PageHeader
+        eyebrow="Expediente"
+        title={caseData.caratulado}
+        description={
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {caseData.numero_causa && (
+              <span className="inline-flex items-center gap-1">
+                <Scale className="h-4 w-4 text-primary" />
+                <span className="text-foreground/70">Causa:</span> {caseData.numero_causa}
+              </span>
+            )}
+            {caseData.materia && (
+              <span className="inline-flex items-center gap-1">
+                <FolderOpen className="h-4 w-4 text-primary" />
+                <span className="text-foreground/70">Materia:</span> {caseData.materia}
+              </span>
+            )}
+          </span>
+        }
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-2xl border border-white/25 bg-white/50 px-3 text-foreground/70 shadow-sm hover:bg-white hover:text-foreground"
+              onClick={() => router.back()}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Button>
+            {canEdit && (
               <Button
-                variant="ghost"
+                asChild
                 size="sm"
-                className="rounded-full border border-white/40 px-4 text-sm font-medium text-foreground/70 hover:text-foreground"
-                onClick={() => router.back()}
+                className="rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
+                <Link href={`/cases/${caseData.id}/edit`}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </Link>
               </Button>
-              <div className="h-6 w-px bg-gray-300" />
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-slate-200/40 text-blue-600">
-                <Scale className="h-5 w-5" />
-              </div>
-              <div>
-                <h1 className="text-base font-semibold text-foreground">Detalle del Caso</h1>
-                <p className="text-sm text-foreground/50">Lex Chile · Suite Studio</p>
-              </div>
-            </div>
+            )}
+          </>
+        }
+      />
 
-            <div className="flex items-center space-x-3">
-              {canEdit && (
-                <Button
-                  asChild
-                  size="sm"
-                  variant="ghost"
-                  className="rounded-full border border-white/40 px-4 text-sm font-medium text-foreground/70 hover:text-foreground"
-                >
-                  <Link href={`/cases/${caseData.id}/edit`}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Editar Caso
-                  </Link>
-                </Button>
-              )}
-              <div className="text-right">
-                <p className="text-sm font-medium text-foreground">{profile.nombre}</p>
-                <p className="text-xs text-foreground/50 capitalize">
-                  {profile.role.replace('_', ' ')}
-                </p>
-              </div>
-              <div
-                className="h-8 w-8 rounded-full flex items-center justify-center text-white font-medium text-sm"
-                style={{ backgroundColor: stringToColor(profile.nombre) }}
-              >
-                {getInitials(profile.nombre)}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Header del caso */}
         <Card className="mb-10 shadow-[0_35px_65px_-34px_rgba(15,23,42,0.45)]">
           <CardContent className="pt-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="flex-1">
-                <h2 className="text-3xl font-semibold text-foreground mb-2 tracking-tight">
-                  {caseData.caratulado}
-                </h2>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-foreground/60">
                   {caseData.numero_causa && (
                     <span className="flex items-center">
@@ -812,7 +790,9 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                           {caseData.nombre_cliente}
                         </p>
                         {caseData.rut_cliente && (
-                          <p className="mt-1 text-sm text-foreground/60">RUT · {caseData.rut_cliente}</p>
+                          <p suppressHydrationWarning className="mt-1 text-sm text-foreground/60">
+                            RUT · {caseData.rut_cliente}
+                          </p>
                         )}
                       </div>
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-600">
@@ -1008,22 +988,32 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         </Card>
 
         {/* Tabs de navegación */}
-        <div className="mb-8 flex justify-center">
-          <nav className="flex items-center gap-2 rounded-full border border-white/40 bg-white/70 px-2 py-1 text-sm font-medium shadow-sm backdrop-blur-xl">
+        <div className="sticky top-16 z-40 -mx-4 border-y border-white/20 bg-white/65 py-3 backdrop-blur-2xl sm:-mx-6 lg:-mx-8">
+          <nav className="mx-auto flex w-full max-w-[1600px] items-center justify-start gap-2 overflow-x-auto px-4 sm:px-6 lg:px-8">
             {tabs.map((tab) => {
               const Icon = tab.icon;
+              const count = tab.count ?? 0;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 transition-all ${
+                  className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
                     activeTab === tab.id
                       ? 'bg-foreground text-white shadow-md'
-                      : 'text-foreground/55 hover:bg-white/60 hover:text-foreground'
+                      : 'border border-white/20 bg-white/40 text-foreground/60 hover:bg-white/70 hover:text-foreground'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
                   <span>{tab.label}</span>
+                  {count > 0 && (
+                    <span
+                      className={`ml-1 inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
+                      }`}
+                    >
+                      {count > 99 ? '99+' : count}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1031,7 +1021,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         </div>
 
         {/* Contenido de las tabs */}
-        <div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+          <div className="min-w-0">
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,4.5fr)_minmax(0,2.5fr)] xl:items-start">
               <div className="space-y-6">
@@ -1121,92 +1112,6 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Link2 className="h-5 w-5" />
-                    Vinculación PJUD (base)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-foreground/60">
-                    Guarda el identificador de causa (RIT/Rol/RUC) y el tribunal para habilitar sincronización futura.
-                  </p>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="pjud_rit">RIT / Rol</Label>
-                      <Input
-                        id="pjud_rit"
-                        value={pjudLinkDraft.rit ?? ''}
-                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, rit: e.target.value }))}
-                        placeholder="Ej: O-1874-2025 / C-4764-2025"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pjud_ruc">RUC (penal, opcional)</Label>
-                      <Input
-                        id="pjud_ruc"
-                        value={pjudLinkDraft.ruc ?? ''}
-                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, ruc: e.target.value }))}
-                        placeholder="Ej: 2300xxxxxx-x"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pjud_cod_tribunal">Código tribunal (cod_tribunal)</Label>
-                      <Input
-                        id="pjud_cod_tribunal"
-                        value={pjudLinkDraft.tribunalId ?? ''}
-                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, tribunalId: e.target.value }))}
-                        placeholder="Ej: 4413301"
-                        inputMode="numeric"
-                      />
-                      <p className="text-xs text-foreground/50">Requerido para “Estado Diario”.</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pjud_tipo_juzgado">Tipo juzgado (tipo_juzgado)</Label>
-                      <Input
-                        id="pjud_tipo_juzgado"
-                        value={pjudLinkDraft.tipoJuzgado ?? ''}
-                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, tipoJuzgado: e.target.value }))}
-                        placeholder="Ej: 8"
-                        inputMode="numeric"
-                      />
-                      <p className="text-xs text-foreground/50">Requerido para “Estado Diario”.</p>
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="pjud_tribunal">Tribunal</Label>
-                      <Input
-                        id="pjud_tribunal"
-                        value={pjudLinkDraft.tribunal ?? ''}
-                        onChange={(e) => setPjudLinkDraft((prev) => ({ ...prev, tribunal: e.target.value }))}
-                        placeholder="Ej: 1° Juzgado de Letras del Trabajo de Santiago"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-xs text-foreground/60">
-                      {pjudLinkRow?.updated_at ? (
-                        <>Última actualización: {formatDate(pjudLinkRow.updated_at)}</>
-                      ) : (
-                        <>Aún no se ha guardado vínculo PJUD.</>
-                      )}
-                      {pjudLinkRow?.last_synced_at ? ` · última sync: ${formatDate(pjudLinkRow.last_synced_at)}` : ''}
-                    </div>
-                    <Button type="button" onClick={handleSavePjudLink} disabled={isSavingPjudLink}>
-                      {isSavingPjudLink ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Guardando...
-                        </>
-                      ) : (
-                        'Guardar vínculo'
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
                   <CardTitle className="flex items-center justify-between gap-3">
                     <span className="flex items-center gap-2">
                       <ClipboardList className="h-5 w-5" />
@@ -1221,7 +1126,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                       <Label htmlFor="event_kind">Tipo</Label>
                       <select
                         id="event_kind"
-                        className="form-input"
+                        className="h-11 w-full rounded-2xl border border-white/25 bg-white/60 px-4 text-sm text-foreground shadow-inner outline-none transition focus:border-primary/40 focus:bg-white/85 focus:ring-2 focus:ring-primary/20"
                         value={eventDraft.kind}
                         onChange={(e) =>
                           setEventDraft((prev) => ({ ...prev, kind: e.target.value as any }))
@@ -1270,23 +1175,25 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                       {caseEvents.slice(0, 30).map((event) => (
                         <div
                           key={event.id}
-                          className="rounded-2xl border border-slate-100 bg-white px-4 py-3"
+                          className="rounded-2xl border border-white/20 bg-white/55 px-4 py-3"
                         >
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div>
-                              <p className="text-sm font-semibold text-slate-900">{event.title}</p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-sm font-semibold text-foreground">{event.title}</p>
+                              <p className="text-xs text-foreground/55">
                                 {event.kind} · {formatDate(event.occurred_at)}
                               </p>
                             </div>
-                            <Badge variant="outline" className="border-slate-200 text-slate-600 w-fit">
+                            <Badge variant="outline" className="w-fit">
                               {event.provider}
                             </Badge>
                           </div>
                         </div>
                       ))}
                       {caseEvents.length > 30 && (
-                        <p className="text-xs text-slate-500">Mostrando 30 de {caseEvents.length} eventos.</p>
+                        <p className="text-xs text-foreground/55">
+                          Mostrando 30 de {caseEvents.length} eventos.
+                        </p>
                       )}
                     </div>
                   )}
@@ -1332,45 +1239,45 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           {activeTab === 'clients' && canManageClients && (
             <div className="space-y-6">
               {/* Lista de clientes asociados */}
-              {caseData.clients && caseData.clients.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Clientes Asociados ({caseData.clients.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {caseData.clients.map((client) => (
-                        <div
-                          key={client.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className="h-10 w-10 rounded-full flex items-center justify-center text-white font-medium"
-                              style={{ backgroundColor: stringToColor(client.nombre) }}
-                            >
-                              {getInitials(client.nombre)}
-                            </div>
-                            <div>
-                              <h4 className="font-medium text-gray-900">{client.nombre}</h4>
-                              <div className="flex items-center space-x-4 text-sm text-gray-500">
-                                <span className="flex items-center">
-                                  <Mail className="h-3 w-3 mr-1" />
-                                  {client.email}
-                                </span>
-                                {client.telefono && (
-                                  <span className="flex items-center">
-                                    <Phone className="h-3 w-3 mr-1" />
-                                    {client.telefono}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <Badge variant="outline">Cliente</Badge>
+	              {caseData.clients && caseData.clients.length > 0 && (
+	                <Card>
+	                  <CardHeader>
+	                    <CardTitle className="flex items-center gap-2">
+	                      <Users className="h-5 w-5" />
+	                      Clientes Asociados ({caseData.clients.length})
+	                    </CardTitle>
+	                  </CardHeader>
+	                  <CardContent>
+	                    <div className="space-y-3">
+	                      {caseData.clients.map((client) => (
+	                        <div
+	                          key={client.id}
+	                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-4 py-3"
+	                        >
+	                          <div className="flex items-center space-x-3">
+	                            <div
+	                              className="flex h-10 w-10 items-center justify-center rounded-2xl text-white font-medium"
+	                              style={{ backgroundColor: stringToColor(client.nombre) }}
+	                            >
+	                              {getInitials(client.nombre)}
+	                            </div>
+	                            <div>
+	                              <h4 className="font-semibold text-foreground">{client.nombre}</h4>
+	                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground/55">
+	                                <span className="flex items-center">
+	                                  <Mail className="mr-1 h-3 w-3" />
+	                                  {client.email}
+	                                </span>
+	                                {client.telefono && (
+	                                  <span className="flex items-center">
+	                                    <Phone className="mr-1 h-3 w-3" />
+	                                    {client.telefono}
+	                                  </span>
+	                                )}
+	                              </div>
+	                            </div>
+	                          </div>
+	                          <Badge variant="outline">Cliente</Badge>
                         </div>
                       ))}
                     </div>
@@ -1406,14 +1313,14 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         onChange={(event) => handleCounterpartyInputChange('rut', event.target.value)}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="counterparty_tipo">Rol</Label>
-                      <select
-                        id="counterparty_tipo"
-                        className="form-input"
-                        value={counterpartyForm.tipo}
-                        onChange={(event) => handleCounterpartyInputChange('tipo', event.target.value as 'demandado' | 'demandante' | 'tercero')}
-                      >
+	                    <div className="space-y-2">
+	                      <Label htmlFor="counterparty_tipo">Rol</Label>
+	                      <select
+	                        id="counterparty_tipo"
+	                        className="h-11 w-full rounded-2xl border border-white/25 bg-white/60 px-4 text-sm text-foreground shadow-inner outline-none transition focus:border-primary/40 focus:bg-white/85 focus:ring-2 focus:ring-primary/20"
+	                        value={counterpartyForm.tipo}
+	                        onChange={(event) => handleCounterpartyInputChange('tipo', event.target.value as 'demandado' | 'demandante' | 'tercero')}
+	                      >
                         <option value="demandado">Demandado</option>
                         <option value="demandante">Demandante</option>
                         <option value="tercero">Tercero</option>
@@ -1437,34 +1344,34 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                     </div>
                   </form>
 
-                  <div className="space-y-3">
-                    {counterparties.length === 0 ? (
-                      <p className="text-sm text-slate-500">
-                        Aún no se agregan demandados al expediente. Regístralos para tener claridad de las partes involucradas.
-                      </p>
-                    ) : (
-                      counterparties.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
-                        >
-                          <div className="flex flex-col">
-                            <span className="font-medium text-slate-900">{item.nombre}</span>
-                            <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-600">
-                                {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)}
-                              </span>
-                              {item.rut && <span>RUT: {item.rut}</span>}
-                              <span>Agregado: {item.created_at ? formatDate(item.created_at) : '—'}</span>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 rounded-full text-slate-400 hover:text-red-600"
-                            onClick={() => handleDeleteCounterparty(item.id)}
-                            disabled={pendingDeleteCounterparty === item.id}
-                          >
+	                  <div className="space-y-3">
+	                    {counterparties.length === 0 ? (
+	                      <p className="text-sm text-foreground/60">
+	                        Aún no se agregan demandados al expediente. Regístralos para tener claridad de las partes involucradas.
+	                      </p>
+	                    ) : (
+	                      counterparties.map((item) => (
+	                        <div
+	                          key={item.id}
+	                          className="flex items-center justify-between rounded-2xl border border-white/20 bg-white/55 px-4 py-3 text-sm shadow-sm"
+	                        >
+	                          <div className="flex flex-col">
+	                            <span className="font-semibold text-foreground">{item.nombre}</span>
+	                            <div className="flex flex-wrap gap-3 text-xs text-foreground/55">
+	                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-600">
+	                                {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)}
+	                              </span>
+	                              {item.rut && <span>RUT: {item.rut}</span>}
+	                              <span>Agregado: {item.created_at ? formatDate(item.created_at) : '—'}</span>
+	                            </div>
+	                          </div>
+	                          <Button
+	                            variant="ghost"
+	                            size="icon"
+	                            className="h-9 w-9 rounded-full text-foreground/45 hover:text-red-600"
+	                            onClick={() => handleDeleteCounterparty(item.id)}
+	                            disabled={pendingDeleteCounterparty === item.id}
+	                          >
                             {pendingDeleteCounterparty === item.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
@@ -1479,8 +1386,152 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               </Card>
             </div>
           )}
+          </div>
+
+          {/* Right rail (Salesforce-like) */}
+          <aside className="space-y-6 lg:sticky lg:top-24">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Acciones rápidas</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('documents')}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Documentos
+                  </Button>
+                  <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('requests')}>
+                    <ClipboardList className="mr-2 h-4 w-4" />
+                    Solicitudes
+                  </Button>
+                  <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('messages')}>
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Mensajes
+                  </Button>
+                  <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('activity')}>
+                    <Clock className="mr-2 h-4 w-4" />
+                    Bitácora
+                  </Button>
+                </div>
+                {canEdit && (
+                  <Button
+                    asChild
+                    className="w-full rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
+                  >
+                    <Link href={`/cases/${caseData.id}/edit`}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Editar caso
+                    </Link>
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Equipo y contacto</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {currentLawyer ? (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/45">
+                      Abogado responsable
+                    </p>
+                    <p className="text-sm font-semibold text-foreground">{currentLawyer.nombre}</p>
+                    <div className="flex flex-wrap gap-2 pt-1 text-xs text-foreground/60">
+                      {currentLawyer.email && (
+                        <a className="pill hover:bg-white/70" href={`mailto:${currentLawyer.email}`}>
+                          <Mail className="h-3.5 w-3.5" />
+                          {currentLawyer.email}
+                        </a>
+                      )}
+                      {currentLawyer.telefono && (
+                        <a className="pill hover:bg-white/70" href={`tel:${currentLawyer.telefono}`}>
+                          <Phone className="h-3.5 w-3.5" />
+                          {currentLawyer.telefono}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground/60">Sin abogado responsable asignado.</p>
+                )}
+
+                {caseData.clients && caseData.clients.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/45">
+                      Clientes
+                    </p>
+                    <div className="space-y-2">
+                      {caseData.clients.slice(0, 3).map((client) => (
+                        <div
+                          key={client.id}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-foreground">{client.nombre}</p>
+                            <p className="truncate text-xs text-foreground/55">{client.email}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {client.telefono && (
+                              <a
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/25 bg-white/60 text-foreground/70 hover:bg-white"
+                                href={`tel:${client.telefono}`}
+                                aria-label="Llamar"
+                              >
+                                <Phone className="h-4 w-4" />
+                              </a>
+                            )}
+                            {client.email && (
+                              <a
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/25 bg-white/60 text-foreground/70 hover:bg-white"
+                                href={`mailto:${client.email}`}
+                                aria-label="Enviar correo"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {caseData.clients.length > 3 && (
+                        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => setActiveTab('clients')}>
+                          Ver {caseData.clients.length - 3} más…
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Resumen</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-foreground/70">
+                <div className="flex items-center justify-between gap-3">
+                  <span>Etapa actual</span>
+                  <span className="font-medium text-foreground">{caseData.etapa_actual ?? 'Sin definir'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Estado</span>
+                  <span className="font-medium text-foreground">{caseData.estado ?? 'Sin definir'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Sentencia</span>
+                  <span className="font-medium text-foreground">{getSentenceStatusLabel(caseData.sentencia_estado)}</span>
+                </div>
+                {typeof caseData.valor_estimado === 'number' && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Valor estimado</span>
+                    <span className="font-medium text-foreground">{formatCurrency(caseData.valor_estimado)}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </aside>
         </div>
-      </div>
     </div>
   );
 }

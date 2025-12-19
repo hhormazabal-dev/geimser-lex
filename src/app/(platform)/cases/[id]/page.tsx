@@ -5,6 +5,9 @@ import { getCurrentProfile, canAccessCase } from '@/lib/auth/roles';
 import { getCaseById } from '@/lib/actions/cases';
 import { listCaseMessages } from '@/lib/actions/messages';
 import { CaseDetailView } from '@/components/CaseDetailView';
+import { Button } from '@/components/ui/button';
+
+export const dynamic = 'force-dynamic';
 
 type CaseRouteParams = { id: string };
 type CaseDetailPageProps = { params: Promise<CaseRouteParams> };
@@ -41,29 +44,35 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     redirect('/login');
   }
 
+  const dashboardHref =
+    profile.role === 'admin_firma'
+      ? '/dashboard/admin'
+      : profile.role === 'analista'
+        ? '/dashboard/analista'
+        : profile.role === 'abogado'
+          ? '/dashboard/abogado'
+          : '/dashboard/cliente';
+
   // 2) Permisos (NO 404 si no tiene acceso)
   const hasAccess = await canAccessCase(id);
   if (!hasAccess) {
     return (
-      <div className="min-h-screen bg-lexser-gray-950 text-white flex items-center justify-center px-6">
-        <div className="max-w-md text-center space-y-4">
-          <h1 className="text-2xl font-semibold">Sin permisos para ver este caso</h1>
-          <p className="text-lexser-gray-300 text-sm">
-            Tu usuario no tiene acceso al detalle de este caso.
+      <div className="py-14">
+        <div className="soft-section mx-auto max-w-xl p-8 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Sin permisos para ver este caso
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-foreground/60">
+            Tu usuario no tiene acceso al detalle de este expediente. Si crees que es un error,
+            contacta al administrador de la firma.
           </p>
-          <div className="flex items-center justify-center gap-3">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center rounded-md bg-lexser-blue-600 px-4 py-2 text-sm font-medium hover:bg-lexser-blue-700"
-            >
-              Ir al dashboard
-            </Link>
-            <Link
-              href="/cases"
-              className="inline-flex items-center justify-center rounded-md border border-white/10 px-4 py-2 text-sm font-medium hover:bg-white/10"
-            >
-              Ver listado de casos
-            </Link>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <Button asChild>
+              <Link href="/cases">Volver a casos</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={dashboardHref}>Ir al dashboard</Link>
+            </Button>
           </div>
         </div>
       </div>

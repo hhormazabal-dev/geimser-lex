@@ -12,11 +12,13 @@ import {
   getCasesByStatus,
   getCasesByMateria,
   getCasesByPriority,
+  getCasesByWorkflowState,
   getMonthlyStats,
   getAbogadoWorkload,
   getUpcomingDeadlines,
   getClientPortfolio,
 } from '@/lib/actions/analytics';
+import { getWorkQueue } from '@/lib/actions/work-queue';
 
 export const metadata: Metadata = {
   title: 'Dashboard Administrativo - Xel Chile',
@@ -39,19 +41,23 @@ export default async function AdminDashboardPage() {
     statusResult,
     materiaResult,
     priorityResult,
+    workflowResult,
     monthlyResult,
     workloadResult,
     deadlinesResult,
     portfolioResult,
+    workQueueResult,
   ] = await Promise.all([
     getDashboardStats(),
     getCasesByStatus(),
     getCasesByMateria(),
     getCasesByPriority(),
+    getCasesByWorkflowState(),
     getMonthlyStats(),
     getAbogadoWorkload(),
     getUpcomingDeadlines(),
     getClientPortfolio(30),
+    getWorkQueue(),
   ]);
 
   const dashboardData = {
@@ -59,10 +65,21 @@ export default async function AdminDashboardPage() {
     casesByStatus: statusResult.success ? statusResult.data ?? [] : [],
     casesByMateria: materiaResult.success ? materiaResult.data ?? [] : [],
     casesByPriority: priorityResult.success ? priorityResult.data ?? [] : [],
+    casesByWorkflowState: workflowResult.success ? workflowResult.data ?? [] : [],
     monthlyStats: monthlyResult.success ? monthlyResult.data ?? [] : [],
     abogadoWorkload: workloadResult.success ? workloadResult.data ?? [] : [],
     upcomingDeadlines: deadlinesResult.success ? deadlinesResult.data ?? [] : [],
     clientPortfolio: portfolioResult.success ? portfolioResult.data ?? [] : [],
+    workQueue:
+      workQueueResult.success && workQueueResult.data
+        ? workQueueResult.data
+        : {
+            overdueStages: [],
+            dueNext7Days: [],
+            paymentBlocks: [],
+            pendingRequests: [],
+            stats: { overdueStages: 0, dueNext7Days: 0, paymentBlocks: 0, pendingRequests: 0 },
+          },
     highlights:
       statsResult.success && statsResult.highlights
         ? statsResult.highlights

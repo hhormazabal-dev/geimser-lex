@@ -882,6 +882,7 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
 
     if (validatedFilters.estado) query = query.eq('estado', validatedFilters.estado);
     if (validatedFilters.prioridad) query = query.eq('prioridad', validatedFilters.prioridad);
+    if (validatedFilters.workflow_state) query = query.eq('workflow_state', validatedFilters.workflow_state);
     if (validatedFilters.abogado_responsable) query = query.eq('abogado_responsable', validatedFilters.abogado_responsable);
     if (validatedFilters.materia) query = query.eq('materia', validatedFilters.materia);
     if (validatedFilters.fecha_inicio_desde) query = query.gte('fecha_inicio', validatedFilters.fecha_inicio_desde);

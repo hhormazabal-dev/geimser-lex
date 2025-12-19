@@ -20,6 +20,11 @@ function extractDateFromHeader(headerText: string): string | null {
   return m?.[1] ?? null;
 }
 
+function extractCompetenciaFromHeader(headerText: string): string | null {
+  const m = normalizeSpace(headerText).match(/competencia\s+([a-záéíóúñ]+)/i);
+  return m?.[1] ? normalizeSpace(m[1]).toLowerCase() : null;
+}
+
 function pickBestDate(dates: string[]): string | null {
   let best: { key: number; value: string } | null = null;
   for (const date of dates) {
@@ -57,12 +62,20 @@ export function parsePjudDailyStatementsHtml(html: string): ParsedDailyStatement
   const items: DailyStatementItem[] = [];
   const datesFound: string[] = [];
 
-  $('table[id^="data-table-estado-diario-"]').each((_, tableEl) => {
+  $('table[id^="data-table-estado-diario-"], table#data-table-estado-diario').each((_, tableEl) => {
     const table = $(tableEl);
     const id = table.attr('id') ?? '';
-    const competencia = normalizeSpace(id.replace(/^data-table-estado-diario-/, '')).toLowerCase();
+    const competenciaFromId = id.startsWith('data-table-estado-diario-')
+      ? normalizeSpace(id.replace(/^data-table-estado-diario-/, '')).toLowerCase()
+      : '';
 
-    const headerText = normalizeSpace(table.closest('.card').find('.card-header').first().text());
+    const headerNode = table.closest('.card').find('.card-header').first();
+    const panelHeaderNode = table.closest('.panel').find('.panel-heading').first();
+    const headerText = normalizeSpace((headerNode.text() || panelHeaderNode.text() || '').trim());
+
+    const competenciaFromHeader = headerText ? extractCompetenciaFromHeader(headerText) : null;
+    const competencia = competenciaFromId || competenciaFromHeader || 'desconocida';
+
     const dateInHeader = headerText ? extractDateFromHeader(headerText) : null;
     if (dateInHeader) datesFound.push(dateInHeader);
 
@@ -87,7 +100,7 @@ export function parsePjudDailyStatementsHtml(html: string): ParsedDailyStatement
       if (!datesFound.length && linkMeta?.date) datesFound.push(linkMeta.date);
 
       items.push({
-        competencia: competencia || 'desconocida',
+        competencia,
         numeroIngreso,
         partes,
         providencias,
@@ -98,4 +111,3 @@ export function parsePjudDailyStatementsHtml(html: string): ParsedDailyStatement
 
   return { date: pickBestDate(datesFound), items };
 }
-

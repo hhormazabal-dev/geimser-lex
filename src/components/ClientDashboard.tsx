@@ -9,6 +9,7 @@ import { DocumentsPanel } from '@/components/DocumentsPanel';
 import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
 import { 
@@ -26,7 +27,6 @@ import {
 } from 'lucide-react';
 import type { Profile, Case } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
-import LogoutButton from '@/components/LogoutButton';
 
 type CaseFieldsForClient = Pick<
   Case,
@@ -206,37 +206,14 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
   };
 
   return (
-    <div className='min-h-screen bg-gray-50'>
-      {/* Header */}
-      <div className='bg-white shadow-sm border-b'>
-        <div className='mx-auto w-full max-w-[1760px] px-4 lg:px-6'>
-          <div className='flex items-center justify-between h-16'>
-            <div className='flex items-center space-x-4'>
-              <Scale className='h-8 w-8 text-blue-600' />
-              <div>
-                <h1 className='text-xl font-semibold text-gray-900'>Portal Cliente</h1>
-                <p className='text-sm text-gray-500'>Xel Chile</p>
-              </div>
-            </div>
-            
-            <div className='flex items-center space-x-4'>
-              <div className='text-right'>
-                <p className='text-sm font-medium text-gray-900'>{profile.nombre}</p>
-                <p className='text-xs text-gray-500'>{profile.email ?? 'Sin correo registrado'}</p>
-              </div>
-              <div 
-                className='h-10 w-10 rounded-full flex items-center justify-center text-white font-medium'
-                style={{ backgroundColor: stringToColor(profile.nombre) }}
-              >
-                {getInitials(profile.nombre)}
-              </div>
-              <LogoutButton />
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Mi portal"
+        title="Seguimiento de casos"
+        description="Revisa el avance, documentos, solicitudes y mensajes del expediente. Todo en un solo lugar."
+      />
 
-      <div className='mx-auto w-full max-w-[1760px] px-4 lg:px-6 py-8'>
+      <section>
         <div className='grid grid-cols-1 gap-4 md:grid-cols-6 lg:grid-cols-12'>
           <Card className='bg-white shadow-sm col-span-1 md:col-span-3 lg:col-span-3'>
             <CardContent className='pt-6'>
@@ -269,6 +246,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
             </CardContent>
           </Card>
         </div>
+      </section>
 
         {summary.ufTotals.hasMixedCurrencies && (
           <div className='mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>
@@ -276,7 +254,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
           </div>
         )}
 
-        <div className='grid grid-cols-1 gap-6 lg:grid-cols-[272px_minmax(0,1fr)_300px] lg:gap-8'>
+        <section className='grid grid-cols-1 gap-6 lg:grid-cols-[272px_minmax(0,1fr)_300px] lg:gap-8'>
           {/* Sidebar - Lista de casos */}
           <div className='lg:sticky lg:top-24 lg:h-[calc(100dvh-6rem)] lg:overflow-auto'>
             <Card className='h-full'>
@@ -624,8 +602,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
               </Card>
             )}
           </div>
-        </div>
-      </div>
+        </section>
     </div>
   );
 }

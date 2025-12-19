@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { cn, formatRelativeTime, formatDateShort } from '@/lib/utils';
+import { formatRoleLabel } from '@/lib/navigation/role-label';
 
 interface AdminUserManagerProps {
   initialUsers: ManagedUser[];
@@ -353,7 +354,7 @@ export function AdminUserManager({ initialUsers }: AdminUserManagerProps) {
             >
               {managedUserRoles.map((role) => (
                 <option key={role} value={role} className='capitalize'>
-                  {role.replace('_', ' ')}
+                  {formatRoleLabel(role)}
                 </option>
               ))}
             </select>
@@ -398,7 +399,7 @@ export function AdminUserManager({ initialUsers }: AdminUserManagerProps) {
                 onClick={() => setFilter(role)}
                 className={activeClass(role)}
               >
-                {role.replace('_', ' ')} ({stats.byRole[role] ?? 0})
+                {formatRoleLabel(role)} ({stats.byRole[role] ?? 0})
               </button>
             ))}
             <button
@@ -454,7 +455,7 @@ export function AdminUserManager({ initialUsers }: AdminUserManagerProps) {
                             {user.activo ? 'Activo' : 'Inactivo'}
                           </span>
                           <span className='rounded-full bg-gray-100 px-2 py-0.5 text-xs uppercase tracking-wide text-gray-600'>
-                            {user.role.replace('_', ' ')}
+                            {formatRoleLabel(user.role)}
                           </span>
                         </div>
                         <div className='grid gap-1 text-muted-foreground md:grid-cols-2'>
@@ -559,7 +560,7 @@ export function AdminUserManager({ initialUsers }: AdminUserManagerProps) {
                             >
                               {managedUserRoles.map((role) => (
                                 <option key={role} value={role}>
-                                  {role.replace('_', ' ')}
+                                  {formatRoleLabel(role)}
                                 </option>
                               ))}
                             </select>

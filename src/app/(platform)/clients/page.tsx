@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   listClients,
   createClientProfile,
@@ -62,6 +63,7 @@ const EMPTY_ASSIGN_STATE: AssignUIState = {
 };
 
 export default function ClientsPage() {
+  const searchParams = useSearchParams();
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -109,6 +111,18 @@ export default function ClientsPage() {
   useEffect(() => {
     loadClients();
   }, [loadClients]);
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q && q.trim().length > 0) {
+      setSearch(q);
+    }
+
+    const clientId = searchParams.get('clientId');
+    if (clientId && clientId.trim().length > 0) {
+      setExpandedClientId(clientId);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const handler = setTimeout(() => {

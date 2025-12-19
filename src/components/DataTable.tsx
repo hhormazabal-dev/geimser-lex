@@ -23,6 +23,13 @@ interface DataTableProps {
   onPageChange: (page: number) => void;
   onSearch: (search: string) => void;
   onFilter: (filters: any) => void;
+  initialSearchTerm?: string;
+  initialFilterValues?: Partial<{
+    estado: string;
+    prioridad: string;
+    workflow_state: string;
+    materia: string;
+  }>;
   canCreate?: boolean;
   canEdit?: boolean;
 }
@@ -49,15 +56,24 @@ export function DataTable({
   onPageChange,
   onSearch,
   onFilter,
+  initialSearchTerm,
+  initialFilterValues,
   canCreate = false,
   canEdit = false,
 }: DataTableProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => initialSearchTerm ?? '');
   const [showFilters, setShowFilters] = useState(false);
-  const [filterValues, setFilterValues] = useState<{ estado: string; prioridad: string; materia: string }>({
+  const [filterValues, setFilterValues] = useState<{
+    estado: string;
+    prioridad: string;
+    workflow_state: string;
+    materia: string;
+  }>({
     estado: '',
     prioridad: '',
+    workflow_state: '',
     materia: '',
+    ...(initialFilterValues ?? {}),
   });
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total, limit]);
@@ -67,10 +83,12 @@ export function DataTable({
     onSearch(searchTerm.trim());
   };
 
-  const handleFilterChange = (field: 'estado' | 'prioridad' | 'materia') => (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = event.target.value;
-    setFilterValues((prev) => ({ ...prev, [field]: value }));
-  };
+  const handleFilterChange =
+    (field: 'estado' | 'prioridad' | 'workflow_state' | 'materia') =>
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = event.target.value;
+      setFilterValues((prev) => ({ ...prev, [field]: value }));
+    };
 
   const applyFilters = () => {
     const cleaned = Object.fromEntries(
@@ -82,7 +100,7 @@ export function DataTable({
   };
 
   const resetFilters = () => {
-    setFilterValues({ estado: '', prioridad: '', materia: '' });
+    setFilterValues({ estado: '', prioridad: '', workflow_state: '', materia: '' });
     onFilter({});
   };
 
@@ -191,7 +209,7 @@ export function DataTable({
 
         {showFilters && (
           <div className='border-t border-slate-200 bg-slate-50/60 px-5 py-4'>
-            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-5'>
               <div>
                 <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Estado</label>
                 <select
@@ -219,6 +237,21 @@ export function DataTable({
                   <option value='media'>Media</option>
                   <option value='alta'>Alta</option>
                   <option value='urgente'>Urgente</option>
+                </select>
+              </div>
+
+              <div>
+                <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Workflow</label>
+                <select
+                  value={filterValues.workflow_state}
+                  onChange={handleFilterChange('workflow_state')}
+                  className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
+                >
+                  <option value=''>Todos</option>
+                  <option value='preparacion'>Preparación</option>
+                  <option value='en_revision'>En revisión</option>
+                  <option value='activo'>Activo</option>
+                  <option value='cerrado'>Cerrado</option>
                 </select>
               </div>
 

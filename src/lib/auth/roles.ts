@@ -22,6 +22,7 @@ const ROLE_NORMALIZATION_MAP: Record<string, Role> = {
   abogado: 'abogado',
   analista: 'analista',
   cliente: 'cliente',
+  usuario: 'cliente',
 };
 
 function normalizeRole(value: unknown): Role | null {

@@ -57,4 +57,34 @@ describe('parsePjudDailyStatementsHtml', () => {
     expect(penal.competencia).toBe('penal');
     expect(penal.linkMeta).toBeUndefined();
   });
+
+  test('parses single-competencia panel table', () => {
+    const html = `
+      <div class="panel panel-primary border">
+        <div class="panel-heading">Estados diario competencia laboral del día 18-12-2025</div>
+        <div class="panel-body">
+          <table id="data-table-estado-diario" class="table">
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>O-6481-2025</td>
+                <td> Díaz/Copec S.a </td>
+                <td> 2 </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    const parsed = parsePjudDailyStatementsHtml(html);
+    expect(parsed.date).toBe('18-12-2025');
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]).toMatchObject({
+      competencia: 'laboral',
+      numeroIngreso: 'O-6481-2025',
+      partes: 'Díaz/Copec S.a',
+      providencias: '2',
+    });
+  });
 });

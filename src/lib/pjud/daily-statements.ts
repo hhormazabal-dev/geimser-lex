@@ -108,6 +108,16 @@ export type DailyStatementsCachedResult = {
   cached: boolean;
 };
 
+function toDateKeyDDMMYYYY(value: string): number | null {
+  const m = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!m) return null;
+  const dd = Number(m[1]);
+  const mm = Number(m[2]);
+  const yyyy = Number(m[3]);
+  if (!yyyy || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  return yyyy * 10_000 + mm * 100 + dd;
+}
+
 type DbCacheRow = {
   cod_tribunal: string;
   tipo_juzgado: string;
@@ -116,6 +126,39 @@ type DbCacheRow = {
   payload_json: { items?: DailyStatementItem[] } | null;
   fetched_at: string;
 };
+
+export async function findNearestPreviousDailyStatementsWithItems(
+  db: any,
+  court: CourtConfig,
+  dateRequested: string,
+): Promise<DailyStatementsCachedResult | null> {
+  const dateKey = toDateKeyDDMMYYYY(dateRequested);
+  if (dateKey === null) return null;
+
+  try {
+    const { data, error } = await db
+      .from('daily_statements_cache')
+      .select('cod_tribunal,tipo_juzgado,date,item_count,payload_json,fetched_at')
+      .eq('cod_tribunal', court.codTribunal)
+      .eq('tipo_juzgado', court.tipoJuzgado)
+      .gt('item_count', 0)
+      .lte('date_key', dateKey)
+      .order('date_key', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as DbCacheRow;
+    const items = (row.payload_json?.items ?? []) as DailyStatementItem[];
+    return { date: row.date, items, fetchedAt: row.fetched_at, cached: true };
+  } catch (error: any) {
+    const code = String(error?.code ?? '').toUpperCase();
+    // tabla/columna no existe aún
+    if (code === '42P01' || code === 'PGRST205' || code === '42703') return null;
+    return null;
+  }
+}
 
 async function readDbCache(
   db: any,
@@ -150,7 +193,8 @@ async function readDbCache(
     memCacheByKey.set(cacheKey(court, row.date), entry);
     return { date: row.date, items, fetchedAt: row.fetched_at, cached: true };
   } catch (error: any) {
-    if (String(error?.code ?? '').toUpperCase() === '42P01') return null;
+    const code = String(error?.code ?? '').toUpperCase();
+    if (code === '42P01' || code === 'PGRST205') return null;
     return null;
   }
 }
@@ -189,7 +233,8 @@ async function readDbLatest(
     memLatestByCourt.set(`${court.codTribunal}::${court.tipoJuzgado}`, { date: row.date, expiresAtMs: fetchedAtMs + ttlMs });
     return { date: row.date, items, fetchedAt: row.fetched_at, cached: true };
   } catch (error: any) {
-    if (String(error?.code ?? '').toUpperCase() === '42P01') return null;
+    const code = String(error?.code ?? '').toUpperCase();
+    if (code === '42P01' || code === 'PGRST205') return null;
     return null;
   }
 }
@@ -217,7 +262,8 @@ async function writeDbCache(db: any, court: CourtConfig, date: string, items: Da
 
     if (error) throw error;
   } catch (error: any) {
-    if (String(error?.code ?? '').toUpperCase() === '42P01') return;
+    const code = String(error?.code ?? '').toUpperCase();
+    if (code === '42P01' || code === 'PGRST205') return;
   }
 }
 

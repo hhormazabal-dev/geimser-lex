@@ -282,6 +282,15 @@ export async function closeInfoRequest(requestId: string) {
         if (!caseData || caseData.abogado_responsable !== profile.id) {
           throw new Error('Sin permisos para cerrar esta solicitud')
         }
+      } else if (profile.role === 'analista') {
+        const { data: caseData } = await supabase
+          .from('cases')
+          .select('analista_id')
+          .eq('id', existing.case_id)
+          .single()
+        if (!caseData || caseData.analista_id !== profile.id) {
+          throw new Error('Sin permisos para cerrar esta solicitud')
+        }
       } else {
         throw new Error('Sin permisos para cerrar esta solicitud')
       }

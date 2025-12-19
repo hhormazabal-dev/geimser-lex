@@ -66,6 +66,12 @@ export interface CasesByPriority {
   percentage: number;
 }
 
+export interface CasesByWorkflowState {
+  workflow_state: string;
+  count: number;
+  percentage: number;
+}
+
 export interface MonthlyStats {
   month: string;
   newCases: number;
@@ -431,6 +437,56 @@ export async function getCasesByPriority(): Promise<{ success: boolean; data?: C
     return { success: true, data: result };
   } catch (error) {
     console.error('Error getting cases by priority:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Obtiene distribución de casos por workflow_state
+ */
+export async function getCasesByWorkflowState(): Promise<{
+  success: boolean;
+  data?: CasesByWorkflowState[];
+  error?: string;
+}> {
+  try {
+    const profile = await requireAuth();
+    const role = normalizeRole(profile.role);
+
+    if (!canSeeStats(role)) {
+      console.warn('⚠️ Rol sin permisos (getCasesByWorkflowState):', profile.role);
+      return { success: true, data: [] };
+    }
+
+    const supabase = await createServerClient();
+
+    let query = supabase.from('cases').select('workflow_state');
+
+    if (role === 'abogado') {
+      query = query.eq('abogado_responsable', profile.id);
+    }
+
+    const { data: casesData, error } = await query;
+    if (error) throw error;
+
+    const caseRows = (casesData as Array<Record<string, any>> | null) ?? [];
+
+    const wfCounts = caseRows.reduce((acc, case_) => {
+      const wf = (case_.workflow_state as string | null) || 'preparacion';
+      acc[wf] = (acc[wf] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const total = caseRows.length;
+    const result: CasesByWorkflowState[] = Object.entries(wfCounts).map(([workflow_state, count]) => ({
+      workflow_state,
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+    }));
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error getting cases by workflow state:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }

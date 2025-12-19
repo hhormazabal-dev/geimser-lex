@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,23 +8,43 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
-import type { DailyStatementItem, DailyStatementsResponse } from '@/types/daily-statements';
+import { useRouter } from 'next/navigation';
+import type {
+  DailyStatementItem,
+  DailyStatementsResponse,
+  DailyStatementsHistoryEntry,
+  DailyStatementsHistoryResponse,
+} from '@/types/daily-statements';
 
 function normalizeSpace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-function normalizeRol(value: string): string {
-  return normalizeSpace(value).toUpperCase().replace(/\s+/g, '');
+function normalizeRolLoose(raw: string): string {
+  const s = normalizeSpace(raw).toUpperCase();
+  if (!s) return '';
+
+  // Normaliza formatos tipo "T-03127-2024" -> "T-3127-2024" (quita ceros a la izquierda del rol)
+  const m = s.match(/^([A-Z]{1,5})\s*[-/ ]\s*([0-9]{1,10})\s*[-/ ]\s*([0-9]{4})$/);
+  if (m) {
+    const tipo = m[1] ?? '';
+    const rol = String(Number(m[2] ?? '0'));
+    const era = m[3] ?? '';
+    return `${tipo}-${rol}-${era}`;
+  }
+
+  return s.replace(/\s+/g, '');
 }
 
 function isMatchToCase(item: DailyStatementItem, caseNumeroCausa: string): boolean {
-  const target = normalizeRol(caseNumeroCausa);
-  if (normalizeRol(item.numeroIngreso) === target) return true;
+  const target = normalizeRolLoose(caseNumeroCausa);
+  const numero = normalizeRolLoose(item.numeroIngreso);
+  if (numero === target) return true;
+  if (numero && target && (numero.includes(target) || target.includes(numero))) return true;
   const meta = item.linkMeta;
   if (meta?.tipocausa && meta?.rol && meta?.era) {
     const fromMeta = `${meta.tipocausa}-${meta.rol}-${meta.era}`;
-    if (normalizeRol(fromMeta) === target) return true;
+    if (normalizeRolLoose(fromMeta) === target) return true;
   }
   return false;
 }
@@ -63,8 +83,25 @@ type DailyStatementsPanelProps = {
 
 export function DailyStatementsPanel({ caseId, caseNumeroCausa }: DailyStatementsPanelProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<DailyStatementsHistoryEntry[]>([]);
+  const [historyNextTo, setHistoryNextTo] = useState<string | null>(null);
+  const [historyMaxAvailableDate, setHistoryMaxAvailableDate] = useState<string | null>(null);
+  const [historyScannedDays, setHistoryScannedDays] = useState<number>(0);
+  const [historyFailures, setHistoryFailures] = useState<number>(0);
+  const [historyPartial, setHistoryPartial] = useState<boolean>(false);
+  const [lastLoading, setLastLoading] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastNextTo, setLastNextTo] = useState<string | null>(null);
+  const [lastScannedDays, setLastScannedDays] = useState<number>(0);
+  const [lastFailures, setLastFailures] = useState<number>(0);
+  const [lastPartial, setLastPartial] = useState<boolean>(false);
+  const historyAbortRef = useRef<AbortController | null>(null);
+  const lastAbortRef = useRef<AbortController | null>(null);
 
   const [dateInput, setDateInput] = useState<string>('');
   const [maxKnownDate, setMaxKnownDate] = useState<string | null>(null);
@@ -95,7 +132,7 @@ export function DailyStatementsPanel({ caseId, caseNumeroCausa }: DailyStatement
         setData(payload);
         setDateInput(payload.date);
 
-        if (source === 'auto') setMaxKnownDate((prev) => prev ?? payload.date);
+        if (source === 'auto') setMaxKnownDate((prev) => prev ?? (payload.maxAvailableDate || payload.date));
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Error inesperado.');
         setData(null);
@@ -105,6 +142,112 @@ export function DailyStatementsPanel({ caseId, caseNumeroCausa }: DailyStatement
     },
     [caseId],
   );
+
+  const loadHistory = useCallback(
+    async (params: { mode: 'last' | 'range'; days: number; to?: string | null; append?: boolean }) => {
+      if (!caseNumeroCausa) {
+        toast({
+          title: 'Falta ROL',
+          description: 'La causa debe tener “Número de causa / ROL” para buscar histórico.',
+          variant: 'destructive',
+        });
+        return null;
+      }
+
+      setHistoryLoading(true);
+      setHistoryError(null);
+      try {
+        historyAbortRef.current?.abort();
+        historyAbortRef.current = new AbortController();
+
+        const url = new URL(`/api/causas/${caseId}/estado-diario/historial`, window.location.origin);
+        url.searchParams.set('mode', params.mode);
+        url.searchParams.set('days', String(params.days));
+        if (params.to) url.searchParams.set('to', params.to);
+
+        const res = await fetch(`${url.pathname}${url.search}`, {
+          method: 'GET',
+          signal: historyAbortRef.current.signal,
+        });
+        const json = (await res.json().catch(() => null)) as any;
+        if (!res.ok || !json?.success) {
+          const msg = json?.error || `Error consultando histórico (${res.status}).`;
+          setHistoryError(msg);
+          return null;
+        }
+
+        const payload = json as DailyStatementsHistoryResponse;
+        setHistoryMaxAvailableDate(payload.maxAvailableDate);
+        setHistoryNextTo(payload.nextTo);
+        setHistoryScannedDays(payload.scannedDays ?? 0);
+        setHistoryFailures(payload.failures ?? 0);
+        setHistoryPartial(Boolean(payload.partial));
+        setHistoryEntries((prev) => (params.append ? [...prev, ...(payload.matches ?? [])] : payload.matches ?? []));
+        return payload;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return null;
+        const msg = e instanceof Error ? e.message : 'Error inesperado.';
+        setHistoryError(msg);
+        return null;
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [caseId, caseNumeroCausa, toast],
+  );
+
+  const findLastMovement = useCallback(
+    async (days: number, to?: string | null) => {
+      if (!caseNumeroCausa) {
+        toast({
+          title: 'Falta ROL',
+          description: 'La causa debe tener “Número de causa / ROL” para buscar histórico.',
+          variant: 'destructive',
+        });
+        return null;
+      }
+
+      setLastLoading(true);
+      setLastError(null);
+      try {
+        lastAbortRef.current?.abort();
+        lastAbortRef.current = new AbortController();
+
+        const url = new URL(`/api/causas/${caseId}/estado-diario/historial`, window.location.origin);
+        url.searchParams.set('mode', 'last');
+        url.searchParams.set('days', String(days));
+        url.searchParams.set('source', 'hybrid');
+        if (to) url.searchParams.set('to', to);
+
+        const res = await fetch(`${url.pathname}${url.search}`, {
+          method: 'GET',
+          signal: lastAbortRef.current.signal,
+        });
+        const json = (await res.json().catch(() => null)) as any;
+        if (!res.ok || !json?.success) {
+          const msg = json?.error || `Error consultando último movimiento (${res.status}).`;
+          setLastError(msg);
+          return null;
+        }
+        const payload = json as DailyStatementsHistoryResponse;
+        setLastNextTo(payload.nextTo ?? null);
+        setLastScannedDays(payload.scannedDays ?? 0);
+        setLastFailures(payload.failures ?? 0);
+        setLastPartial(Boolean(payload.partial));
+        return payload;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return null;
+        const msg = e instanceof Error ? e.message : 'Error inesperado.';
+        setLastError(msg);
+        return null;
+      } finally {
+        setLastLoading(false);
+      }
+    },
+    [caseId, caseNumeroCausa, toast],
+  );
+
+  const HISTORY_PAGE_DAYS = 10;
 
   useEffect(() => {
     load(null, 'auto');
@@ -249,6 +392,126 @@ export function DailyStatementsPanel({ caseId, caseNumeroCausa }: DailyStatement
                   Solo mi causa {caseNumeroCausa ? `(${caseNumeroCausa})` : ''}
                 </Label>
               </div>
+              {caseNumeroCausa ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={historyLoading || lastLoading || isLoading}
+                    onClick={async () => {
+                      setHistoryEntries([]);
+                      setHistoryNextTo(null);
+                      setHistoryError(null);
+
+                      setLastNextTo(null);
+                      setLastError(null);
+                      setLastFailures(0);
+                      setLastPartial(false);
+                      setLastScannedDays(0);
+
+                      const payload = await findLastMovement(90, null);
+                      const hit = payload?.matches?.[0];
+                      if (!hit) {
+                        toast({
+                          title: 'Sin resultados',
+                          description: payload?.partial && payload?.nextTo
+                            ? 'La búsqueda quedó parcial (PJUD lento). Puedes presionar “Seguir buscando”.'
+                            : 'No se encontró tu causa en los últimos 90 días. Prueba “Histórico” y carga más.',
+                        });
+                        return;
+                      }
+                      setOnlyThisCase(true);
+                      setDateInput(hit.date);
+                      await load(hit.date);
+                      toast({ title: 'Último movimiento', description: `Encontrado en ${hit.date}.` });
+                    }}
+                  >
+                    {lastLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Buscando…
+                      </>
+                    ) : (
+                      'Último movimiento'
+                    )}
+                  </Button>
+
+                  {lastNextTo && !lastLoading && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={historyLoading || lastLoading || isLoading}
+                      onClick={async () => {
+                        const payload = await findLastMovement(90, lastNextTo);
+                        const hit = payload?.matches?.[0];
+                        if (!hit) {
+                          toast({
+                            title: 'Sin resultados',
+                            description: payload?.partial && payload?.nextTo
+                              ? 'Sigue quedando parcial. Puedes intentar nuevamente.'
+                              : 'No se encontró tu causa en el rango consultado.',
+                          });
+                          return;
+                        }
+                        setOnlyThisCase(true);
+                        setDateInput(hit.date);
+                        await load(hit.date);
+                        toast({ title: 'Último movimiento', description: `Encontrado en ${hit.date}.` });
+                      }}
+                    >
+                      Seguir buscando
+                    </Button>
+                  )}
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={historyLoading || lastLoading || isLoading}
+                    onClick={async () => {
+                      setHistoryEntries([]);
+                      setHistoryNextTo(null);
+                      setHistoryError(null);
+                      await loadHistory({ mode: 'range', days: HISTORY_PAGE_DAYS, append: false });
+                      toast({
+                        title: 'Histórico',
+                        description: `Mostrando coincidencias en los últimos ${HISTORY_PAGE_DAYS} días (puedes cargar más).`,
+                      });
+                    }}
+                  >
+                    {historyLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Buscando…
+                      </>
+                    ) : (
+                      `Histórico ${HISTORY_PAGE_DAYS} días`
+                    )}
+                  </Button>
+
+                  {(historyLoading || lastLoading) && (
+                    <span className="text-xs text-foreground/55">
+                      Buscando histórico… puede tardar (PJUD limita 1 req/seg).
+                    </span>
+                  )}
+                  {(historyLoading || lastLoading) && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        historyAbortRef.current?.abort();
+                        lastAbortRef.current?.abort();
+                        toast({ title: 'Búsqueda cancelada' });
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -271,9 +534,123 @@ export function DailyStatementsPanel({ caseId, caseNumeroCausa }: DailyStatement
 
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>{error}</div>
+                {error.toLowerCase().includes('región') ||
+                error.toLowerCase().includes('comuna') ||
+                error.toLowerCase().includes('tribunal') ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push(`/cases/${caseId}/edit`)}
+                  >
+                    Editar causa
+                  </Button>
+                ) : null}
+              </div>
             </div>
           )}
+
+          {historyError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {historyError}
+            </div>
+          )}
+
+          {lastError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {lastError}
+            </div>
+          )}
+
+          {historyEntries.length > 0 && (
+            <div className="rounded-2xl border border-white/40 bg-white/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium text-foreground">Histórico (mi causa)</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-foreground/60">
+                    Escaneado: {historyScannedDays}d{historyPartial ? ' (parcial)' : ''}{historyFailures ? ` · fallas: ${historyFailures}` : ''}
+                  </span>
+                  {historyMaxAvailableDate ? (
+                    <span className="text-xs text-foreground/60">Último día disponible: {historyMaxAvailableDate}</span>
+                  ) : null}
+                  {historyNextTo ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={historyLoading || lastLoading || isLoading}
+                      onClick={() =>
+                        loadHistory({ mode: 'range', days: HISTORY_PAGE_DAYS, to: historyNextTo, append: true })
+                      }
+                    >
+                      {historyLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Cargando…
+                        </>
+                      ) : (
+                        `Cargar ${HISTORY_PAGE_DAYS} días más`
+                      )}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-white/60">
+                    <tr className="text-left text-foreground/70">
+                      <th className="px-3 py-2 font-semibold">Fecha</th>
+                      <th className="px-3 py-2 font-semibold">Coincidencias</th>
+                      <th className="px-3 py-2 font-semibold" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/30">
+                    {historyEntries.map((entry) => (
+                      <tr key={entry.date}>
+                        <td className="px-3 py-2 font-medium text-foreground">{entry.date}</td>
+                        <td className="px-3 py-2 text-foreground/80">{entry.items.length}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              setOnlyThisCase(true);
+                              setDateInput(entry.date);
+                              await load(entry.date);
+                            }}
+                          >
+                            Ver ese día
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {!error && data?.dateRequested && data.dateRequested !== data.date && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {data.dateResolution === 'nearest_previous'
+                ? `No hay registros para la fecha solicitada (${data.dateRequested}). Mostrando el día anterior con registros: ${data.date}.`
+                : `No hay registros para la fecha solicitada (${data.dateRequested}). Mostrando el último día disponible: ${data.date}.`}
+            </div>
+          )}
+
+          {!error &&
+            !data?.dateRequested &&
+            data?.maxAvailableDate &&
+            data.maxAvailableDate !== data.date && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {data.dateResolution === 'nearest_previous'
+                  ? `No hay registros para el último día disponible (${data.maxAvailableDate}). Mostrando el día anterior con registros: ${data.date}.`
+                  : `Mostrando el último día disponible con registros: ${data.date}.`}
+              </div>
+            )}
 
           {!error && data && data.items.length === 0 && (
             <div className="rounded-xl border border-white/40 bg-white/70 px-4 py-6 text-sm text-foreground/70">
@@ -283,7 +660,9 @@ export function DailyStatementsPanel({ caseId, caseNumeroCausa }: DailyStatement
 
           {!error && data && data.items.length > 0 && filteredItems.length === 0 && (
             <div className="rounded-xl border border-white/40 bg-white/70 px-4 py-6 text-sm text-foreground/70">
-              No hay resultados con los filtros actuales.
+              {onlyThisCase && caseNumeroCausa
+                ? `No hay registros para tu causa (${caseNumeroCausa}) en esta fecha. Desmarca “Solo mi causa” para ver el tribunal completo.`
+                : 'No hay resultados con los filtros actuales.'}
             </div>
           )}
 
@@ -328,7 +707,7 @@ function DailyRow({
 }) {
   const { toast } = useToast();
   const matches = matchNumeroCausa
-    ? normalizeRol(item.numeroIngreso) === normalizeRol(matchNumeroCausa)
+    ? normalizeRolLoose(item.numeroIngreso) === normalizeRolLoose(matchNumeroCausa)
     : false;
 
   return (

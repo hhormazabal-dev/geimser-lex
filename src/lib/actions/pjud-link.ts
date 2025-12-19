@@ -40,6 +40,13 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function isMissingTableError(error: unknown, table: string): boolean {
+  const code = typeof error === 'object' && error ? String((error as any).code ?? '') : '';
+  if (code.toUpperCase() === 'PGRST205') return true;
+  const msg = error instanceof Error ? error.message : String((error as any)?.message ?? error ?? '').trim();
+  return msg.toLowerCase().includes('could not find the table') && msg.toLowerCase().includes(table.toLowerCase());
+}
+
 export async function getCasePjudLink(caseId: string): Promise<{ success: boolean; link?: CaseExternalRefRow | null; error?: string }> {
   try {
     await requireAuth();
@@ -56,6 +63,13 @@ export async function getCasePjudLink(caseId: string): Promise<{ success: boolea
     return { success: true, link: (data as CaseExternalRefRow | null) ?? null };
   } catch (error) {
     console.error('Error in getCasePjudLink:', error);
+    if (isMissingTableError(error, 'public.case_external_refs')) {
+      return {
+        success: false,
+        error:
+          'Falta la tabla `case_external_refs` en tu BD. Aplica la migración `supabase/migrations/20251218000100_case_external_refs_and_events.sql`.',
+      };
+    }
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
@@ -87,6 +101,13 @@ export async function upsertCasePjudLink(input: {
     return { success: true, link: data as CaseExternalRefRow };
   } catch (error) {
     console.error('Error in upsertCasePjudLink:', error);
+    if (isMissingTableError(error, 'public.case_external_refs')) {
+      return {
+        success: false,
+        error:
+          'Falta la tabla `case_external_refs` en tu BD. Aplica la migración `supabase/migrations/20251218000100_case_external_refs_and_events.sql`.',
+      };
+    }
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }

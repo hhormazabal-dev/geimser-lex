@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight, Briefcase, Calendar, Clock, FileText, Target } from 'lucide-react';
 
-import LogoutButton from '@/components/LogoutButton';
 import { QuickLinksPanel } from '@/components/QuickLinksPanel';
 import { TemplateLibrary } from '@/components/TemplateLibrary';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { CasesByPriority, CasesByStatus, DashboardStats } from '@/lib/actions/analytics';
 import type { Case, CaseStage, LegalTemplate, Profile, QuickLink } from '@/lib/supabase/types';
+import { formatRoleLabel } from '@/lib/navigation/role-label';
 import { formatCurrency, formatDate, formatRelativeTime, getInitials, stringToColor } from '@/lib/utils';
 
 interface LawyerDashboardProps {
@@ -44,13 +46,15 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
 
   if (!stats) {
     return (
-      <div className='flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-white to-slate-50 text-slate-900'>
-        <div className='space-y-3 text-center'>
-          <AlertTriangle className='mx-auto h-12 w-12 text-red-400' />
-          <h2 className='text-xl font-semibold'>No pudimos cargar tu panel</h2>
-          <p className='text-sm text-slate-500'>Refresca la página o inténtalo más tarde.</p>
-        </div>
-      </div>
+      <Card className="border-red-200/60 bg-white/80">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-600">
+            <AlertTriangle className="h-5 w-5" />
+            No se pudieron cargar los datos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-foreground/60">Intenta nuevamente en unos minutos.</CardContent>
+      </Card>
     );
   }
 
@@ -97,14 +101,24 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   ];
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-50 text-slate-900'>
-      <main className='mx-auto flex max-w-6xl flex-col gap-8 px-4 pb-12 pt-6 sm:px-6 lg:px-8'>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Mi tablero"
+        title={`Hola, ${profile.nombre.split(' ')[0]}.`}
+        description={heroDescription}
+        actions={
+          <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+            <Link href="/inbox">Abrir Inbox</Link>
+          </Button>
+        }
+      />
+
         <section className='grid gap-4 lg:grid-cols-[2fr_1.1fr]'>
           <Card className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
             <CardContent className='flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between'>
               <div className='flex-1 space-y-3'>
                 <p className='text-[11px] uppercase tracking-[0.25em] text-slate-400'>Panel de gestión</p>
-                <h1 className='text-2xl font-semibold tracking-tight'>Hola, {profile.nombre.split(' ')[0]}.</h1>
+                <h2 className='text-2xl font-semibold tracking-tight'>Estado de tu cartera</h2>
                 <p className='max-w-xl text-sm leading-relaxed text-slate-600'>{heroDescription}</p>
               </div>
               <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
@@ -119,10 +133,9 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   </div>
                   <div>
                     <p className='text-sm font-medium text-slate-900'>{profile.nombre}</p>
-                    <p className='text-xs capitalize text-slate-500'>{profile.role.replace('_', ' ')}</p>
+                    <p className='text-xs text-slate-500'>{formatRoleLabel(profile.role)}</p>
                   </div>
                 </div>
-                <LogoutButton />
               </div>
             </CardContent>
           </Card>
@@ -407,7 +420,6 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
             <TemplateLibrary templates={templates} />
           </div>
         </section>
-      </main>
     </div>
   );
 }

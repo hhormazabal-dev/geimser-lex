@@ -134,7 +134,7 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
     const requestsQuery = supabase
       .from('info_requests')
       .select('id, titulo, estado, tipo, prioridad, fecha_limite, case:cases(id, caratulado)')
-      .in('estado', ['pendiente', 'vencido', 'en_revision'])
+      .in('estado', ['pendiente', 'en_revision'])
       .order('fecha_limite', { ascending: true, nullsFirst: false });
 
     if (visibleCaseIds) {
@@ -206,4 +206,3 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
-

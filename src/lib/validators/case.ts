@@ -234,6 +234,7 @@ export const assignLawyerSchema = z.object({
 export const caseFiltersSchema = z.object({
   estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado']).optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'urgente']).optional(),
+  workflow_state: z.enum(['preparacion', 'en_revision', 'activo', 'cerrado']).optional(),
   abogado_responsable: z.string().uuid().optional(),
   materia: z.string().optional(),
   fecha_inicio_desde: z.string().optional(),
