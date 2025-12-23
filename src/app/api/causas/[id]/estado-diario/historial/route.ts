@@ -381,6 +381,45 @@ async function scanRangeFromPjud(params: {
   return { entries: out, scannedDays, failures, partial };
 }
 
+function normalizeSpace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function mergeHistoryEntries(
+  a: DailyStatementsHistoryEntry[],
+  b: DailyStatementsHistoryEntry[],
+): DailyStatementsHistoryEntry[] {
+  const byDate = new Map<string, DailyStatementsHistoryEntry>();
+
+  const upsert = (entry: DailyStatementsHistoryEntry) => {
+    const existing = byDate.get(entry.date);
+    if (!existing) {
+      byDate.set(entry.date, { date: entry.date, items: [...(entry.items ?? [])] });
+      return;
+    }
+
+    const seen = new Set(
+      (existing.items ?? []).map((it) =>
+        normalizeSpace(`${it.competencia}|${it.numeroIngreso}|${it.partes}|${it.providencias}`),
+      ),
+    );
+
+    for (const it of entry.items ?? []) {
+      const key = normalizeSpace(`${it.competencia}|${it.numeroIngreso}|${it.partes}|${it.providencias}`);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      existing.items.push(it);
+    }
+  };
+
+  for (const entry of a) upsert(entry);
+  for (const entry of b) upsert(entry);
+
+  const merged = Array.from(byDate.values());
+  merged.sort((x, y) => (toDateKeyDDMMYYYY(y.date) ?? 0) - (toDateKeyDDMMYYYY(x.date) ?? 0));
+  return merged;
+}
+
 async function scanLastFromPjud(params: {
   court: CourtConfig;
   cacheDb: any | null;
@@ -527,14 +566,16 @@ export async function GET(
     let partial = false;
 
     let matches: DailyStatementsHistoryEntry[] = [];
+    let cachedMatches: DailyStatementsHistoryEntry[] = [];
     if (cacheDb && (source === 'cache' || source === 'hybrid')) {
-      matches = await readMatchesFromDbCache({
+      cachedMatches = await readMatchesFromDbCache({
         db: cacheDb,
         court,
         toDate,
         days,
         caseNumeroCausa,
       });
+      matches = cachedMatches;
       scannedDays = days;
     }
 
@@ -547,7 +588,7 @@ export async function GET(
         caseNumeroCausa,
         deadlineAtMs,
       });
-      matches = scanned.entries;
+      matches = source === 'hybrid' ? mergeHistoryEntries(cachedMatches, scanned.entries) : scanned.entries;
       scannedDays = scanned.scannedDays;
       failures = scanned.failures;
       partial = scanned.partial;

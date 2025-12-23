@@ -602,7 +602,7 @@ export function DailyStatementsPanel({ caseId, caseNumeroCausa }: DailyStatement
                   <thead className="bg-white/60">
                     <tr className="text-left text-foreground/70">
                       <th className="px-3 py-2 font-semibold">Fecha</th>
-                      <th className="px-3 py-2 font-semibold">Coincidencias</th>
+                      <th className="px-3 py-2 font-semibold">Movimientos</th>
                       <th className="px-3 py-2 font-semibold" />
                     </tr>
                   </thead>
@@ -610,7 +610,22 @@ export function DailyStatementsPanel({ caseId, caseNumeroCausa }: DailyStatement
                     {historyEntries.map((entry) => (
                       <tr key={entry.date}>
                         <td className="px-3 py-2 font-medium text-foreground">{entry.date}</td>
-                        <td className="px-3 py-2 text-foreground/80">{entry.items.length}</td>
+                        <td className="px-3 py-2 text-foreground/80">
+                          <div className="space-y-1">
+                            {entry.items.slice(0, 2).map((item, idx) => (
+                              <div key={`${entry.date}-${item.numeroIngreso}-${idx}`} className="text-xs">
+                                <span className="font-medium text-foreground/80">{item.competencia}</span>
+                                <span className="text-foreground/60"> · </span>
+                                <span className="text-foreground/75">{item.providencias}</span>
+                              </div>
+                            ))}
+                            {entry.items.length > 2 && (
+                              <div className="text-xs text-foreground/55">
+                                +{entry.items.length - 2} movimiento(s) más
+                              </div>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-2 text-right">
                           <Button
                             type="button"
