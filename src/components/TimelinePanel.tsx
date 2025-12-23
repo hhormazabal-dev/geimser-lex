@@ -686,6 +686,52 @@ export function TimelinePanel({
     }
   };
 
+  const handleEditStageCost = async (stage: CaseStage) => {
+    const current = stage.costo_uf ?? null;
+    const input = prompt('Costo de la etapa (UF)', current !== null ? String(current) : '');
+    if (input === null) return;
+
+    const parsed = Number(input.trim().replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      toast({
+        title: 'Monto inválido',
+        description: 'Ingresa un número válido (UF) mayor o igual a 0.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setPaymentActionStage(stage.id);
+      const result = await updateStage(stage.id, {
+        costo_uf: parsed,
+        requiere_pago: true,
+      });
+      if (!result.success) {
+        toast({
+          title: 'No se pudo actualizar el costo',
+          description: result.error || 'Intenta nuevamente.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Costo actualizado',
+          description: `Nuevo costo: ${formatUf(parsed)}.`,
+        });
+        await loadStages();
+      }
+    } catch (error) {
+      console.error('Error updating stage cost:', error);
+      toast({
+        title: 'Error inesperado',
+        description: 'No pudimos actualizar el costo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPaymentActionStage(null);
+    }
+  };
+
   const filteredStages = showPrivateStages 
     ? stages 
     : stages.filter(stage => stage.es_publica);
@@ -695,6 +741,7 @@ export function TimelinePanel({
   const totalPagadoEtapas = stages.reduce((sum, stage) => sum + (stage.monto_pagado_uf ?? 0), 0);
   const etapasRequierenPago = stages.filter((stage) => stage.requiere_pago);
   const etapasCobroOrdenadas = [...etapasRequierenPago].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+  const showPaymentTimeline = etapasCobroOrdenadas.length > 0;
   const etapasPagadas = etapasRequierenPago.filter((stage) => stage.estado_pago === 'pagado').length;
   const etapasPendientesPago = etapasRequierenPago.filter(
     (stage) => stage.estado_pago !== 'pagado'
@@ -920,6 +967,16 @@ export function TimelinePanel({
                           )}
                           {canEditPayments && (
                             <>
+                              <Button
+                                size='sm'
+                                variant='outline'
+                                className='rounded-full px-3'
+                                onClick={() => handleEditStageCost(stage)}
+                                disabled={busy}
+                              >
+                                <DollarSign className='mr-2 h-4 w-4' />
+                                Editar costo
+                              </Button>
                               <Button
                                 size='sm'
                                 variant='outline'
@@ -1483,7 +1540,7 @@ export function TimelinePanel({
                                 </a>
                               </Button>
                             )}
-                            {canManageStages && (
+                            {canManageStages && !showPaymentTimeline && (
                               <>
                                 <Button
                                   size='sm'

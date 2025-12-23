@@ -77,6 +77,25 @@ function daysBetween(startIso?: string | null, endIso?: string | null): number |
   return Math.max(Math.round((end.getTime() - start.getTime()) / msPerDay), 0);
 }
 
+function normalizeSpace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function parsePartyLines(raw?: string | null): Array<{ nombre: string; rut?: string | null }> {
+  if (!raw) return [];
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^(.*?)(?:\s*\(RUT[:\s]+(.+?)\))?\s*$/i);
+      const nombre = normalizeSpace((match?.[1] ?? line).trim());
+      const rut = normalizeSpace((match?.[2] ?? '').trim());
+      return { nombre, ...(rut ? { rut } : {}) };
+    })
+    .filter((row) => row.nombre.length > 0);
+}
+
 interface CaseDetailViewProps {
   case: Omit<Case, 'abogado_responsable'> & {
     fecha_termino?: string | null;
@@ -91,6 +110,7 @@ interface CaseDetailViewProps {
       nombre: string;
       email: string;
       telefono?: string;
+      rut?: string | null;
     }>;
     case_stages?: CaseStage[];
     counterparties?: CaseCounterparty[];
@@ -305,6 +325,45 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     caseData.sentencia_fecha,
     stageCatalog,
   ]);
+
+  const parties = useMemo(() => {
+    const primaryClientId = caseData.cliente_principal_id ?? null;
+    const primaryClient =
+      primaryClientId && Array.isArray(caseData.clients)
+        ? caseData.clients.find((client) => client.id === primaryClientId) ?? null
+        : null;
+
+    const demandantesFromText = parsePartyLines(caseData.nombre_cliente);
+    const demandadosFromText = parsePartyLines(caseData.contraparte);
+
+    const demandantesFromCounterparties = (counterparties ?? [])
+      .filter((item) => item.tipo === 'demandante')
+      .map((item) => ({ nombre: normalizeSpace(item.nombre ?? ''), rut: item.rut ?? null }))
+      .filter((row) => row.nombre.length > 0);
+
+    const demandadosFromCounterparties = (counterparties ?? [])
+      .filter((item) => item.tipo === 'demandado')
+      .map((item) => ({ nombre: normalizeSpace(item.nombre ?? ''), rut: item.rut ?? null }))
+      .filter((row) => row.nombre.length > 0);
+
+    const mergeUnique = (rows: Array<{ nombre: string; rut?: string | null }>) => {
+      const seen = new Set<string>();
+      const out: Array<{ nombre: string; rut?: string | null }> = [];
+      for (const row of rows) {
+        const key = normalizeSpace(row.nombre).toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(row);
+      }
+      return out;
+    };
+
+    return {
+      primaryClient,
+      demandantes: mergeUnique([...demandantesFromCounterparties, ...demandantesFromText]),
+      demandados: mergeUnique([...demandadosFromCounterparties, ...demandadosFromText]),
+    };
+  }, [caseData.clients, caseData.cliente_principal_id, caseData.contraparte, caseData.nombre_cliente, counterparties]);
   const requestedStageName = clientAdvance.solicitado > 0 ? stageNamesByOrder.get(clientAdvance.solicitado) ?? null : null;
   const authorizedStageName = clientAdvance.autorizado > 0 ? stageNamesByOrder.get(clientAdvance.autorizado) ?? null : null;
   const [isAuthorizing, setIsAuthorizing] = useState(false);
@@ -346,6 +405,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
 
   const canEdit =
     profile.role === 'admin_firma' ||
+    profile.role === 'analista' ||
     (profile.role === 'abogado' && caseData.abogado_responsable?.id === profile.id);
   const canReassign = profile.role === 'admin_firma' || profile.role === 'analista';
 
@@ -880,7 +940,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               </div>
 
               {/* Cliente */}
-              {caseData.nombre_cliente && (
+              {(parties.primaryClient || parties.demandantes.length > 0 || parties.demandados.length > 0) && (
                 <div className="group relative overflow-hidden rounded-2xl border border-emerald-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                   <div
                     aria-hidden
@@ -890,16 +950,73 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
-                          Cliente principal
+                          Partes
                         </p>
-                        <p className="mt-3 text-base font-semibold text-foreground">
-                          {caseData.nombre_cliente}
-                        </p>
-                        {caseData.rut_cliente && (
-                          <p suppressHydrationWarning className="mt-1 text-sm text-foreground/60">
-                            RUT · {caseData.rut_cliente}
-                          </p>
-                        )}
+                        <div className="mt-3 space-y-3 text-sm text-foreground/70">
+                          <div className="flex items-start gap-2">
+                            <Badge variant="outline" className="badge-spark shrink-0">
+                              Cliente principal
+                            </Badge>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-foreground">
+                                {parties.primaryClient?.nombre ?? 'Sin registrar'}
+                              </p>
+                              {(parties.primaryClient?.rut || parties.primaryClient?.email) && (
+                                <p className="text-xs text-foreground/55">
+                                  {parties.primaryClient?.rut ? `RUT · ${parties.primaryClient.rut}` : ''}
+                                  {parties.primaryClient?.rut && parties.primaryClient?.email ? ' · ' : ''}
+                                  {parties.primaryClient?.email ? parties.primaryClient.email : ''}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-2">
+                            <Badge variant="outline" className="badge-spark shrink-0">
+                              Demandante
+                            </Badge>
+                            <div className="min-w-0 space-y-1">
+                              {parties.demandantes.length === 0 ? (
+                                <p className="text-foreground/55">Sin registrar</p>
+                              ) : (
+                                <>
+                                  {parties.demandantes.slice(0, 2).map((row, idx) => (
+                                    <p key={`demandante-${row.nombre}-${idx}`} className="text-foreground/75">
+                                      {row.nombre}
+                                      {row.rut ? <span className="text-xs text-foreground/55">{` · RUT ${row.rut}`}</span> : null}
+                                    </p>
+                                  ))}
+                                  {parties.demandantes.length > 2 && (
+                                    <p className="text-xs text-foreground/55">+{parties.demandantes.length - 2} más</p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-2">
+                            <Badge variant="outline" className="badge-spark shrink-0">
+                              Demandado
+                            </Badge>
+                            <div className="min-w-0 space-y-1">
+                              {parties.demandados.length === 0 ? (
+                                <p className="text-foreground/55">Sin registrar</p>
+                              ) : (
+                                <>
+                                  {parties.demandados.slice(0, 2).map((row, idx) => (
+                                    <p key={`demandado-${row.nombre}-${idx}`} className="text-foreground/75">
+                                      {row.nombre}
+                                      {row.rut ? <span className="text-xs text-foreground/55">{` · RUT ${row.rut}`}</span> : null}
+                                    </p>
+                                  ))}
+                                  {parties.demandados.length > 2 && (
+                                    <p className="text-xs text-foreground/55">+{parties.demandados.length - 2} más</p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-600">
                         <User className="h-5 w-5" />

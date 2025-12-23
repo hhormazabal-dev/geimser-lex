@@ -1004,7 +1004,7 @@ export async function getCaseById(caseId: string) {
         .order('created_at', { ascending: false }),
       supabase
         .from('case_clients')
-        .select('client:profiles!case_clients_client_profile_id_fkey(id, nombre, email, telefono)')
+        .select('client:profiles!case_clients_client_profile_id_fkey(id, nombre, email, telefono, rut)')
         .eq('case_id', caseId)
         .order('created_at', { ascending: true }),
     ]);
@@ -1026,11 +1026,11 @@ export async function getCaseById(caseId: string) {
       info_requests: reqsRes?.data ?? [],
       counterparties: counterpartiesRes?.data ?? [],
       clients:
-        clientsRes?.data
-          ?.map((item: { client: { id: string; nombre: string; email: string; telefono: string | null } | null }) =>
+      clientsRes?.data
+          ?.map((item: { client: { id: string; nombre: string; email: string; telefono: string | null; rut?: string | null } | null }) =>
             item.client ? { ...item.client } : null,
           )
-          .filter((client): client is { id: string; nombre: string; email: string; telefono: string | null } => Boolean(client)) ??
+          .filter((client): client is { id: string; nombre: string; email: string; telefono: string | null; rut?: string | null } => Boolean(client)) ??
         [],
     };
 
