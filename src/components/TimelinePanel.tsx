@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,15 +19,9 @@ import {
   CheckCircle, 
   Circle, 
   Plus, 
-  Edit, 
   Trash2, 
-  Calendar,
-  User,
-  Users,
   Gavel,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
   DollarSign,
   ExternalLink,
   Wallet,
@@ -83,7 +77,6 @@ export function TimelinePanel({
   const [stages, setStages] = useState<CaseStage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  const [editingStage, setEditingStage] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newStage, setNewStage] = useState<DraftStageState>({
     etapa: '',
@@ -114,35 +107,8 @@ export function TimelinePanel({
     autorizado: alcanceAutorizado,
   });
   const [isRequestingStage, setIsRequestingStage] = useState<string | null>(null);
-  const stageTrackRef = useRef<HTMLDivElement | null>(null);
-  const prevStageCountRef = useRef<number>(0);
-  const [canScrollPrev, setCanScrollPrev] = useState(false);
-  const [canScrollNext, setCanScrollNext] = useState(false);
-  const [hasAutoAligned, setHasAutoAligned] = useState(false);
-
-  const updateScrollControls = useCallback(() => {
-    const track = stageTrackRef.current;
-    if (!track) {
-      setCanScrollPrev(false);
-      setCanScrollNext(false);
-      return;
-    }
-    const { scrollLeft, scrollWidth, clientWidth } = track;
-    setCanScrollPrev(scrollLeft > 12);
-    setCanScrollNext(scrollLeft + clientWidth < scrollWidth - 12);
-  }, []);
-
-  const scrollTrack = useCallback((direction: 'prev' | 'next') => {
-    const track = stageTrackRef.current;
-    if (!track) return;
-    const offset = direction === 'next' ? track.clientWidth * 0.75 : -track.clientWidth * 0.75;
-    track.scrollBy({ left: offset, behavior: 'smooth' });
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(updateScrollControls);
-    } else {
-      updateScrollControls();
-    }
-  }, [updateScrollControls]);
+  const [activeSection, setActiveSection] = useState<'proceso' | 'cobro'>('cobro');
+  const [hasInitializedSection, setHasInitializedSection] = useState(false);
 
   const loadStages = async () => {
     setIsLoading(true);
@@ -173,6 +139,11 @@ export function TimelinePanel({
 
   useEffect(() => {
     loadStages();
+  }, [caseId]);
+
+  useEffect(() => {
+    setHasInitializedSection(false);
+    setActiveSection('cobro');
   }, [caseId]);
 
   useEffect(() => {
@@ -743,9 +714,6 @@ export function TimelinePanel({
   const etapasCobroOrdenadas = [...etapasRequierenPago].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
   const showPaymentTimeline = etapasCobroOrdenadas.length > 0;
   const etapasPagadas = etapasRequierenPago.filter((stage) => stage.estado_pago === 'pagado').length;
-  const etapasPendientesPago = etapasRequierenPago.filter(
-    (stage) => stage.estado_pago !== 'pagado'
-  ).length;
   const etapasSolicitadas = etapasRequierenPago.filter((stage) => stage.estado_pago === 'solicitado').length;
 
   const findStageLabelByOrder = (order: number) => {
@@ -758,42 +726,16 @@ export function TimelinePanel({
   const authorizedStageLabel = clientMode ? findStageLabelByOrder(clientProgress.autorizado) : null;
 
   useEffect(() => {
-    updateScrollControls();
-    const track = stageTrackRef.current;
-    if (!track) return;
-    const handleScroll = () => updateScrollControls();
-    track.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      track.removeEventListener('scroll', handleScroll);
-    };
-  }, [filteredStages.length, updateScrollControls]);
+    if (isLoading || hasInitializedSection) return;
+    setActiveSection(showPaymentTimeline ? 'cobro' : 'proceso');
+    setHasInitializedSection(true);
+  }, [hasInitializedSection, isLoading, showPaymentTimeline]);
 
   useEffect(() => {
-    if (isLoading) return;
-    const track = stageTrackRef.current;
-    if (!track) return;
-
-    if (filteredStages.length === 0) {
-      prevStageCountRef.current = 0;
-      setHasAutoAligned(false);
-      return;
+    if (!showPaymentTimeline && activeSection === 'cobro') {
+      setActiveSection('proceso');
     }
-
-    const targetIndex = filteredStages.findIndex((stage) => stage.estado !== 'completado');
-    const indexToReveal = targetIndex === -1 ? filteredStages.length - 1 : targetIndex;
-    const targetChild = track.children.item(indexToReveal) as HTMLElement | null;
-
-    const lengthChanged = prevStageCountRef.current !== filteredStages.length;
-    if ((lengthChanged || !hasAutoAligned) && targetChild) {
-      track.scrollTo({
-        left: Math.max(0, targetChild.offsetLeft - 24),
-        behavior: hasAutoAligned ? 'smooth' : 'auto',
-      });
-      setHasAutoAligned(true);
-    }
-
-    prevStageCountRef.current = filteredStages.length;
-  }, [filteredStages, isLoading, hasAutoAligned]);
+  }, [activeSection, showPaymentTimeline]);
 
   useEffect(() => {
     if (showAddForm && etapasRequierenPago.length > 0) {
@@ -801,77 +743,71 @@ export function TimelinePanel({
     }
   }, [showAddForm, etapasRequierenPago.length]);
 
-  if (isLoading) {
-    return (
-      <Card className='w-full shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)]'>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Clock className='h-5 w-5' />
-            Timeline Procesal
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className='flex items-center justify-center py-8'>
-            <Loader2 className='h-6 w-6 animate-spin' />
+	  if (isLoading) {
+	    return (
+	      <Card className='w-full shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)]'>
+	        <CardHeader>
+	          <CardTitle className='flex items-center gap-2'>
+	            <Clock className='h-5 w-5' />
+	            Timeline
+	          </CardTitle>
+	        </CardHeader>
+	        <CardContent>
+	          <div className='flex items-center justify-center py-8'>
+	            <Loader2 className='h-6 w-6 animate-spin' />
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  return (
-    <Card className='w-full shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)] lg:col-span-full'>
-      <CardHeader>
-        <div className='flex items-center justify-between'>
-          <CardTitle className='flex items-center gap-2'>
-            <Clock className='h-5 w-5' />
-            Timeline Procesal ({filteredStages.length})
-          </CardTitle>
-          {canManageStages && (
-            <Button
-              size='sm'
-              className='rounded-full px-4'
-              onClick={() => setShowAddForm(!showAddForm)}
-              disabled={isCreating}
-            >
-              <Plus className='h-4 w-4 mr-2' />
-              Nueva Etapa
-            </Button>
-          )}
-        </div>
+	  return (
+	    <Card className='w-full shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)] lg:col-span-full'>
+	      <CardHeader>
+	        <div className='flex items-center justify-between'>
+	          <CardTitle className='flex items-center gap-2'>
+	            <Clock className='h-5 w-5' />
+	            {activeSection === 'cobro'
+	              ? `Etapas de cobro (${etapasCobroOrdenadas.length})`
+	              : `Timeline Procesal (${filteredStages.length})`}
+	          </CardTitle>
+	          <div className='flex items-center gap-2'>
+	            {showPaymentTimeline && (
+	              <>
+	                <Button
+	                  size='sm'
+	                  variant={activeSection === 'proceso' ? 'default' : 'outline'}
+	                  className='rounded-full px-4'
+	                  onClick={() => setActiveSection('proceso')}
+	                >
+	                  Procesal
+	                </Button>
+	                <Button
+	                  size='sm'
+	                  variant={activeSection === 'cobro' ? 'default' : 'outline'}
+	                  className='rounded-full px-4'
+	                  onClick={() => setActiveSection('cobro')}
+	                >
+	                  Cobro
+	                </Button>
+	              </>
+	            )}
+	            {activeSection === 'proceso' && canManageStages && (
+	              <Button
+	                size='sm'
+	                className='rounded-full px-4'
+	                onClick={() => setShowAddForm(!showAddForm)}
+	                disabled={isCreating}
+	              >
+	                <Plus className='h-4 w-4 mr-2' />
+	                Nueva Etapa
+	              </Button>
+	            )}
+	          </div>
+	        </div>
       </CardHeader>
       <CardContent className='space-y-6'>
-        {etapasRequierenPago.length > 0 && (
-          <div className='grid gap-5 sm:grid-cols-2 xl:grid-cols-4'>
-            <div className='rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/30 px-7 py-6 shadow-sm'>
-              <p className='text-sm font-medium text-slate-500'>Honorario distribuido</p>
-              <p className='mt-5 text-3xl font-semibold text-slate-900 tracking-tight'>{formatUf(totalCostoEtapas)}</p>
-            </div>
-            <div className='rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/30 px-7 py-6 shadow-sm'>
-              <p className='text-sm font-medium text-slate-500'>Pagado</p>
-              <p className='mt-5 text-3xl font-semibold text-slate-900 tracking-tight'>{formatUf(totalPagadoEtapas)}</p>
-            </div>
-            <div className='rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/30 px-7 py-6 shadow-sm'>
-              <p className='text-sm font-medium text-slate-500'>Etapas liberadas</p>
-              <p className='mt-5 text-3xl font-semibold text-slate-900 tracking-tight'>
-                {etapasPagadas} / {etapasRequierenPago.length}
-              </p>
-              {etapasPendientesPago > 0 && (
-                <p className='mt-3 text-xs leading-5 text-sky-600'>
-                  Faltan {etapasPendientesPago} pago(s) para completar el plan.
-                </p>
-              )}
-            </div>
-            {clientMode && (
-              <div className='rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/30 px-7 py-6 shadow-sm'>
-                <p className='text-sm font-medium text-slate-500'>Solicitadas por el cliente</p>
-                <p className='mt-5 text-3xl font-semibold text-slate-900 tracking-tight'>{etapasSolicitadas}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {clientMode && (
+        {activeSection === 'proceso' && clientMode && (
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
               <p className="text-sm font-medium text-slate-500">Alcance solicitado</p>
@@ -903,15 +839,16 @@ export function TimelinePanel({
           </div>
         )}
 
-        {etapasCobroOrdenadas.length > 0 && (
+        {activeSection === 'cobro' && etapasCobroOrdenadas.length > 0 && (
           <div className='rounded-3xl border border-white/40 bg-white/70 p-6 shadow-inner'>
             <div className='flex flex-wrap items-end justify-between gap-3'>
               <div>
                 <h3 className='text-sm font-semibold text-foreground/70'>Etapas de cobro</h3>
                 <p className='mt-1 text-xs text-foreground/50'>Timeline de pagos por etapa (más fácil de revisar).</p>
               </div>
-              <div className='text-xs text-foreground/50'>
-                {etapasPagadas} / {etapasCobroOrdenadas.length} pagadas
+              <div className='text-xs text-foreground/50 text-right'>
+                <div>{etapasPagadas} / {etapasCobroOrdenadas.length} pagadas</div>
+                <div>Total {formatUf(totalCostoEtapas)} · Pagado {formatUf(totalPagadoEtapas)}</div>
               </div>
             </div>
 
@@ -1032,7 +969,7 @@ export function TimelinePanel({
         )}
 
         {/* Formulario para nueva etapa */}
-        {showAddForm && canManageStages && (
+        {activeSection === 'proceso' && showAddForm && canManageStages && (
           <Card className='border border-dashed border-white/40 bg-white/80 shadow-lg'>
             <CardContent className='pt-6'>
               <div className='space-y-5'>
@@ -1346,38 +1283,14 @@ export function TimelinePanel({
           </Card>
         )}
 
+        {activeSection === 'proceso' && (
+          <>
         {/* Timeline de etapas */}
         <div className='space-y-4'>
           <div className='flex flex-wrap items-center justify-between gap-3 lg:items-end'>
             <p className='text-sm text-foreground/60'>
               Revisa el avance completo: arrastra en pantallas pequeñas o navega la grilla en escritorio.
             </p>
-            {filteredStages.length > 0 && (
-              <div className='flex items-center gap-2 lg:hidden'>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  className='rounded-full border border-white/40 bg-white/60 backdrop-blur'
-                  onClick={() => scrollTrack('prev')}
-                  disabled={!canScrollPrev}
-                  aria-label='Ver etapas anteriores'
-                >
-                  <ChevronLeft className='h-4 w-4' />
-                </Button>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  className='rounded-full border border-white/40 bg-white/60 backdrop-blur'
-                  onClick={() => scrollTrack('next')}
-                  disabled={!canScrollNext}
-                  aria-label='Ver etapas siguientes'
-                >
-                  <ChevronRight className='h-4 w-4' />
-                </Button>
-              </div>
-            )}
           </div>
           <div className='relative lg:rounded-3xl lg:border lg:border-white/40 lg:bg-white/60 lg:p-6 lg:shadow-inner'>
             {filteredStages.length > 0 && (
@@ -1386,10 +1299,7 @@ export function TimelinePanel({
                 <div className='pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white via-white/80 to-transparent lg:hidden' />
               </>
             )}
-            <div
-              ref={stageTrackRef}
-              className='flex gap-4 overflow-x-auto pb-4 pl-2 pr-10 scroll-smooth snap-x snap-mandatory sm:pl-4 sm:pr-14 lg:grid lg:[grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] lg:gap-4 lg:overflow-visible lg:p-0 lg:snap-none'
-            >
+            <div className='flex gap-4 overflow-x-auto pb-4 pl-2 pr-10 scroll-smooth snap-x snap-mandatory sm:pl-4 sm:pr-14 lg:grid lg:[grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] lg:gap-4 lg:overflow-visible lg:p-0 lg:snap-none'>
               {filteredStages.map((stage, index) => {
                 const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
                 const stageOrder = stage.orden ?? index + 1;
@@ -1413,7 +1323,7 @@ export function TimelinePanel({
                     `Audiencia ${stage.audiencia_tipo}`
                   : null;
                 const statusBadge = getStatusBadge(stage.estado || 'pendiente');
-                const paymentBadge = stage.requiere_pago
+                const paymentBadge = !showPaymentTimeline && stage.requiere_pago
                   ? getPaymentStatusBadge(stage.estado_pago ?? 'pendiente')
                   : null;
 
@@ -1456,7 +1366,7 @@ export function TimelinePanel({
                             stage.requiere_testigos ||
                             stageResponsable ||
                             stage.fecha_programada ||
-                            stage.requiere_pago) && (
+                            (!showPaymentTimeline && stage.requiere_pago)) && (
                             <div className='grid grid-cols-1 gap-3 text-xs text-foreground/60 sm:grid-cols-2'>
                               {stage.fecha_programada && (
                                 <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
@@ -1495,7 +1405,7 @@ export function TimelinePanel({
                                   )}
                                 </div>
                               )}
-                              {stage.requiere_pago && (
+                              {stage.requiere_pago && !showPaymentTimeline && (
                                 <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
                                   <p className='text-[10px] uppercase tracking-[0.22em] text-foreground/40'>
                                     Cobranza
@@ -1659,14 +1569,6 @@ export function TimelinePanel({
                                 size='sm'
                                 variant='ghost'
                                 className='rounded-full px-3'
-                                onClick={() => setEditingStage(stage.id)}
-                              >
-                                <Edit className='h-4 w-4' />
-                              </Button>
-                              <Button
-                                size='sm'
-                                variant='ghost'
-                                className='rounded-full px-3'
                                 onClick={() => handleDeleteStage(stage.id)}
                               >
                                 <Trash2 className='h-4 w-4' />
@@ -1714,6 +1616,8 @@ export function TimelinePanel({
               ))}
             </ul>
           </div>
+        )}
+          </>
         )}
       </CardContent>
     </Card>

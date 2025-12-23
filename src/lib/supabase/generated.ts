@@ -138,18 +138,21 @@ export type Database = {
           client_profile_id: string
           created_at: string | null
           id: string
+          is_primary: boolean
         }
         Insert: {
           case_id: string
           client_profile_id: string
           created_at?: string | null
           id?: string
+          is_primary?: boolean
         }
         Update: {
           case_id?: string
           client_profile_id?: string
           created_at?: string | null
           id?: string
+          is_primary?: boolean
         }
         Relationships: [
           {

@@ -260,6 +260,7 @@ export function CaseForm({
 
   const FIELD_LABELS: Record<string, string> = {
     cliente_principal_id: 'Cliente principal',
+    clientes_principales_extra_ids: 'Co-clientes principales',
     nombre_cliente: 'Demandante(s)',
     rut_cliente: 'RUT demandante principal',
     caratulado: 'Carátula',
@@ -294,6 +295,7 @@ export function CaseForm({
 
   const FIELD_ORDER = [
     'cliente_principal_id',
+    'clientes_principales_extra_ids',
     'nombre_cliente',
     'rut_cliente',
     'caratulado',
@@ -438,6 +440,10 @@ export function CaseForm({
         notificacion_demanda_fecha: (existingCase as any).notificacion_demanda_fecha ?? '',
         abogado_responsable: existingLawyerId || defaultLawyerId,
         cliente_principal_id: existingCase.cliente_principal_id ?? '',
+        clientes_principales_extra_ids:
+          ((existingCase as any).clients as Array<{ id: string; is_primary?: boolean }> | undefined)
+            ?.filter((client) => Boolean(client?.is_primary) && client.id !== (existingCase.cliente_principal_id ?? ''))
+            .map((client) => client.id) ?? [],
         prioridad: (existingCase.prioridad || 'media') as CreateCaseInput['prioridad'],
         valor_estimado: existingCase.valor_estimado || undefined,
         honorario_total_uf: (existingCase as any).honorario_total_uf ?? undefined,
@@ -477,6 +483,7 @@ export function CaseForm({
         notificacion_demanda_fecha: '',
         abogado_responsable: defaultLawyerId,
         cliente_principal_id: '',
+        clientes_principales_extra_ids: [],
         prioridad: 'media',
         valor_estimado: undefined,
         honorario_total_uf: undefined,
@@ -565,6 +572,7 @@ export function CaseForm({
   }, [demandados, contraparteField]);
 
   const clientePrincipalId = watch('cliente_principal_id');
+  const clientesPrincipalesExtraIds = watch('clientes_principales_extra_ids');
   const caratuladoValue = watch('caratulado');
   const materiaValue = watch('materia');
   const descripcionInicialValue = watch('descripcion_inicial');
@@ -733,6 +741,17 @@ export function CaseForm({
       return [nextFirstRow, ...prev.slice(1)];
     });
   }, [clientePrincipalId, clientOptions]);
+
+  useEffect(() => {
+    if (!clientePrincipalId) return;
+    const current = Array.isArray(clientesPrincipalesExtraIds) ? clientesPrincipalesExtraIds : [];
+    if (!current.includes(clientePrincipalId)) return;
+    setValue(
+      'clientes_principales_extra_ids',
+      current.filter((id) => id !== clientePrincipalId),
+      { shouldDirty: true, shouldValidate: true },
+    );
+  }, [clientePrincipalId, clientesPrincipalesExtraIds, setValue]);
 
   useEffect(() => {
     if (existingCase) return;
@@ -1337,6 +1356,51 @@ export function CaseForm({
                   {errors.cliente_principal_id && (
                     <p className='text-sm text-red-600'>{errors.cliente_principal_id.message}</p>
                   )}
+                  <Controller
+                    control={control}
+                    name='clientes_principales_extra_ids'
+                    render={({ field }) => {
+                      const selected = new Set<string>((field.value as string[] | undefined) ?? []);
+                      const options = clientOptions.filter((client) => client.id !== clientePrincipalId);
+                      if (options.length === 0) return <></>;
+
+                      return (
+                        <div className='mt-4 space-y-2 rounded-md border border-gray-200 bg-gray-50 p-4'>
+                          <p className='text-xs font-semibold uppercase tracking-[0.28em] text-gray-600'>
+                            Co-clientes principales (opcional)
+                          </p>
+                          <p className='text-xs text-gray-500'>
+                            Marca más de un cliente principal si el expediente tiene varios representados. Tendrán acceso al portal del caso.
+                          </p>
+                          <div className='mt-3 grid gap-2'>
+                            {options.map((client) => {
+                              const checked = selected.has(client.id);
+                              return (
+                                <label
+                                  key={client.id}
+                                  className='flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700'
+                                >
+                                  <input
+                                    type='checkbox'
+                                    className='h-4 w-4'
+                                    checked={checked}
+                                    onChange={(event) => {
+                                      const next = new Set(selected);
+                                      if (event.target.checked) next.add(client.id);
+                                      else next.delete(client.id);
+                                      field.onChange(Array.from(next));
+                                    }}
+                                    disabled={isLoading}
+                                  />
+                                  <span className='min-w-0 truncate'>{client.nombre}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
                   {isAddingClient && (
                     <div
                       role='group'

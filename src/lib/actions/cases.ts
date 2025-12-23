@@ -141,6 +141,7 @@ export async function createCase(input: CreateCaseInput) {
       audiencia_inicial_tipo,
       audiencia_inicial_fecha,
       audiencia_inicial_requiere_testigos,
+      clientes_principales_extra_ids,
       ...caseInput
     } = parsed;
 
@@ -241,7 +242,10 @@ export async function createCase(input: CreateCaseInput) {
       .single();
     if (error) throw error;
 
-    await upsertPrimaryClient(newCase.id, baseData.cliente_principal_id);
+    await upsertPrimaryClients(newCase.id, [
+      baseData.cliente_principal_id,
+      ...((clientes_principales_extra_ids ?? []) as string[]),
+    ]);
     await syncDemandadoCounterparties(supabase, newCase.id, baseData.contraparte);
     await createInitialStages(newCase);
 
@@ -383,6 +387,7 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       audiencia_inicial_tipo,
       audiencia_inicial_fecha,
       audiencia_inicial_requiere_testigos,
+      clientes_principales_extra_ids,
       ...rest
     } = validated;
 
@@ -521,7 +526,14 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       .single();
     if (error) throw error;
 
-    await upsertPrimaryClient(caseId, rest.cliente_principal_id ?? undefined);
+    if (
+      rest.cliente_principal_id !== undefined ||
+      clientes_principales_extra_ids !== undefined
+    ) {
+      const primaryBase = rest.cliente_principal_id ?? existingCase.cliente_principal_id ?? null;
+      const extra = (clientes_principales_extra_ids ?? []) as string[];
+      await upsertPrimaryClients(caseId, [primaryBase, ...extra]);
+    }
 
     if (rest.contraparte !== undefined) {
       await syncDemandadoCounterparties(supabase, caseId, rest.contraparte);
@@ -1004,7 +1016,7 @@ export async function getCaseById(caseId: string) {
         .order('created_at', { ascending: false }),
       supabase
         .from('case_clients')
-        .select('client:profiles!case_clients_client_profile_id_fkey(id, nombre, email, telefono, rut)')
+        .select('client_profile_id,is_primary,client:profiles!case_clients_client_profile_id_fkey(id, nombre, email, telefono, rut)')
         .eq('case_id', caseId)
         .order('created_at', { ascending: true }),
     ]);
@@ -1027,10 +1039,10 @@ export async function getCaseById(caseId: string) {
       counterparties: counterpartiesRes?.data ?? [],
       clients:
       clientsRes?.data
-          ?.map((item: { client: { id: string; nombre: string; email: string; telefono: string | null; rut?: string | null } | null }) =>
-            item.client ? { ...item.client } : null,
+          ?.map((item: { is_primary?: boolean | null; client: { id: string; nombre: string; email: string; telefono: string | null; rut?: string | null } | null }) =>
+            item.client ? { ...item.client, is_primary: Boolean(item.is_primary) } : null,
           )
-          .filter((client): client is { id: string; nombre: string; email: string; telefono: string | null; rut?: string | null } => Boolean(client)) ??
+          .filter((client): client is { id: string; nombre: string; email: string; telefono: string | null; rut?: string | null; is_primary: boolean } => Boolean(client)) ??
         [],
     };
 
@@ -1056,6 +1068,30 @@ async function upsertPrimaryClient(caseId: string, clientProfileId?: string | nu
       });
   } catch (error) {
     console.error('Error vinculando cliente principal al caso:', error);
+  }
+}
+
+async function upsertPrimaryClients(caseId: string, clientProfileIds: Array<string | null | undefined>) {
+  const ids = Array.from(new Set(clientProfileIds.filter((id): id is string => Boolean(id && id.trim()))));
+  if (ids.length === 0) return;
+
+  try {
+    const supabase = await getSB();
+    await supabase
+      .from('case_clients')
+      .upsert(
+        ids.map((id) => ({ case_id: caseId, client_profile_id: id, is_primary: true })),
+        { onConflict: 'case_id,client_profile_id' },
+      );
+
+    const inList = `(${ids.map((id) => `'${id}'`).join(',')})`;
+    await supabase
+      .from('case_clients')
+      .update({ is_primary: false })
+      .eq('case_id', caseId)
+      .not('client_profile_id', 'in', inList);
+  } catch (error) {
+    console.error('Error actualizando clientes principales del caso:', error);
   }
 }
 

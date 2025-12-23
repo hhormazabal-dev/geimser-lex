@@ -58,6 +58,7 @@ const baseCaseSchema = z.object({
   abogado_responsable: z.string().uuid('ID de abogado inválido').optional(),
   analista_id: z.string().uuid('ID de analista inválido').optional(),
   cliente_principal_id: z.string().uuid('ID de cliente inválido'),
+  clientes_principales_extra_ids: z.array(z.string().uuid('ID de cliente inválido')).optional(),
   workflow_state: z
     .enum(['preparacion', 'en_revision', 'activo', 'cerrado'])
     .default('preparacion'),

@@ -111,6 +111,7 @@ interface CaseDetailViewProps {
       email: string;
       telefono?: string;
       rut?: string | null;
+      is_primary?: boolean;
     }>;
     case_stages?: CaseStage[];
     counterparties?: CaseCounterparty[];
@@ -328,10 +329,22 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
 
   const parties = useMemo(() => {
     const primaryClientId = caseData.cliente_principal_id ?? null;
-    const primaryClient =
-      primaryClientId && Array.isArray(caseData.clients)
-        ? caseData.clients.find((client) => client.id === primaryClientId) ?? null
-        : null;
+    const allClients = Array.isArray(caseData.clients) ? caseData.clients : [];
+    const primaryFromFlag = allClients.filter((client) => Boolean(client.is_primary));
+    const primaryFromLegacy =
+      primaryClientId ? allClients.find((client) => client.id === primaryClientId) ?? null : null;
+
+    const primaryClients = (() => {
+      const seen = new Set<string>();
+      const out: Array<(typeof allClients)[number]> = [];
+      for (const c of primaryFromFlag) {
+        if (!c?.id || seen.has(c.id)) continue;
+        seen.add(c.id);
+        out.push(c);
+      }
+      if (primaryFromLegacy && !seen.has(primaryFromLegacy.id)) out.push(primaryFromLegacy);
+      return out;
+    })();
 
     const demandantesFromText = parsePartyLines(caseData.nombre_cliente);
     const demandadosFromText = parsePartyLines(caseData.contraparte);
@@ -359,7 +372,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     };
 
     return {
-      primaryClient,
+      primaryClients,
       demandantes: mergeUnique([...demandantesFromCounterparties, ...demandantesFromText]),
       demandados: mergeUnique([...demandadosFromCounterparties, ...demandadosFromText]),
     };
@@ -940,7 +953,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               </div>
 
               {/* Cliente */}
-              {(parties.primaryClient || parties.demandantes.length > 0 || parties.demandados.length > 0) && (
+              {(parties.primaryClients.length > 0 || parties.demandantes.length > 0 || parties.demandados.length > 0) && (
                 <div className="group relative overflow-hidden rounded-2xl border border-emerald-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                   <div
                     aria-hidden
@@ -955,18 +968,31 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         <div className="mt-3 space-y-3 text-sm text-foreground/70">
                           <div className="flex items-start gap-2">
                             <Badge variant="outline" className="badge-spark shrink-0">
-                              Cliente principal
+                              Clientes principales
                             </Badge>
                             <div className="min-w-0">
-                              <p className="font-semibold text-foreground">
-                                {parties.primaryClient?.nombre ?? 'Sin registrar'}
-                              </p>
-                              {(parties.primaryClient?.rut || parties.primaryClient?.email) && (
-                                <p className="text-xs text-foreground/55">
-                                  {parties.primaryClient?.rut ? `RUT · ${parties.primaryClient.rut}` : ''}
-                                  {parties.primaryClient?.rut && parties.primaryClient?.email ? ' · ' : ''}
-                                  {parties.primaryClient?.email ? parties.primaryClient.email : ''}
-                                </p>
+                              {parties.primaryClients.length === 0 ? (
+                                <p className="font-semibold text-foreground">Sin registrar</p>
+                              ) : (
+                                <>
+                                  {parties.primaryClients.slice(0, 2).map((client, idx) => (
+                                    <div key={`primary-client-${client.id}-${idx}`} className="space-y-0.5">
+                                      <p className="font-semibold text-foreground">{client.nombre}</p>
+                                      {(client.rut || client.email) && (
+                                        <p className="text-xs text-foreground/55">
+                                          {client.rut ? `RUT · ${client.rut}` : ''}
+                                          {client.rut && client.email ? ' · ' : ''}
+                                          {client.email ? client.email : ''}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {parties.primaryClients.length > 2 && (
+                                    <p className="text-xs text-foreground/55">
+                                      +{parties.primaryClients.length - 2} más
+                                    </p>
+                                  )}
+                                </>
                               )}
                             </div>
                           </div>
