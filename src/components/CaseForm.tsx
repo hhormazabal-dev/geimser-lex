@@ -57,6 +57,7 @@ type CaseFormMeta = {
 
 const OBSERVACIONES_META_PREFIX = '<!--case-form-meta:';
 const OBSERVACIONES_META_SUFFIX = '-->';
+const OBSERVACIONES_META_REGEX = /<!--case-form-meta:[\s\S]*?-->/g;
 
 function createRandomRowId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -204,19 +205,9 @@ function parseObservacionesMeta(value?: string | null): { text: string; meta: Ca
   return { text, meta };
 }
 
-function composeObservacionesMeta(text: string | undefined, meta: CaseFormMeta): string {
-  const cleaned = (text ?? '').trim();
-  const refinedMeta: CaseFormMeta = {};
-
-  if (meta.notification) {
-    refinedMeta.notification = meta.notification;
-  }
-
-  if (Object.keys(refinedMeta).length === 0) {
-    return cleaned;
-  }
-
-  return `${cleaned}${cleaned ? '\n\n' : ''}${OBSERVACIONES_META_PREFIX}${JSON.stringify(refinedMeta)}${OBSERVACIONES_META_SUFFIX}`;
+function cleanObservacionesText(value?: string | null): string {
+  if (!value) return '';
+  return value.replace(OBSERVACIONES_META_REGEX, '').trim();
 }
 
 const formatFileSize = (bytes: number) => {
@@ -937,12 +928,7 @@ export function CaseForm({
       const serializedDemandados = serializePartyRows(demandados);
       const primaryRut = demandantes[0]?.rut ?? '';
 
-      const metaObservaciones: CaseFormMeta = {};
-      if (notificacionEstado) {
-        metaObservaciones.notification = notificacionEstado;
-      }
-
-      const observacionesFinales = composeObservacionesMeta(data.observaciones, metaObservaciones);
+      const observacionesFinales = cleanObservacionesText(data.observaciones);
 
       const payload: CreateCaseInput = {
         ...data,

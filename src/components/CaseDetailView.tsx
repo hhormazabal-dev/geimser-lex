@@ -61,6 +61,13 @@ function getSentenceStatusLabel(status?: string | null): string {
   return SENTENCE_STATUS_LABELS[status] ?? 'Sin sentencia registrada';
 }
 
+const CASE_META_REGEX = /<!--case-form-meta:[\s\S]*?-->/g;
+
+function cleanObservaciones(value?: string | null): string {
+  if (!value) return '';
+  return value.replace(CASE_META_REGEX, '').trim();
+}
+
 function parseDateOnly(value?: string | null): Date | null {
   if (!value) return null;
   const [year, month, day] = value.split('-').map((part) => Number(part));
@@ -226,6 +233,10 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   const [selectedLawyerId, setSelectedLawyerId] = useState<string>(caseData.abogado_responsable?.id ?? '');
   const [isLoadingLawyers, setIsLoadingLawyers] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
+  const observacionesClean = useMemo(
+    () => cleanObservaciones(caseData.observaciones),
+    [caseData.observaciones],
+  );
   const stageNamesByOrder = useMemo(() => {
     const map = new Map<number, string>();
     stageCatalog.forEach((stage) => {
@@ -1275,11 +1286,11 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             )}
 
             {/* Observaciones */}
-            {caseData.observaciones && (
+            {observacionesClean && (
               <div className="mt-6 rounded-3xl border border-white/30 bg-white/75 p-6 shadow-inner">
                 <h3 className="text-lg font-semibold text-foreground mb-2">Observaciones</h3>
                 <p className="text-sm text-foreground/65 whitespace-pre-wrap">
-                  {caseData.observaciones}
+                  {observacionesClean}
                 </p>
               </div>
             )}

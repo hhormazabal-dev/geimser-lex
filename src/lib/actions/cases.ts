@@ -37,6 +37,13 @@ import type {
 
 const sOrNull = (v: string | undefined | null): string | null => (v ?? null);
 const nOrNull = (v: number | undefined | null): number | null => (v ?? null);
+const CASE_META_REGEX = /<!--case-form-meta:[\s\S]*?-->/g;
+
+function sanitizeObservaciones(value?: string | null): string | null {
+  if (value === undefined || value === null) return null;
+  const cleaned = value.replace(CASE_META_REGEX, '').trim();
+  return cleaned.length > 0 ? cleaned : null;
+}
 
 type ParsedPartyRow = { nombre: string; rut: string | null };
 
@@ -216,7 +223,7 @@ export async function createCase(input: CreateCaseInput) {
         caseInput.honorario_pagado_uf !== undefined && caseInput.honorario_pagado_uf !== null
           ? Number(caseInput.honorario_pagado_uf)
           : 0,
-      observaciones: sOrNull(caseInput.observaciones),
+      observaciones: sanitizeObservaciones(caseInput.observaciones),
       alcance_cliente_autorizado:
         typeof caseInput.alcance_cliente_autorizado === 'number'
           ? caseInput.alcance_cliente_autorizado
@@ -311,7 +318,7 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       // 🔴 El schema exige string → nunca dejamos undefined
       descripcion_inicial: extracted.descripcion_inicial ?? 'Caso creado desde brief.',
       documentacion_recibida: extracted.documentacion_recibida ?? undefined,
-      observaciones: extracted.observaciones ?? `Caso creado desde brief:\n\n${validated.brief}`,
+      observaciones: sanitizeObservaciones(extracted.observaciones) ?? `Caso creado desde brief:\n\n${validated.brief}`,
       valor_estimado: extracted.valor_estimado ?? undefined,
       honorario_total_uf: extracted.honorario_total_uf ?? undefined,
       honorario_pagado_uf: extracted.honorario_pagado_uf ?? undefined,
@@ -427,7 +434,7 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       ...(rest.contraparte !== undefined && { contraparte: rest.contraparte }),
       ...(rest.descripcion_inicial !== undefined && { descripcion_inicial: rest.descripcion_inicial }),
       ...(rest.documentacion_recibida !== undefined && { documentacion_recibida: rest.documentacion_recibida }),
-      ...(rest.observaciones !== undefined && { observaciones: rest.observaciones }),
+      ...(rest.observaciones !== undefined && { observaciones: sanitizeObservaciones(rest.observaciones) }),
       ...(rest.sentencia_estado !== undefined && { sentencia_estado: rest.sentencia_estado }),
       ...(rest.sentencia_fecha !== undefined && {
         sentencia_fecha:
