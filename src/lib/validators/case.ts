@@ -99,6 +99,9 @@ const baseCaseSchema = z.object({
     .min(0, 'El alcance autorizado no puede ser negativo')
     .max(100, 'El alcance autorizado no puede exceder 100 etapas')
     .optional(),
+  next_action_title: z.string().max(280, 'La próxima acción no puede exceder 280 caracteres').optional(),
+  next_action_at: z.string().optional(),
+  next_action_owner_id: z.string().uuid('ID de responsable inválido').optional(),
   observaciones: z.string().optional(),
   descripcion_inicial: z
     .string()

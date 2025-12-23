@@ -847,6 +847,9 @@ export interface ClientPortfolioCase {
   etapa_actual: string | null;
   fecha_inicio: string | null;
   workflow_state: string | null;
+  next_action_at?: string | null;
+  next_action_title?: string | null;
+  next_action_owner_id?: string | null;
 }
 
 export interface ClientPortfolioLawyer {
@@ -1006,6 +1009,9 @@ export async function getClientPortfolioWithLawyers(
           etapa_actual,
           fecha_inicio,
           workflow_state,
+          next_action_at,
+          next_action_title,
+          next_action_owner_id,
           abogado_responsable:profiles!cases_abogado_responsable_fkey(id, nombre)
         )
       `,
@@ -1051,6 +1057,9 @@ export async function getClientPortfolioWithLawyers(
           etapa_actual: caseRow.etapa_actual,
           fecha_inicio: caseRow.fecha_inicio,
           workflow_state: caseRow.workflow_state,
+          next_action_at: (caseRow as any).next_action_at ?? null,
+          next_action_title: (caseRow as any).next_action_title ?? null,
+          next_action_owner_id: (caseRow as any).next_action_owner_id ?? null,
         });
       }
 
@@ -1144,6 +1153,9 @@ export async function getClientDetail(
           etapa_actual,
           fecha_inicio,
           workflow_state,
+          next_action_at,
+          next_action_title,
+          next_action_owner_id,
           abogado_responsable:profiles!cases_abogado_responsable_fkey(id, nombre)
         )
       `,
@@ -1215,6 +1227,9 @@ export async function getClientDetail(
         etapa_actual: caseItem.etapa_actual ?? null,
         fecha_inicio: caseItem.fecha_inicio ?? null,
         workflow_state: caseItem.workflow_state ?? null,
+        next_action_at: (caseItem as any).next_action_at ?? null,
+        next_action_title: (caseItem as any).next_action_title ?? null,
+        next_action_owner_id: (caseItem as any).next_action_owner_id ?? null,
         abogado_responsable: lawyer ? { id: lawyer.id, nombre: lawyer.nombre ?? null } : null,
         nextStage: nextStage
           ? {

@@ -45,6 +45,12 @@ function sanitizeObservaciones(value?: string | null): string | null {
   return cleaned.length > 0 ? cleaned : null;
 }
 
+const tsOrNull = (v: string | undefined | null): string | null => {
+  if (v === undefined || v === null) return null;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 type ParsedPartyRow = { nombre: string; rut: string | null };
 
 function parseSerializedPartyRows(raw?: string | null): ParsedPartyRow[] {
@@ -232,6 +238,10 @@ export async function createCase(input: CreateCaseInput) {
         typeof caseInput.alcance_cliente_solicitado === 'number'
           ? caseInput.alcance_cliente_solicitado
           : 0,
+
+      next_action_title: tsOrNull((caseInput as any).next_action_title),
+      next_action_at: tsOrNull((caseInput as any).next_action_at),
+      next_action_owner_id: sOrNull((caseInput as any).next_action_owner_id),
 
       cliente_principal_id: sOrNull((caseInput as any).cliente_principal_id),
       descripcion_inicial: sOrNull(caseInput.descripcion_inicial),
@@ -484,6 +494,15 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
           rest.alcance_cliente_autorizado === null
             ? 0
             : Number(rest.alcance_cliente_autorizado),
+      }),
+      ...(rest.next_action_title !== undefined && {
+        next_action_title: tsOrNull(rest.next_action_title),
+      }),
+      ...(rest.next_action_at !== undefined && {
+        next_action_at: tsOrNull(rest.next_action_at),
+      }),
+      ...(rest.next_action_owner_id !== undefined && {
+        next_action_owner_id: sOrNull(rest.next_action_owner_id),
       }),
     };
 
