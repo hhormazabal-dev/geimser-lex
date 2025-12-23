@@ -255,7 +255,15 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
       throw new Error('Debes registrar el pago de esta etapa antes de completarla');
     }
 
-    const completionDate = validatedInput['fecha_completada'] || new Date().toISOString();
+    const defaultDate = new Date().toISOString().split('T')[0]!;
+    const rawCompletion = (validatedInput['fecha_completada'] as string | undefined)?.trim();
+    const normalized =
+      rawCompletion && rawCompletion.length > 0
+        ? rawCompletion.includes('T')
+          ? (rawCompletion.split('T')[0] ?? rawCompletion)
+          : rawCompletion
+        : defaultDate;
+    const completionDate = normalized;
 
     const updatePayload: CompleteStageDB = {
       estado: 'completado',

@@ -322,6 +322,8 @@ export type Database = {
           id: string
           materia: string | null
           nombre_cliente: string
+          notificacion_demanda_estado: string | null
+          notificacion_demanda_fecha: string | null
           numero_causa: string | null
           observaciones: string | null
           prioridad: Database["public"]["Enums"]["case_priority"] | null
@@ -343,6 +345,8 @@ export type Database = {
           id?: string
           materia?: string | null
           nombre_cliente: string
+          notificacion_demanda_estado?: string | null
+          notificacion_demanda_fecha?: string | null
           numero_causa?: string | null
           observaciones?: string | null
           prioridad?: Database["public"]["Enums"]["case_priority"] | null
@@ -364,6 +368,8 @@ export type Database = {
           id?: string
           materia?: string | null
           nombre_cliente?: string
+          notificacion_demanda_estado?: string | null
+          notificacion_demanda_fecha?: string | null
           numero_causa?: string | null
           observaciones?: string | null
           prioridad?: Database["public"]["Enums"]["case_priority"] | null

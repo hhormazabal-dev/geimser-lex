@@ -421,6 +421,8 @@ export type Database = {
           materia: string | null
           modalidad_cobro: string
           nombre_cliente: string
+          notificacion_demanda_estado: string | null
+          notificacion_demanda_fecha: string | null
           numero_causa: string | null
           objetivo_cliente: string | null
           observaciones: string | null
@@ -461,6 +463,8 @@ export type Database = {
           materia?: string | null
           modalidad_cobro?: string
           nombre_cliente: string
+          notificacion_demanda_estado?: string | null
+          notificacion_demanda_fecha?: string | null
           numero_causa?: string | null
           objetivo_cliente?: string | null
           observaciones?: string | null
@@ -501,6 +505,8 @@ export type Database = {
           materia?: string | null
           modalidad_cobro?: string
           nombre_cliente?: string
+          notificacion_demanda_estado?: string | null
+          notificacion_demanda_fecha?: string | null
           numero_causa?: string | null
           objetivo_cliente?: string | null
           observaciones?: string | null

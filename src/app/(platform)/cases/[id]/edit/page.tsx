@@ -2,9 +2,13 @@
 import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { CaseForm } from '@/components/CaseForm';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
 import { requireAuth } from '@/lib/auth/roles';
 import { getCaseById } from '@/lib/actions/cases';
 import { getAssignableLawyers, getActiveClientsDirectory } from '@/lib/actions/profiles';
+import Link from 'next/link';
+import { ArrowUpRight, FolderOpen } from 'lucide-react';
 
 // 👇 Aquí está el tipo correcto según Next 15
 interface EditCasePageProps {
@@ -42,14 +46,20 @@ export default async function EditCasePage({ params }: EditCasePageProps) {
     }
 
     return (
-      <div className="container mx-auto py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Editar Caso</h1>
-          <p className="text-gray-600 mt-2">
-            Actualiza la información del expediente y sincroniza al equipo.
-          </p>
-        </div>
-
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Casos"
+          title="Editar caso"
+          description="Actualiza información del expediente. Los cambios se reflejan en el timeline y en las vistas operativas."
+          actions={
+            <Button asChild variant="outline">
+              <Link href={`/cases/${id}`} className="inline-flex items-center gap-2">
+                <FolderOpen className="h-4 w-4" />
+                Ver caso <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          }
+        />
         <CaseForm
           case={caseResult.case}
           lawyers={lawyers}

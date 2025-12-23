@@ -151,7 +151,7 @@ export function AdminLawyerDetail({ data }: AdminLawyerDetailProps) {
                               </strong>
                             </span>
                             {caseItem.nombre_cliente && <span>Cliente: {caseItem.nombre_cliente}</span>}
-                            {caseItem.valor_estimado && <span>Monto estimado: {formatCurrency(caseItem.valor_estimado)}</span>}
+                            {caseItem.valor_estimado && <span>Cuantía: {formatCurrency(caseItem.valor_estimado)}</span>}
                             {caseItem.fecha_inicio && <span>Inicio: {formatDate(caseItem.fecha_inicio)}</span>}
                           </div>
                           <div className='flex flex-wrap items-center gap-4 text-xs text-white/50'>

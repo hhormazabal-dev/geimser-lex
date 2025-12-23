@@ -341,7 +341,48 @@ export function TimelinePanel({
 
     try {
       setProcessingStage(stage.id);
-      const result = await completeStage(stage.id);
+      const normalize = (value: string) =>
+        value
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+      const stageName = normalize(stage.etapa ?? '');
+      const shouldAskDate =
+        Boolean(stage.audiencia_tipo) || stageName.includes('audiencia') || stageName.includes('notific');
+
+      const today = new Date().toISOString().split('T')[0]!;
+      const suggested = stage.fecha_programada ?? today;
+
+      const completionDate = shouldAskDate
+        ? (() => {
+            const input = prompt(
+              stageName.includes('audiencia')
+                ? 'Fecha en que se realizó la audiencia (YYYY-MM-DD)'
+                : stageName.includes('notific')
+                  ? 'Fecha en que se realizó la notificación (YYYY-MM-DD)'
+                  : 'Fecha de cumplimiento de la etapa (YYYY-MM-DD)',
+              suggested,
+            );
+            if (input === null) return null;
+            const trimmed = input.trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+              toast({
+                title: 'Fecha inválida',
+                description: 'Usa el formato YYYY-MM-DD.',
+                variant: 'destructive',
+              });
+              return null;
+            }
+            return trimmed;
+          })()
+        : today;
+
+      if (completionDate === null) {
+        setProcessingStage(null);
+        return;
+      }
+
+      const result = await completeStage(stage.id, { fecha_completada: completionDate });
       
       if (result.success) {
         toast({
@@ -653,6 +694,7 @@ export function TimelinePanel({
   const totalCostoEtapas = stages.reduce((sum, stage) => sum + (stage.costo_uf ?? 0), 0);
   const totalPagadoEtapas = stages.reduce((sum, stage) => sum + (stage.monto_pagado_uf ?? 0), 0);
   const etapasRequierenPago = stages.filter((stage) => stage.requiere_pago);
+  const etapasCobroOrdenadas = [...etapasRequierenPago].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
   const etapasPagadas = etapasRequierenPago.filter((stage) => stage.estado_pago === 'pagado').length;
   const etapasPendientesPago = etapasRequierenPago.filter(
     (stage) => stage.estado_pago !== 'pagado'
@@ -811,6 +853,124 @@ export function TimelinePanel({
                 Estamos revisando tu solicitud para avanzar. Te notificaremos cuando esté aprobada.
               </div>
             )}
+          </div>
+        )}
+
+        {etapasCobroOrdenadas.length > 0 && (
+          <div className='rounded-3xl border border-white/40 bg-white/70 p-6 shadow-inner'>
+            <div className='flex flex-wrap items-end justify-between gap-3'>
+              <div>
+                <h3 className='text-sm font-semibold text-foreground/70'>Etapas de cobro</h3>
+                <p className='mt-1 text-xs text-foreground/50'>Timeline de pagos por etapa (más fácil de revisar).</p>
+              </div>
+              <div className='text-xs text-foreground/50'>
+                {etapasPagadas} / {etapasCobroOrdenadas.length} pagadas
+              </div>
+            </div>
+
+            <ol className='relative mt-5 space-y-4 border-l border-white/50 pl-6'>
+              {etapasCobroOrdenadas.map((stage) => {
+                const statusBadge = getPaymentStatusBadge(stage.estado_pago ?? 'pendiente');
+                const icon = (() => {
+                  if (stage.estado_pago === 'pagado') return <CheckCircle className='h-4 w-4 text-emerald-600' />;
+                  if (stage.estado_pago === 'solicitado') return <PiggyBank className='h-4 w-4 text-sky-600' />;
+                  if (stage.enlace_pago) return <Link2 className='h-4 w-4 text-amber-700' />;
+                  return <DollarSign className='h-4 w-4 text-foreground/60' />;
+                })();
+
+                const canEditPayments = canManageStages && viewerRole !== 'cliente';
+                const busy = paymentActionStage === stage.id;
+
+                return (
+                  <li key={stage.id} className='relative'>
+                    <span className='absolute -left-[13px] top-4 flex h-7 w-7 items-center justify-center rounded-2xl border border-white/60 bg-white/90 shadow-sm'>
+                      {icon}
+                    </span>
+                    <div className='rounded-2xl border border-white/40 bg-white/80 px-4 py-3 shadow-sm'>
+                      <div className='flex flex-wrap items-start justify-between gap-3'>
+                        <div className='min-w-0'>
+                          <p className='text-sm font-semibold text-foreground'>{stage.etapa}</p>
+                          <div className='mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-foreground/55'>
+                            {typeof stage.orden === 'number' && stage.orden > 0 && <span>Orden {stage.orden}</span>}
+                            {stage.costo_uf !== null && stage.costo_uf !== undefined && <span>Costo {formatUf(stage.costo_uf)}</span>}
+                            {stage.monto_pagado_uf !== null && stage.monto_pagado_uf !== undefined && (
+                              <span>Pagado {formatUf(stage.monto_pagado_uf)}</span>
+                            )}
+                            {stage.fecha_programada && <span>Programada {formatDate(stage.fecha_programada)}</span>}
+                            {stage.fecha_cumplida && <span>Cumplida {formatDate(stage.fecha_cumplida)}</span>}
+                          </div>
+                        </div>
+                        <div className='flex items-center gap-2'>
+                          {statusBadge}
+                        </div>
+                      </div>
+
+                      {(stage.enlace_pago || canEditPayments) && (
+                        <div className='mt-3 flex flex-wrap items-center gap-2'>
+                          {stage.enlace_pago && (
+                            <a
+                              href={stage.enlace_pago}
+                              target='_blank'
+                              rel='noopener noreferrer'
+                              className='inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-medium text-foreground/70 hover:bg-white'
+                            >
+                              <ExternalLink className='h-3 w-3' />
+                              Abrir Payku
+                            </a>
+                          )}
+                          {canEditPayments && (
+                            <>
+                              <Button
+                                size='sm'
+                                variant='outline'
+                                className='rounded-full px-3'
+                                onClick={() => handleAssignPaymentLink(stage)}
+                                disabled={busy}
+                              >
+                                {busy ? (
+                                  <>
+                                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                    Guardando…
+                                  </>
+                                ) : (
+                                  <>
+                                    <Link2 className='mr-2 h-4 w-4' />
+                                    {stage.enlace_pago ? 'Editar enlace' : 'Asignar enlace'}
+                                  </>
+                                )}
+                              </Button>
+                              {stage.estado_pago !== 'pagado' && (
+                                <>
+                                  <Button
+                                    size='sm'
+                                    variant='outline'
+                                    className='rounded-full px-3'
+                                    onClick={() => handleRegisterPartialPayment(stage)}
+                                    disabled={busy}
+                                  >
+                                    <Wallet className='mr-2 h-4 w-4' />
+                                    Registrar abono
+                                  </Button>
+                                  <Button
+                                    size='sm'
+                                    className='rounded-full px-3'
+                                    onClick={() => handleMarkStagePaid(stage)}
+                                    disabled={busy}
+                                  >
+                                    <CheckCircle className='mr-2 h-4 w-4' />
+                                    Marcar pagado
+                                  </Button>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           </div>
         )}
 

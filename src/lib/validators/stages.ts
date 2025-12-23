@@ -20,7 +20,7 @@ export const createStageSchema = z.object({
   costo_uf: z.number().min(0, 'El costo debe ser positivo').optional(),
   porcentaje_variable: z.number().min(0, 'El porcentaje debe ser positivo').max(100, 'El porcentaje no puede exceder 100').optional(),
   estado_pago: z
-    .enum(['pendiente', 'en_proceso', 'parcial', 'pagado', 'vencido'])
+    .enum(['pendiente', 'solicitado', 'en_proceso', 'parcial', 'pagado', 'vencido'])
     .default('pendiente'),
   enlace_pago: z.string().url('Debe ser una URL válida').optional(),
   notas_pago: z.string().max(1000, 'Las notas no pueden exceder 1000 caracteres').optional(),

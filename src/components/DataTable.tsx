@@ -302,7 +302,7 @@ export function DataTable({
                 <th scope='col' className='px-5 py-3 text-left'>Prioridad</th>
                 <th scope='col' className='px-5 py-3 text-left'>Etapa</th>
                 <th scope='col' className='px-5 py-3 text-left whitespace-nowrap'>Inicio</th>
-                <th scope='col' className='px-5 py-3 text-left'>Valor</th>
+                <th scope='col' className='px-5 py-3 text-left'>Cuantía</th>
                 <th scope='col' className='px-5 py-3 text-right'>Acciones</th>
               </tr>
             </thead>

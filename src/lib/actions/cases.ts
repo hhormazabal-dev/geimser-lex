@@ -139,6 +139,7 @@ export async function createCase(input: CreateCaseInput) {
     const {
       marcar_validado,
       audiencia_inicial_tipo,
+      audiencia_inicial_fecha,
       audiencia_inicial_requiere_testigos,
       ...caseInput
     } = parsed;
@@ -184,6 +185,11 @@ export async function createCase(input: CreateCaseInput) {
       sentencia_fecha:
         caseInput.sentencia_fecha && caseInput.sentencia_fecha.trim().length > 0
           ? caseInput.sentencia_fecha
+          : null,
+      notificacion_demanda_estado: sOrNull((caseInput as any).notificacion_demanda_estado),
+      notificacion_demanda_fecha:
+        (caseInput as any).notificacion_demanda_fecha && (caseInput as any).notificacion_demanda_fecha.trim().length > 0
+          ? (caseInput as any).notificacion_demanda_fecha
           : null,
 
       fecha_inicio: caseInput.fecha_inicio ?? null,
@@ -243,6 +249,9 @@ export async function createCase(input: CreateCaseInput) {
     if (normalizedAudience) {
       await applyInitialAudiencePreferences(newCase, {
         audienciaTipo: normalizedAudience,
+        ...(audiencia_inicial_fecha && audiencia_inicial_fecha.trim().length > 0
+          ? { fechaProgramada: audiencia_inicial_fecha }
+          : {}),
         ...(audiencia_inicial_requiere_testigos !== undefined && {
           requiereTestigos: audiencia_inicial_requiere_testigos ? true : false,
         }),
@@ -372,6 +381,7 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
     const {
       marcar_validado,
       audiencia_inicial_tipo,
+      audiencia_inicial_fecha,
       audiencia_inicial_requiere_testigos,
       ...rest
     } = validated;
@@ -418,6 +428,15 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
         sentencia_fecha:
           rest.sentencia_fecha && rest.sentencia_fecha.trim().length > 0
             ? rest.sentencia_fecha
+            : null,
+      }),
+      ...(rest.notificacion_demanda_estado !== undefined && {
+        notificacion_demanda_estado: sOrNull(rest.notificacion_demanda_estado),
+      }),
+      ...(rest.notificacion_demanda_fecha !== undefined && {
+        notificacion_demanda_fecha:
+          rest.notificacion_demanda_fecha && rest.notificacion_demanda_fecha.trim().length > 0
+            ? rest.notificacion_demanda_fecha
             : null,
       }),
       ...(rest.valor_estimado !== undefined && { valor_estimado: nOrNull(rest.valor_estimado) }),
@@ -531,6 +550,9 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
     if (normalizedAudience) {
       await applyInitialAudiencePreferences(updatedCase as Case, {
         audienciaTipo: normalizedAudience,
+        ...(audiencia_inicial_fecha && audiencia_inicial_fecha.trim().length > 0
+          ? { fechaProgramada: audiencia_inicial_fecha }
+          : {}),
         ...(audiencia_inicial_requiere_testigos !== undefined && {
           requiereTestigos: audiencia_inicial_requiere_testigos ? true : false,
         }),
@@ -1108,9 +1130,9 @@ async function createInitialStages(caseRecord: Case) {
 
 async function applyInitialAudiencePreferences(
   caseRecord: Case,
-  options: { audienciaTipo?: 'preparatoria' | 'juicio'; requiereTestigos?: boolean | null },
+  options: { audienciaTipo?: 'preparatoria' | 'juicio'; requiereTestigos?: boolean | null; fechaProgramada?: string },
 ) {
-  const { audienciaTipo, requiereTestigos } = options;
+  const { audienciaTipo, requiereTestigos, fechaProgramada } = options;
   if (!audienciaTipo) return;
 
   try {
@@ -1159,6 +1181,7 @@ async function applyInitialAudiencePreferences(
       .update({
         audiencia_tipo: audienciaTipo,
         requiere_testigos: Boolean(requiereTestigos),
+        ...(fechaProgramada && fechaProgramada.trim().length > 0 ? { fecha_programada: fechaProgramada } : {}),
       })
       .eq('id', stageId);
   } catch (error) {

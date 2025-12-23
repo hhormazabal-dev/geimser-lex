@@ -93,7 +93,7 @@ export function KpiCards({ stats, highlights }: KpiCardsProps) {
                     </p>
                   </div>
                   <div className='flex items-center gap-2 text-sm text-sky-600'>
-                    {caseItem.valor_estimado ? formatCurrency(caseItem.valor_estimado) : 'Sin valor estimado'}
+                    {caseItem.valor_estimado ? formatCurrency(caseItem.valor_estimado) : 'Sin cuantía registrada'}
                     <ArrowUpRight className='h-4 w-4 text-sky-400 opacity-60 group-hover:opacity-100' />
                   </div>
                 </Link>

@@ -418,7 +418,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                       {selectedCase.valor_estimado && (
                         <div className='rounded-lg bg-green-50 p-3 text-center'>
                           <span className='mb-1 block text-lg'>💰</span>
-                          <p className='text-xs font-medium text-green-600'>Valor Estimado</p>
+                          <p className='text-xs font-medium text-green-600'>Cuantía en disputa</p>
                           <p className='text-sm text-green-900'>{formatCurrency(selectedCase.valor_estimado)}</p>
                         </div>
                       )}

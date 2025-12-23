@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Controller, useController, useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { createCase, updateCase } from '@/lib/actions/cases';
@@ -22,9 +23,9 @@ import {
   CASE_MATERIAS,
   REGIONES_CHILE,
 } from '@/lib/validators/case';
-import { STAGE_AUDIENCE_TYPES } from '@/lib/validators/stages';
+import { STAGE_AUDIENCE_TYPES, getStageTemplatesByMateria } from '@/lib/validators/stages';
 import { createClientSchema, type CreateClientInput } from '@/lib/validators/clients';
-import { formatRUT } from '@/lib/utils';
+import { cn, formatDate, formatRUT } from '@/lib/utils';
 import { Loader2, Save, X, Trash2, Paperclip, UploadCloud } from 'lucide-react';
 import type { Case, Profile } from '@/lib/supabase/types';
 
@@ -39,6 +40,7 @@ interface CaseFormProps {
   lawyers: LightweightProfile[];
   clients: LightweightProfile[];
   currentProfile: Pick<Profile, 'id' | 'role' | 'nombre'>;
+  variant?: 'wizard' | 'default';
 }
 
 const MAX_ATTACHMENT_SIZE_BYTES = 20 * 1024 * 1024;
@@ -56,7 +58,12 @@ type CaseFormMeta = {
 const OBSERVACIONES_META_PREFIX = '<!--case-form-meta:';
 const OBSERVACIONES_META_SUFFIX = '-->';
 
-const generateRowId = () => `party-${Math.random().toString(36).slice(2, 9)}`;
+function createRandomRowId() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `party-${crypto.randomUUID()}`;
+  }
+  return `party-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 const normalizeText = (value: string) =>
   value
@@ -65,32 +72,87 @@ const normalizeText = (value: string) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 
+type TribunalOption = { id: string; name: string };
+
+function filterTribunalesByMateria(tribunales: TribunalOption[], materia?: string | null): TribunalOption[] {
+  const materiaKey = materia ? normalizeText(materia) : '';
+  if (!materiaKey) return tribunales;
+
+  const includesAny = (haystack: string, needles: string[]) => needles.some((needle) => haystack.includes(needle));
+
+  const wantLaboral = includesAny(materiaKey, ['laboral', 'trabaj']);
+  const wantFamilia = materiaKey.includes('familia');
+  const wantPenal = materiaKey.includes('penal');
+  const wantCivil = materiaKey.includes('civil');
+  const wantComercial = materiaKey.includes('comercial');
+
+  const filtered = tribunales.filter((tribunal) => {
+    const name = normalizeText(tribunal.name);
+
+    if (wantLaboral) {
+      return includesAny(name, ['trabajo', 'laboral', 'cobranza laboral', 'previsional']);
+    }
+
+    if (wantFamilia) {
+      return name.includes('familia');
+    }
+
+    if (wantPenal) {
+      return includesAny(name, ['garantia', 'juicio oral', 'oral en lo penal', 'top', 'tribunal de juicio oral']);
+    }
+
+    if (wantCivil || wantComercial) {
+      const includesCivil = includesAny(name, ['civil', 'letras']);
+      const excludesOther = !includesAny(name, [
+        'garantia',
+        'juicio oral',
+        'oral en lo penal',
+        'familia',
+        'trabajo',
+        'laboral',
+        'previsional',
+      ]);
+      return includesCivil && excludesOther;
+    }
+
+    return tribunales.length > 0;
+  });
+
+  return filtered.length > 0 ? filtered : tribunales;
+}
+
 function createPartyRow(overrides?: Partial<PartyRow>): PartyRow {
   return {
-    id: overrides?.id ?? generateRowId(),
+    id: overrides?.id ?? createRandomRowId(),
     nombre: overrides?.nombre?.trim() ?? '',
     rut: overrides?.rut ? formatRUT(overrides.rut) : '',
   };
 }
 
-function parsePartyRows(raw?: string | null): PartyRow[] {
+function parsePartyRows(raw: string | null | undefined, kind: 'demandante' | 'demandado'): PartyRow[] {
   if (!raw) return [];
 
   return raw
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(Boolean)
-    .map(line => {
+    .map((line, index) => {
       const match = line.match(/^(.*?)(?:\s*\(RUT[:\s]+(.+?)\))?$/i);
       const nombre = match?.[1]?.trim() ?? line;
       const rut = match?.[2]?.trim() ?? '';
-      return createPartyRow({ nombre, rut });
+      // Determinístico para SSR/CSR (evita hydration mismatch)
+      return createPartyRow({ id: `${kind}-${index}`, nombre, rut });
     });
 }
 
-function ensurePartyRows(rows: PartyRow[], fallbackRut?: string | null): PartyRow[] {
+function ensurePartyRows(
+  rows: PartyRow[],
+  kind: 'demandante' | 'demandado',
+  fallbackRut?: string | null,
+): PartyRow[] {
   if (rows.length === 0) {
-    return [createPartyRow({ rut: fallbackRut ?? '' })];
+    // Determinístico para SSR/CSR (evita hydration mismatch)
+    return [createPartyRow({ id: `${kind}-0`, rut: fallbackRut ?? '' })];
   }
 
   return rows.map((row, index) => ({
@@ -173,6 +235,7 @@ export function CaseForm({
   lawyers,
   clients,
   currentProfile,
+  variant = 'default',
 }: CaseFormProps) {
   const { text: initialObservacionesText, meta: initialFormMeta } = parseObservacionesMeta(
     existingCase?.observaciones ?? '',
@@ -207,14 +270,17 @@ export function CaseForm({
     comuna: 'Comuna (asiento del tribunal)',
     tribunal: 'Tribunal',
     fecha_inicio: 'Fecha de ingreso',
+    notificacion_demanda_estado: 'Notificación de la demanda',
+    notificacion_demanda_fecha: 'Fecha de notificación',
     etapa_actual: 'Acto / etapa actual',
     estado: 'Estado del expediente',
     prioridad: 'Prioridad',
-    valor_estimado: 'Valor estimado',
+    valor_estimado: 'Cuantía (monto en disputa)',
     abogado_responsable: 'Abogado patrocinante',
     analista_id: 'Analista',
     sentencia_estado: 'Estado de sentencia',
     sentencia_fecha: 'Fecha de sentencia',
+    audiencia_inicial_fecha: 'Fecha de audiencia',
     honorario_total_uf: 'Honorario total',
     honorario_pagado_uf: 'Monto pagado',
     honorario_variable_porcentaje: 'Porcentaje variable',
@@ -238,6 +304,8 @@ export function CaseForm({
     'comuna',
     'tribunal',
     'fecha_inicio',
+    'notificacion_demanda_estado',
+    'notificacion_demanda_fecha',
     'etapa_actual',
     'estado',
     'prioridad',
@@ -365,6 +433,9 @@ export function CaseForm({
         sentencia_fecha: (existingCase as any).sentencia_fecha ?? '',
         estado: (existingCase.estado || 'activo') as CreateCaseInput['estado'],
         fecha_inicio: existingCase.fecha_inicio || new Date().toISOString().split('T')[0],
+        notificacion_demanda_estado:
+          (existingCase as any).notificacion_demanda_estado ?? initialFormMeta.notification ?? null,
+        notificacion_demanda_fecha: (existingCase as any).notificacion_demanda_fecha ?? '',
         abogado_responsable: existingLawyerId || defaultLawyerId,
         cliente_principal_id: existingCase.cliente_principal_id ?? '',
         prioridad: (existingCase.prioridad || 'media') as CreateCaseInput['prioridad'],
@@ -384,6 +455,7 @@ export function CaseForm({
         validado_at: existingCase.validado_at || undefined,
         marcar_validado: Boolean(existingCase.validado_at),
         audiencia_inicial_tipo: undefined,
+        audiencia_inicial_fecha: '',
         audiencia_inicial_requiere_testigos: false,
       }
     : {
@@ -401,6 +473,8 @@ export function CaseForm({
         sentencia_fecha: '',
         estado: 'activo',
         fecha_inicio: new Date().toISOString().split('T')[0],
+        notificacion_demanda_estado: null,
+        notificacion_demanda_fecha: '',
         abogado_responsable: defaultLawyerId,
         cliente_principal_id: '',
         prioridad: 'media',
@@ -419,6 +493,7 @@ export function CaseForm({
         workflow_state: 'preparacion',
         marcar_validado: false,
         audiencia_inicial_tipo: undefined,
+        audiencia_inicial_fecha: '',
         audiencia_inicial_requiere_testigos: false,
       };
 
@@ -435,16 +510,17 @@ export function CaseForm({
   });
 
   const initialDemandantes = ensurePartyRows(
-    parsePartyRows(defaultValues.nombre_cliente ?? ''),
+    parsePartyRows(defaultValues.nombre_cliente ?? '', 'demandante'),
+    'demandante',
     defaultValues.rut_cliente,
   );
-  const initialDemandados = ensurePartyRows(parsePartyRows(defaultValues.contraparte ?? ''));
+  const initialDemandados = ensurePartyRows(
+    parsePartyRows(defaultValues.contraparte ?? '', 'demandado'),
+    'demandado',
+  );
 
   const [demandantes, setDemandantes] = useState<PartyRow[]>(initialDemandantes);
   const [demandados, setDemandados] = useState<PartyRow[]>(initialDemandados);
-  const [notificacionEstado, setNotificacionEstado] = useState<
-    CaseFormMeta['notification'] | null
-  >(initialFormMeta.notification ?? null);
 
   const { field: nombreClienteField } = useController({ name: 'nombre_cliente', control });
   const { field: rutClienteField } = useController({ name: 'rut_cliente', control });
@@ -495,12 +571,15 @@ export function CaseForm({
   const regionValue = watch('region');
   const comunaValue = watch('comuna');
   const tribunalValue = watch('tribunal');
+  const fechaInicioValue = watch('fecha_inicio');
+  const notificacionEstado = watch('notificacion_demanda_estado');
   const marcarValidado = watch('marcar_validado');
   const workflowState = watch('workflow_state');
   const modalidadCobro = watch('modalidad_cobro');
   const honorarioMoneda = watch('honorario_moneda');
   const honorarioTotal = watch('honorario_total_uf');
   const audienciaInicialTipo = watch('audiencia_inicial_tipo');
+  const audienciaInicialFecha = watch('audiencia_inicial_fecha');
   const audienciaInicialRequiereTestigos = watch('audiencia_inicial_requiere_testigos');
   const sentenciaEstado = watch('sentencia_estado');
   const honorarioPagado = watch('honorario_pagado_uf');
@@ -516,9 +595,50 @@ export function CaseForm({
   const step3Done = (descripcionInicialValue ?? '').trim().length >= 20;
   const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
   const showSentenciaFecha = sentenciaEstado === 'programada' || sentenciaEstado === 'dictada';
+  const isWizard = variant === 'wizard' && !existingCase;
+  const canSubmit = Boolean(existingCase) || (step1Done && step2Done && step3Done);
+
+  const timelinePreview = (() => {
+    const materia = (materiaValue ?? '').trim();
+    if (!materia) return null;
+    const templates = getStageTemplatesByMateria(materia);
+    const baseDate = (() => {
+      const raw = fechaInicioValue?.trim();
+      if (!raw) return new Date();
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? new Date() : d;
+    })();
+
+    let cumulativeDays = 0;
+    const items = templates.slice(0, 8).map((t) => {
+      cumulativeDays += t.diasEstimados;
+      const scheduled = new Date(baseDate.getTime());
+      scheduled.setDate(scheduled.getDate() + cumulativeDays);
+      const iso = scheduled.toISOString().split('T')[0]!;
+      return { ...t, fecha: iso };
+    });
+
+    const shouldDistributeCosts =
+      (modalidadCobro ?? 'prepago') === 'prepago' &&
+      honorarioMoneda === 'UF' &&
+      typeof honorarioTotal === 'number' &&
+      Number.isFinite(honorarioTotal) &&
+      honorarioTotal > 0;
+
+    return {
+      total: templates.length,
+      items,
+      shouldDistributeCosts,
+    };
+  })();
+
+  const scrollToStep = (step: 1 | 2 | 3 | 4) => {
+    const el = document.getElementById(`case-form-step-${step}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const [comunaOptions, setComunaOptions] = useState<Array<{ code: string; name: string }>>([]);
-  const [tribunalOptions, setTribunalOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [tribunalOptionsRaw, setTribunalOptionsRaw] = useState<TribunalOption[]>([]);
   const [selectedComunaCode, setSelectedComunaCode] = useState('');
   const [selectedTribunalId, setSelectedTribunalId] = useState('');
   const [isLoadingComunas, setIsLoadingComunas] = useState(false);
@@ -627,7 +747,7 @@ export function CaseForm({
     if (!regionValue) {
       setComunaOptions([]);
       setSelectedComunaCode('');
-      setTribunalOptions([]);
+      setTribunalOptionsRaw([]);
       setSelectedTribunalId('');
       setPjudError(null);
       return;
@@ -679,7 +799,7 @@ export function CaseForm({
 
   useEffect(() => {
     if (!selectedComunaCode) {
-      setTribunalOptions([]);
+      setTribunalOptionsRaw([]);
       setSelectedTribunalId('');
       return;
     }
@@ -698,11 +818,11 @@ export function CaseForm({
       })
       .then((tribunales) => {
         if (canceled) return;
-        setTribunalOptions(tribunales ?? []);
+        setTribunalOptionsRaw(tribunales ?? []);
       })
       .catch((err) => {
         if (canceled) return;
-        setTribunalOptions([]);
+        setTribunalOptionsRaw([]);
         setPjudError(err instanceof Error ? err.message : 'No se pudieron cargar tribunales.');
       })
       .finally(() => {
@@ -715,17 +835,28 @@ export function CaseForm({
     };
   }, [selectedComunaCode]);
 
+  const tribunalOptions = useMemo(() => {
+    const filtered = filterTribunalesByMateria(tribunalOptionsRaw, materiaValue);
+    if (!selectedTribunalId) return filtered;
+
+    const selected = tribunalOptionsRaw.find((option) => option.id === selectedTribunalId);
+    if (!selected) return filtered;
+
+    if (filtered.some((option) => option.id === selectedTribunalId)) return filtered;
+    return [selected, ...filtered];
+  }, [materiaValue, selectedTribunalId, tribunalOptionsRaw]);
+
   useEffect(() => {
     if (!tribunalValue) return;
     if (selectedTribunalId) return;
-    if (tribunalOptions.length === 0) return;
+    if (tribunalOptionsRaw.length === 0) return;
 
     const target = normalizeText(tribunalValue);
-    const match = tribunalOptions.find((option) => normalizeText(option.name) === target);
+    const match = tribunalOptionsRaw.find((option) => normalizeText(option.name) === target);
     if (match) {
       setSelectedTribunalId(match.id);
     }
-  }, [selectedTribunalId, tribunalOptions, tribunalValue]);
+  }, [selectedTribunalId, tribunalOptionsRaw, tribunalValue]);
 
   const resetFileSelection = () => {
     setSelectedFiles([]);
@@ -1004,63 +1135,64 @@ export function CaseForm({
     }
   }, [audienciaInicialTipo, setValue]);
 
+  useEffect(() => {
+    if ((!audienciaInicialTipo || audienciaInicialTipo.endsWith('_sin_fecha')) && audienciaInicialFecha) {
+      setValue('audiencia_inicial_fecha', '', { shouldDirty: true, shouldValidate: true });
+    }
+  }, [audienciaInicialFecha, audienciaInicialTipo, setValue]);
+
   return (
-    <Card className='w-full max-w-4xl mx-auto'>
-      <CardHeader>
-        <div className='space-y-4'>
-          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-            <CardTitle>{existingCase ? 'Editar Caso' : 'Nuevo Caso'}</CardTitle>
+    <div
+      className={cn(
+        'w-full',
+        isWizard && 'grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start',
+      )}
+    >
+      <Card className={cn('w-full', !isWizard && 'max-w-4xl mx-auto')}>
+        <CardHeader>
+          <div className='space-y-4'>
+            <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+              <CardTitle>{existingCase ? 'Editar Caso' : 'Nuevo Caso'}</CardTitle>
+              {isWizard && (
+                <div className="flex items-center gap-2">
+                  <Badge variant={step1Done ? 'info' : 'outline'}>Partes</Badge>
+                  <Badge variant={step2Done ? 'info' : 'outline'}>Carátula</Badge>
+                  <Badge variant={step3Done ? 'info' : 'outline'}>Antecedentes</Badge>
+                </div>
+              )}
+            </div>
+            <div className='flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em]'>
+              {([
+                { step: 1, label: 'Paso 1 · Partes', enabled: true },
+                { step: 2, label: 'Paso 2 · Carátula', enabled: step1Done },
+                { step: 3, label: 'Paso 3 · Antecedentes', enabled: step1Done && step2Done },
+                { step: 4, label: 'Paso 4 · Revisión', enabled: step1Done && step2Done && step3Done },
+              ] as const).map((s) => (
+                <button
+                  key={s.step}
+                  type="button"
+                  onClick={() => s.enabled && scrollToStep(s.step)}
+                  disabled={!s.enabled}
+                  className={cn(
+                    'rounded-full px-3 py-1 transition',
+                    s.step < currentStep ? 'bg-slate-900 text-white shadow-sm' : '',
+                    s.step === currentStep ? 'bg-slate-100 text-slate-700' : '',
+                    s.step > currentStep ? 'bg-slate-100 text-slate-400' : '',
+                    !s.enabled && 'cursor-not-allowed opacity-70',
+                  )}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <p className='text-sm text-slate-500'>
+              Completa el expediente en el orden natural: partes → carátula/competencia → antecedentes → revisión interna + timeline por etapas.
+            </p>
           </div>
-          <div className='flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em]'>
-            <span
-              className={`rounded-full px-3 py-1 transition ${
-                1 < currentStep
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : currentStep === 1
-                    ? 'bg-slate-100 text-slate-600'
-                    : 'bg-slate-100 text-slate-400'
-              }`}
-            >
-              Paso 1 · Partes
-            </span>
-            <span
-              className={`rounded-full px-3 py-1 ${
-                2 < currentStep
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : currentStep === 2
-                    ? 'bg-slate-100 text-slate-600'
-                    : 'bg-slate-100 text-slate-400'
-              }`}
-            >
-              Paso 2 · Carátula
-            </span>
-            <span
-              className={`rounded-full px-3 py-1 ${
-                3 < currentStep
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : currentStep === 3
-                    ? 'bg-slate-100 text-slate-600'
-                    : 'bg-slate-100 text-slate-400'
-              }`}
-            >
-              Paso 3 · Antecedentes
-            </span>
-            <span
-              className={`rounded-full px-3 py-1 ${
-                currentStep === 4 ? 'bg-slate-100 text-slate-600' : 'bg-slate-100 text-slate-400'
-              }`}
-            >
-              Paso 4 · Revisión
-            </span>
-          </div>
-          <p className='text-sm text-slate-500'>
-            Completa el expediente en el mismo orden en que se arma un caso: partes, carátula/competencia, antecedentes y luego el estado procesal y la asignación interna.
-          </p>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className='space-y-8'>
-	          <section className='space-y-4'>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className='space-y-8'>
+	          <section id='case-form-step-1' className='space-y-4 scroll-mt-24'>
 	            <div>
 	              <h2 className='text-lg font-semibold text-gray-900'>Partes</h2>
 	              <p className='text-sm text-gray-500'>Identifica al cliente, a quién representas y la contraparte.</p>
@@ -1350,13 +1482,20 @@ export function CaseForm({
                   >
                     Agregar demandado
                   </Button>
-                  {errors.contraparte && (
-                    <p className='text-sm text-red-600'>{errors.contraparte.message}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
+	                  {errors.contraparte && (
+	                    <p className='text-sm text-red-600'>{errors.contraparte.message}</p>
+	                  )}
+	                  {isWizard && (
+	                    <div className='flex justify-end pt-2'>
+	                      <Button type='button' variant='outline' onClick={() => scrollToStep(2)} disabled={!step1Done}>
+	                        Continuar
+	                      </Button>
+	                    </div>
+	                  )}
+	                </div>
+	              </div>
+	            </div>
+	          </section>
 
           <section className='space-y-4'>
             <div>
@@ -1407,11 +1546,18 @@ export function CaseForm({
                   </option>
                 ))}
               </select>
-              {errors.materia && (
-                <p className='text-sm text-red-600'>{errors.materia.message}</p>
-              )}
-            </div>
-          </section>
+	              {errors.materia && (
+	                <p className='text-sm text-red-600'>{errors.materia.message}</p>
+	              )}
+	            </div>
+	            {isWizard && (
+	              <div className='flex justify-end'>
+	                <Button type='button' variant='outline' onClick={() => scrollToStep(3)} disabled={!step2Done}>
+	                  Continuar
+	                </Button>
+	              </div>
+	            )}
+	          </section>
 
           <section className='space-y-4'>
             <div>
@@ -1442,11 +1588,18 @@ export function CaseForm({
                 {...register('documentacion_recibida')}
                 disabled={isLoading}
               />
-              {errors.documentacion_recibida && (
-                <p className='text-sm text-red-600'>{errors.documentacion_recibida.message}</p>
-              )}
-            </div>
-          </section>
+	              {errors.documentacion_recibida && (
+	                <p className='text-sm text-red-600'>{errors.documentacion_recibida.message}</p>
+	              )}
+	            </div>
+	            {isWizard && (
+	              <div className='flex justify-end'>
+	                <Button type='button' variant='outline' onClick={() => scrollToStep(4)} disabled={!step3Done}>
+	                  Continuar
+	                </Button>
+	              </div>
+	            )}
+	          </section>
 
           {!existingCase && (
             <section className='space-y-4'>
@@ -1525,7 +1678,7 @@ export function CaseForm({
             </section>
           )}
 
-	          <section className='space-y-4'>
+	          <section id='case-form-step-2' className='space-y-4 scroll-mt-24'>
 	            <div>
 	              <h2 className='text-lg font-semibold text-gray-900'>Estado procesal</h2>
 	              <p className='text-sm text-gray-500'>
@@ -1580,7 +1733,7 @@ export function CaseForm({
 	                      const code = event.target.value;
 	                      setSelectedComunaCode(code);
 	                      setSelectedTribunalId('');
-	                      setTribunalOptions([]);
+	                      setTribunalOptionsRaw([]);
 	                      const selected = comunaOptions.find((option) => option.code === code);
 	                      setValue('comuna', selected?.name ?? '', { shouldDirty: true, shouldValidate: true });
 	                      setValue('tribunal', '', { shouldDirty: true, shouldValidate: true });
@@ -1671,7 +1824,7 @@ export function CaseForm({
               </div>
 
               <div className='space-y-2'>
-                <Label htmlFor='valor_estimado'>Valor Estimado (CLP)</Label>
+                <Label htmlFor='valor_estimado'>Cuantía (monto en disputa, CLP)</Label>
                 <Input
                   id='valor_estimado'
                   type='number'
@@ -1679,124 +1832,180 @@ export function CaseForm({
                   {...register('valor_estimado', { setValueAs: toOptionalNumber })}
                   disabled={isLoading}
                 />
+                <p className='text-xs text-gray-500'>Monto reclamado o en discusión (no corresponde a honorarios).</p>
 	                {errors.valor_estimado && (
 	                  <p className='text-sm text-red-600'>{errors.valor_estimado.message}</p>
 	                )}
 	              </div>
 	            </div>
 
-            <div className='space-y-2'>
-              <Label>Notificación de la demanda</Label>
-              <div className='flex flex-wrap gap-2'>
-                {([
-                  { value: 'realizada', label: 'Realizada' },
-                  { value: 'no_realizada', label: 'Pendiente' },
-                ] as const).map(option => (
-                  <Button
-                    key={option.value}
-                    type='button'
-                    variant={notificacionEstado === option.value ? 'default' : 'outline'}
-                    onClick={() => setNotificacionEstado(option.value)}
-                    disabled={isLoading}
-                    aria-pressed={notificacionEstado === option.value}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-                <Button
-                  type='button'
-                  variant={notificacionEstado === null ? 'default' : 'ghost'}
-                  onClick={() => setNotificacionEstado(null)}
-                  disabled={isLoading}
-                  aria-pressed={notificacionEstado === null}
-                >
-                  Sin registrar
-                </Button>
+            {showSentenciaFecha ? (
+              <div className='rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600'>
+                Ya existe una sentencia {sentenciaEstado === 'dictada' ? 'dictada' : 'programada'}: no se solicitan datos
+                de notificación ni audiencia inicial.
               </div>
-              <p className='text-xs text-gray-500'>
-                Se añadirá automáticamente a las observaciones al guardar.
-	              </p>
-	            </div>
+            ) : (
+              <>
+                <div className='space-y-2'>
+                  <Label>Notificación de la demanda</Label>
+                  <div className='flex flex-wrap gap-2'>
+                    {([
+                      { value: 'realizada', label: 'Realizada' },
+                      { value: 'no_realizada', label: 'Pendiente' },
+                    ] as const).map(option => (
+                      <Button
+                        key={option.value}
+                        type='button'
+                        variant={notificacionEstado === option.value ? 'default' : 'outline'}
+                        onClick={() => {
+                          setValue('notificacion_demanda_estado', option.value, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          if (option.value !== 'realizada') {
+                            setValue('notificacion_demanda_fecha', '', { shouldDirty: true, shouldValidate: true });
+                          }
+                        }}
+                        disabled={isLoading}
+                        aria-pressed={notificacionEstado === option.value}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                    <Button
+                      type='button'
+                      variant={notificacionEstado === null ? 'default' : 'ghost'}
+                      onClick={() => {
+                        setValue('notificacion_demanda_estado', null, { shouldDirty: true, shouldValidate: true });
+                        setValue('notificacion_demanda_fecha', '', { shouldDirty: true, shouldValidate: true });
+                      }}
+                      disabled={isLoading}
+                      aria-pressed={notificacionEstado === null}
+                    >
+                      Sin registrar
+                    </Button>
+                  </div>
+                  {notificacionEstado === 'realizada' && (
+                    <div className='mt-3 grid gap-2 md:max-w-xs'>
+                      <Label htmlFor='notificacion_demanda_fecha'>Fecha de notificación</Label>
+                      <Input
+                        id='notificacion_demanda_fecha'
+                        type='date'
+                        {...register('notificacion_demanda_fecha')}
+                        disabled={isLoading}
+                      />
+                      {errors.notificacion_demanda_fecha && (
+                        <p className='text-sm text-red-600'>{errors.notificacion_demanda_fecha.message}</p>
+                      )}
+                    </div>
+                  )}
+                  <p className='text-xs text-gray-500'>
+                    Se añadirá automáticamente a las observaciones al guardar.
+                  </p>
+                </div>
 
-	            <div className='space-y-2'>
-	              <h3 className='text-sm font-semibold text-gray-900'>Primer hito: audiencia</h3>
-	              <p className='text-xs text-gray-500'>
-	                Define el tipo de audiencia que esperas como primer hito y si requerirá coordinación de testigos.
-	              </p>
-	            </div>
+                <div className='space-y-2'>
+                  <h3 className='text-sm font-semibold text-gray-900'>Primer hito: audiencia</h3>
+                  <p className='text-xs text-gray-500'>
+                    Define el tipo de audiencia que esperas como primer hito y si requerirá coordinación de testigos.
+                  </p>
+                </div>
 
-	            <div className='grid gap-4 md:grid-cols-2'>
-	              <div className='space-y-3'>
-	                <Label>Tipo de audiencia inicial</Label>
-	                <div className='grid gap-2'>
-	                  <label
-	                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-	                      audienciaInicialTipo
-	                        ? 'border-slate-200 bg-white text-slate-700'
-	                        : 'border-slate-200 bg-slate-50 text-slate-600'
-	                    }`}
-	                  >
-	                    <input
-	                      type='radio'
-	                      value=''
-	                      className='text-slate-600'
-	                      {...register('audiencia_inicial_tipo')}
-	                    />
-	                    Sin audiencia definida por ahora
-	                  </label>
-	                  {STAGE_AUDIENCE_TYPES.map((option) => (
-	                    <label
-	                      key={option.value}
-	                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-	                        audienciaInicialTipo === option.value
-	                          ? 'border-sky-300 bg-sky-50 text-sky-700'
-	                          : 'border-slate-200 bg-white text-slate-700'
-	                      }`}
-	                    >
-	                      <input
-	                        type='radio'
-	                        value={option.value}
-	                        className='text-slate-600'
-	                        {...register('audiencia_inicial_tipo')}
-	                      />
-	                      {option.label}
-	                    </label>
-	                  ))}
-	                </div>
-	              </div>
+                <div className='grid gap-4 md:grid-cols-2'>
+                  <div className='space-y-3'>
+                    <Label>Tipo de audiencia inicial</Label>
+                    <div className='grid gap-2'>
+                      <label
+                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                          audienciaInicialTipo
+                            ? 'border-slate-200 bg-white text-slate-700'
+                            : 'border-slate-200 bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        <input
+                          type='radio'
+                          value=''
+                          className='text-slate-600'
+                          {...register('audiencia_inicial_tipo')}
+                        />
+                        Sin audiencia definida por ahora
+                      </label>
+                      {STAGE_AUDIENCE_TYPES.map((option) => (
+                        <label
+                          key={option.value}
+                          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                            audienciaInicialTipo === option.value
+                              ? 'border-sky-300 bg-sky-50 text-sky-700'
+                              : 'border-slate-200 bg-white text-slate-700'
+                          }`}
+                        >
+                          <input
+                            type='radio'
+                            value={option.value}
+                            className='text-slate-600'
+                            {...register('audiencia_inicial_tipo')}
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                    </div>
+                    <div className='mt-4 space-y-2'>
+                      <Label htmlFor='audiencia_inicial_fecha'>Fecha de audiencia</Label>
+                      <Input
+                        id='audiencia_inicial_fecha'
+                        type='date'
+                        {...register('audiencia_inicial_fecha')}
+                        disabled={
+                          isLoading ||
+                          !audienciaInicialTipo ||
+                          audienciaInicialTipo.endsWith('_sin_fecha')
+                        }
+                      />
+                      {(!audienciaInicialTipo || audienciaInicialTipo.endsWith('_sin_fecha')) && (
+                        <p className='text-xs text-gray-500'>
+                          Se habilita cuando seleccionas una audiencia con fecha.
+                        </p>
+                      )}
+                      {errors.audiencia_inicial_fecha && (
+                        <p className='text-sm text-red-600'>{errors.audiencia_inicial_fecha.message}</p>
+                      )}
+                    </div>
+                  </div>
 
-	              <div className='space-y-3'>
-	                <Label>Participación de testigos</Label>
-	                <Controller
-	                  control={control}
-	                  name='audiencia_inicial_requiere_testigos'
-	                  render={({ field }) => (
-	                    <label
-	                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-	                        audienciaInicialTipo
-	                          ? 'border-slate-200 bg-white text-slate-700'
-	                          : 'border-dashed border-slate-200 bg-slate-50 text-slate-500'
-	                      }`}
-	                    >
-	                      <input
-	                        type='checkbox'
-	                        className='rounded border-slate-300'
-	                        checked={Boolean(field.value)}
-	                        onChange={(event) => field.onChange(event.target.checked)}
-	                        onBlur={field.onBlur}
-	                        ref={field.ref}
-	                        name={field.name}
-	                        disabled={!audienciaInicialTipo}
-	                      />
-	                      Se coordinarán testigos para esta audiencia
-	                    </label>
-	                  )}
-	                />
-	                <p className='text-xs text-gray-500'>
-	                  Esta marca solo aplica si defines una audiencia inicial y se reflejará en la primera etapa del timeline.
-	                </p>
-	              </div>
-	            </div>
+                  <div className='space-y-3'>
+                    <Label>Participación de testigos</Label>
+                    <Controller
+                      control={control}
+                      name='audiencia_inicial_requiere_testigos'
+                      render={({ field }) => (
+                        <label
+                          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                            audienciaInicialTipo
+                              ? 'border-slate-200 bg-white text-slate-700'
+                              : 'border-dashed border-slate-200 bg-slate-50 text-slate-500'
+                          }`}
+                        >
+                          <input
+                            type='checkbox'
+                            className='rounded border-slate-300'
+                            checked={Boolean(field.value)}
+                            onChange={(event) => field.onChange(event.target.checked)}
+                            onBlur={field.onBlur}
+                            ref={field.ref}
+                            name={field.name}
+                            disabled={!audienciaInicialTipo}
+                          />
+                          Se coordinarán testigos para esta audiencia
+                        </label>
+                      )}
+                    />
+                    <p className='text-xs text-gray-500'>
+                      Esta marca solo aplica si defines una audiencia inicial y se reflejará en la primera etapa del timeline.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
 	            <div className='space-y-2'>
 	              <h3 className='text-sm font-semibold text-gray-900'>Sentencia</h3>
@@ -1915,7 +2124,7 @@ export function CaseForm({
 	            </div>
 	          </section>
 
-	          <section className='space-y-4'>
+	          <section id='case-form-step-3' className='space-y-4 scroll-mt-24'>
 	            <div>
 	              <h2 className='text-lg font-semibold text-gray-900'>Honorarios y cobro prepago</h2>
               <p className='text-sm text-gray-500'>Define cómo se cobrará este caso. El timeline bloqueará etapas hasta registrar el pago correspondiente.</p>
@@ -2068,7 +2277,7 @@ export function CaseForm({
             </div>
           </section>
 
-	          <section className='space-y-4'>
+	          <section id='case-form-step-4' className='space-y-4 scroll-mt-24'>
 	            <div>
 	              <h2 className='text-lg font-semibold text-gray-900'>Asignación y workflow</h2>
 	              <p className='text-sm text-gray-500'>Define el estado interno del expediente y la revisión previa a la asignación.</p>
@@ -2130,7 +2339,7 @@ export function CaseForm({
                 Cancelar
               </Button>
             )}
-            <Button type='submit' disabled={isLoading || !clientePrincipalId}>
+            <Button type='submit' disabled={isLoading || !canSubmit}>
               {isLoading ? (
                 <>
                   <Loader2 className='w-4 h-4 mr-2 animate-spin' />
@@ -2147,5 +2356,90 @@ export function CaseForm({
         </form>
       </CardContent>
     </Card>
+
+    {isWizard && (
+      <aside className="space-y-4 lg:sticky lg:top-24">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Resumen</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              {([
+                { step: 1, label: 'Partes', done: step1Done },
+                { step: 2, label: 'Carátula', done: step2Done },
+                { step: 3, label: 'Antecedentes', done: step3Done },
+                { step: 4, label: 'Revisión', done: canSubmit },
+              ] as const).map((s) => (
+                <button
+                  key={s.step}
+                  type="button"
+                  onClick={() => scrollToStep(s.step)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/50 px-4 py-3 text-left transition hover:bg-white/80',
+                    s.done && 'border-primary/25 bg-primary/10',
+                  )}
+                >
+                  <span className="text-sm font-semibold text-foreground">{s.label}</span>
+                  <Badge variant={s.done ? 'info' : 'outline'} className="shrink-0">
+                    {s.done ? 'Listo' : 'Pendiente'}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-white/20 bg-white/55 p-4 text-sm text-foreground/70">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/50">Estado</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{CASE_WORKFLOW_STATES.find((s) => s.value === workflowState)?.label ?? '—'}</Badge>
+                <Badge variant="outline">{CASE_PRIORITIES.find((p) => p.value === watch('prioridad'))?.label ?? '—'}</Badge>
+                {modalidadCobro && <Badge variant="outline">{modalidadCobro}</Badge>}
+              </div>
+              {audienciaInicialTipo && (
+                <p className="mt-2 text-xs text-foreground/60">
+                  Audiencia: <span className="font-semibold text-foreground">{audienciaInicialTipo}</span>
+                  {audienciaInicialRequiereTestigos ? ' · con testigos' : ''}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {timelinePreview && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Timeline sugerido</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-foreground/70">
+                Se generarán <span className="font-semibold text-foreground">{timelinePreview.total}</span> etapas automáticamente al crear el caso.
+              </p>
+              <div className="mt-3 space-y-2">
+                {timelinePreview.items.map((item) => (
+                  <div key={item.etapa} className="rounded-2xl border border-white/20 bg-white/55 px-4 py-3">
+                    <p className="text-sm font-semibold text-foreground">{item.etapa}</p>
+                    <p className="mt-1 text-xs text-foreground/55">Estimado: {formatDate(item.fecha)}</p>
+                  </div>
+                ))}
+              </div>
+              {timelinePreview.total > timelinePreview.items.length && (
+                <p className="mt-2 text-xs text-foreground/55">
+                  Mostrando {timelinePreview.items.length} de {timelinePreview.total} etapas.
+                </p>
+              )}
+              {timelinePreview.shouldDistributeCosts && (
+                <div className="mt-4 rounded-2xl border border-amber-200/60 bg-amber-50/70 p-4 text-sm text-amber-900">
+                  <p className="font-semibold">Prepago por etapas</p>
+                  <p className="mt-1 text-xs text-amber-900/80">
+                    El honorario total en UF se distribuye automáticamente por etapa (y bloquea avance hasta pago).
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </aside>
+    )}
+  </div>
   );
 }

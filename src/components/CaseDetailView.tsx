@@ -61,6 +61,22 @@ function getSentenceStatusLabel(status?: string | null): string {
   return SENTENCE_STATUS_LABELS[status] ?? 'Sin sentencia registrada';
 }
 
+function parseDateOnly(value?: string | null): Date | null {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map((part) => Number(part));
+  if (!year || !month || !day) return null;
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function daysBetween(startIso?: string | null, endIso?: string | null): number | null {
+  const start = parseDateOnly(startIso);
+  const end = parseDateOnly(endIso);
+  if (!start || !end) return null;
+  const msPerDay = 1000 * 60 * 60 * 24;
+  return Math.max(Math.round((end.getTime() - start.getTime()) / msPerDay), 0);
+}
+
 interface CaseDetailViewProps {
   case: Omit<Case, 'abogado_responsable'> & {
     fecha_termino?: string | null;
@@ -199,6 +215,96 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     });
     return map;
   }, [stageCatalog]);
+  const stageInsights = useMemo(() => {
+    const normalize = (value: string) =>
+      value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    const todayIso = new Date().toISOString().split('T')[0]!;
+    const sorted = [...stageCatalog].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+    const currentStage = sorted.find((stage) => stage.estado !== 'completado') ?? null;
+
+    const stagesWithDate = <T extends CaseStage>(
+      items: T[],
+      selector: (item: T) => string | null,
+    ) =>
+      items
+        .map((item) => ({ item, time: parseDateOnly(selector(item))?.getTime() ?? null }))
+        .filter((row): row is { item: T; time: number } => typeof row.time === 'number')
+        .sort((a, b) => a.time - b.time);
+
+    const nextScheduled = (() => {
+      const upcoming = stagesWithDate(
+        sorted.filter((s) => s.estado !== 'completado' && Boolean(s.fecha_programada)),
+        (s) => s.fecha_programada ?? null,
+      );
+      return upcoming[0]?.item ?? null;
+    })();
+
+    const lastCompleted = (() => {
+      const completed = stagesWithDate(
+        sorted.filter((s) => s.estado === 'completado' && Boolean(s.fecha_cumplida)),
+        (s) => s.fecha_cumplida ?? null,
+      );
+      return completed.length > 0 ? completed[completed.length - 1]!.item : null;
+    })();
+
+    const notificationFromStages = (() => {
+      const candidates = sorted.filter((stage) => normalize(stage.etapa ?? '').includes('notific'));
+      const completed = stagesWithDate(candidates.filter((s) => Boolean(s.fecha_cumplida)), (s) => s.fecha_cumplida ?? null);
+      if (completed.length > 0) return completed[completed.length - 1]!.item.fecha_cumplida ?? null;
+      const scheduled = stagesWithDate(candidates.filter((s) => Boolean(s.fecha_programada)), (s) => s.fecha_programada ?? null);
+      return scheduled.length > 0 ? scheduled[0]!.item.fecha_programada ?? null : null;
+    })();
+
+    const audienceStages = sorted.filter((stage) => {
+      if (stage.audiencia_tipo) return true;
+      return normalize(stage.etapa ?? '').includes('audiencia');
+    });
+    const nextAudience = (() => {
+      const candidates = stagesWithDate(
+        audienceStages.filter((s) => s.estado !== 'completado' && Boolean(s.fecha_programada)),
+        (s) => s.fecha_programada ?? null,
+      );
+      return candidates[0]?.item ?? null;
+    })();
+    const lastAudience = (() => {
+      const candidates = stagesWithDate(
+        audienceStages.filter((s) => s.estado === 'completado' && Boolean(s.fecha_cumplida)),
+        (s) => s.fecha_cumplida ?? null,
+      );
+      return candidates.length > 0 ? candidates[candidates.length - 1]!.item : null;
+    })();
+
+    const notificacionDate = caseData.notificacion_demanda_fecha ?? notificationFromStages ?? null;
+    const endDate =
+      caseData.fecha_termino ??
+      (caseData.sentencia_estado === 'dictada' ? caseData.sentencia_fecha : null) ??
+      lastCompleted?.fecha_cumplida ??
+      todayIso;
+
+    return {
+      etapaActual: currentStage?.etapa ?? caseData.etapa_actual ?? null,
+      nextScheduled,
+      lastCompleted,
+      notificacionDate,
+      nextAudience,
+      lastAudience,
+      durationEndDate: endDate,
+      durationDays: daysBetween(caseData.fecha_inicio, endDate),
+      todayIso,
+    };
+  }, [
+    caseData.etapa_actual,
+    caseData.fecha_inicio,
+    caseData.fecha_termino,
+    caseData.notificacion_demanda_fecha,
+    caseData.sentencia_estado,
+    caseData.sentencia_fecha,
+    stageCatalog,
+  ]);
   const requestedStageName = clientAdvance.solicitado > 0 ? stageNamesByOrder.get(clientAdvance.solicitado) ?? null : null;
   const authorizedStageName = clientAdvance.autorizado > 0 ? stageNamesByOrder.get(clientAdvance.autorizado) ?? null : null;
   const [isAuthorizing, setIsAuthorizing] = useState(false);
@@ -668,9 +774,9 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               <div className="flex flex-wrap items-center justify-end gap-2 md:flex-col md:items-end md:gap-3">
                 {getStatusBadge(caseData.estado || 'activo')}
                 {caseData.prioridad && getPriorityBadge(caseData.prioridad)}
-                {caseData.etapa_actual && (
+                {stageInsights.etapaActual && (
                   <Badge variant="outline" className="badge-spark">
-                    {caseData.etapa_actual}
+                    {stageInsights.etapaActual}
                   </Badge>
                 )}
                 {caseData.sentencia_estado && caseData.sentencia_estado !== 'no_registra' && (
@@ -821,6 +927,41 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                             Inicio · <span className="font-medium text-foreground">{formatDate(caseData.fecha_inicio)}</span>
                           </p>
                         )}
+                        {stageInsights.notificacionDate && (
+                          <p>
+                            Notificación ·{' '}
+                            <span className="font-medium text-foreground">
+                              {formatDate(stageInsights.notificacionDate)}
+                            </span>
+                          </p>
+                        )}
+                        {stageInsights.nextAudience?.fecha_programada && (
+                          <p>
+                            Audiencia próxima ·{' '}
+                            <span className="font-medium text-foreground">
+                              {formatDate(stageInsights.nextAudience.fecha_programada)}
+                            </span>
+                            <span className="text-xs text-foreground/50"> · {stageInsights.nextAudience.etapa}</span>
+                          </p>
+                        )}
+                        {stageInsights.nextScheduled?.fecha_programada && (
+                          <p>
+                            Próximo hito ·{' '}
+                            <span className="font-medium text-foreground">
+                              {formatDate(stageInsights.nextScheduled.fecha_programada)}
+                            </span>
+                            <span className="text-xs text-foreground/50"> · {stageInsights.nextScheduled.etapa}</span>
+                          </p>
+                        )}
+                        {stageInsights.lastCompleted?.fecha_cumplida && (
+                          <p>
+                            Último hito ·{' '}
+                            <span className="font-medium text-foreground">
+                              {formatDate(stageInsights.lastCompleted.fecha_cumplida)}
+                            </span>
+                            <span className="text-xs text-foreground/50"> · {stageInsights.lastCompleted.etapa}</span>
+                          </p>
+                        )}
                         {caseData.sentencia_fecha && (
                           <p>
                             Sentencia · <span className="font-medium text-foreground">{formatDate(caseData.sentencia_fecha)}</span>
@@ -829,6 +970,20 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         {caseData.fecha_termino && (
                           <p>
                             Término · <span className="font-medium text-foreground">{formatDate(caseData.fecha_termino)}</span>
+                          </p>
+                        )}
+                        {stageInsights.durationDays !== null && (
+                          <p>
+                            {caseData.fecha_termino || (caseData.sentencia_estado === 'dictada' && caseData.sentencia_fecha)
+                              ? 'Duración total'
+                              : 'Duración'}
+                            {' '}·{' '}
+                            <span className="font-medium text-foreground">{stageInsights.durationDays} días</span>
+                            {stageInsights.durationEndDate && (
+                              <span className="text-xs text-foreground/50">
+                                {' '}· al {formatDate(stageInsights.durationEndDate)}
+                              </span>
+                            )}
                           </p>
                         )}
                       </div>
@@ -851,11 +1006,12 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
-                          Valor estimado
+                          Cuantía en disputa
                         </p>
                         <p className="mt-3 text-2xl font-semibold text-foreground">
                           {formatCurrency(caseData.valor_estimado)}
                         </p>
+                        <p className="mt-1 text-xs text-foreground/50">Monto reclamado o discutido (no honorarios).</p>
                       </div>
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent text-amber-600">
                         <DollarSign className="h-5 w-5" />
@@ -1512,7 +1668,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               <CardContent className="space-y-2 text-sm text-foreground/70">
                 <div className="flex items-center justify-between gap-3">
                   <span>Etapa actual</span>
-                  <span className="font-medium text-foreground">{caseData.etapa_actual ?? 'Sin definir'}</span>
+                  <span className="font-medium text-foreground">{stageInsights.etapaActual ?? 'Sin definir'}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span>Estado</span>
@@ -1524,7 +1680,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                 </div>
                 {typeof caseData.valor_estimado === 'number' && (
                   <div className="flex items-center justify-between gap-3">
-                    <span>Valor estimado</span>
+                    <span>Cuantía</span>
                     <span className="font-medium text-foreground">{formatCurrency(caseData.valor_estimado)}</span>
                   </div>
                 )}

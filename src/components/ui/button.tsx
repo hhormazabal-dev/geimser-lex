@@ -9,11 +9,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'border border-white/30 bg-white/70 text-foreground shadow-sm backdrop-blur-xl hover:bg-white/90 focus-visible:ring-primary/40 focus-visible:ring-offset-transparent',
+          'border border-[color:var(--glass-border)] bg-[color:var(--glass)] text-foreground shadow-sm backdrop-blur-xl hover:bg-[color:var(--glass-hover)] focus-visible:ring-primary/35 focus-visible:ring-offset-transparent',
         destructive:
           'border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/90 focus-visible:ring-destructive/40 focus-visible:ring-offset-transparent',
         outline:
-          'border border-white/30 bg-transparent text-foreground/80 hover:bg-white/10 focus-visible:ring-primary/30 focus-visible:ring-offset-transparent',
+          'border border-[color:var(--glass-border)] bg-transparent text-foreground/80 hover:bg-white/10 focus-visible:ring-primary/25 focus-visible:ring-offset-transparent',
         secondary:
           'border border-transparent bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 focus-visible:ring-primary/40 focus-visible:ring-offset-transparent',
         ghost:

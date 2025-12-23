@@ -62,7 +62,7 @@ const baseCaseSchema = z.object({
     .enum(['preparacion', 'en_revision', 'activo', 'cerrado'])
     .default('preparacion'),
   prioridad: z.enum(['baja', 'media', 'alta', 'urgente']).default('media'),
-  valor_estimado: z.number().positive('El valor debe ser positivo').optional(),
+  valor_estimado: z.number().positive('La cuantía debe ser positiva').optional(),
   honorario_total_uf: z.number().nonnegative('El honorario total debe ser positivo').optional(),
   honorario_pagado_uf: z.number().nonnegative('El monto pagado debe ser positivo').optional(),
   honorario_variable_porcentaje: z
@@ -78,10 +78,13 @@ const baseCaseSchema = z.object({
     .string()
     .max(1000, 'El identificador de tarifa no puede exceder 1000 caracteres')
     .optional(),
+  notificacion_demanda_estado: z.enum(['realizada', 'no_realizada']).optional().nullable(),
+  notificacion_demanda_fecha: z.string().optional(),
   audiencia_inicial_tipo: z.preprocess(
     (value) => (value === '' ? undefined : value),
     z.enum(['preparatoria', 'juicio', 'preparatoria_sin_fecha', 'juicio_sin_fecha']).optional(),
   ),
+  audiencia_inicial_fecha: z.string().optional(),
   audiencia_inicial_requiere_testigos: z.boolean().optional(),
   alcance_cliente_solicitado: z
     .number()
@@ -176,6 +179,32 @@ export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
       path: ['sentencia_fecha'],
     });
   }
+
+  const skipMilestones = data.sentencia_estado === 'programada' || data.sentencia_estado === 'dictada';
+  if (!skipMilestones) {
+    if (
+      data.notificacion_demanda_estado === 'realizada' &&
+      (!data.notificacion_demanda_fecha || data.notificacion_demanda_fecha.trim().length === 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debes indicar la fecha de notificación.',
+        path: ['notificacion_demanda_fecha'],
+      });
+    }
+
+    if (
+      data.audiencia_inicial_tipo &&
+      (data.audiencia_inicial_tipo === 'preparatoria' || data.audiencia_inicial_tipo === 'juicio') &&
+      (!data.audiencia_inicial_fecha || data.audiencia_inicial_fecha.trim().length === 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debes indicar la fecha de la audiencia.',
+        path: ['audiencia_inicial_fecha'],
+      });
+    }
+  }
 });
 
 export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx) => {
@@ -215,6 +244,32 @@ export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx)
       message: 'Debes indicar la fecha de la sentencia.',
       path: ['sentencia_fecha'],
     });
+  }
+
+  const skipMilestones = data.sentencia_estado === 'programada' || data.sentencia_estado === 'dictada';
+  if (!skipMilestones) {
+    if (
+      data.notificacion_demanda_estado === 'realizada' &&
+      (!data.notificacion_demanda_fecha || data.notificacion_demanda_fecha.trim().length === 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debes indicar la fecha de notificación.',
+        path: ['notificacion_demanda_fecha'],
+      });
+    }
+
+    if (
+      data.audiencia_inicial_tipo &&
+      (data.audiencia_inicial_tipo === 'preparatoria' || data.audiencia_inicial_tipo === 'juicio') &&
+      (!data.audiencia_inicial_fecha || data.audiencia_inicial_fecha.trim().length === 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debes indicar la fecha de la audiencia.',
+        path: ['audiencia_inicial_fecha'],
+      });
+    }
   }
 });
 
