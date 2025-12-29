@@ -322,6 +322,7 @@ export type Database = {
           estado: Database["public"]["Enums"]["case_status"] | null
           etapa_actual: string | null
           fecha_inicio: string | null
+          fecha_desistimiento: string | null
           id: string
           materia: string | null
           nombre_cliente: string
@@ -348,6 +349,7 @@ export type Database = {
           estado?: Database["public"]["Enums"]["case_status"] | null
           etapa_actual?: string | null
           fecha_inicio?: string | null
+          fecha_desistimiento?: string | null
           id?: string
           materia?: string | null
           nombre_cliente: string
@@ -374,6 +376,7 @@ export type Database = {
           estado?: Database["public"]["Enums"]["case_status"] | null
           etapa_actual?: string | null
           fecha_inicio?: string | null
+          fecha_desistimiento?: string | null
           id?: string
           materia?: string | null
           nombre_cliente?: string
@@ -1084,7 +1087,12 @@ export type Database = {
     }
     Enums: {
       case_priority: "baja" | "media" | "alta" | "urgente"
-      case_status: "activo" | "suspendido" | "archivado" | "terminado"
+      case_status:
+        | "activo"
+        | "suspendido"
+        | "archivado"
+        | "terminado"
+        | "terminado_desistido_demandante"
       document_visibility: "privado" | "cliente"
       note_type: "privada" | "publica"
       request_status:
@@ -1231,7 +1239,13 @@ export const Constants = {
   public: {
     Enums: {
       case_priority: ["baja", "media", "alta", "urgente"],
-      case_status: ["activo", "suspendido", "archivado", "terminado"],
+      case_status: [
+        "activo",
+        "suspendido",
+        "archivado",
+        "terminado",
+        "terminado_desistido_demandante",
+      ],
       document_visibility: ["privado", "cliente"],
       note_type: ["privada", "publica"],
       request_status: [

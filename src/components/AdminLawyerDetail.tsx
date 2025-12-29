@@ -25,6 +25,7 @@ const STATUS_LABELS: Record<string, string> = {
   suspendido: 'Suspendido',
   archivado: 'Archivado',
   terminado: 'Terminado',
+  terminado_desistido_demandante: 'Terminada (Desistida)',
 };
 
 const PRIORITY_LABELS: Record<string, string> = {

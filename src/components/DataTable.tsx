@@ -39,6 +39,10 @@ const STATUS_VARIANTS: Record<string, { label: string; chipClass: string }> = {
   suspendido: { label: 'Suspendido', chipClass: 'bg-amber-50 text-amber-700 border border-amber-100' },
   archivado: { label: 'Archivado', chipClass: 'bg-slate-100 text-slate-600 border border-slate-200' },
   terminado: { label: 'Terminado', chipClass: 'bg-sky-50 text-sky-700 border border-sky-100' },
+  terminado_desistido_demandante: {
+    label: 'Terminada (Desistida)',
+    chipClass: 'bg-sky-50 text-sky-700 border border-sky-100',
+  },
 };
 
 const PRIORITY_VARIANTS: Record<string, string> = {
@@ -222,6 +226,7 @@ export function DataTable({
                   <option value='suspendido'>Suspendido</option>
                   <option value='archivado'>Archivado</option>
                   <option value='terminado'>Terminado</option>
+                  <option value='terminado_desistido_demandante'>Terminada - Desistida por Demandante</option>
                 </select>
               </div>
 

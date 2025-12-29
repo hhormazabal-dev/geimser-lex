@@ -199,7 +199,7 @@ export async function createCase(input: CreateCaseInput) {
       }
     }
 
-    const baseData: CaseInsert = {
+    const baseData: CaseInsert & Record<string, any> = {
       caratulado: caseInput.caratulado,
       nombre_cliente: caseInput.nombre_cliente,
 
@@ -217,17 +217,15 @@ export async function createCase(input: CreateCaseInput) {
           ? caseInput.sentencia_fecha
           : null,
       notificacion_demanda_estado: sOrNull((caseInput as any).notificacion_demanda_estado),
-      notificacion_demanda_fecha:
-        (caseInput as any).notificacion_demanda_fecha && (caseInput as any).notificacion_demanda_fecha.trim().length > 0
-          ? (caseInput as any).notificacion_demanda_fecha
-          : null,
+      notificacion_demanda_fecha: normalizeDateOnlyInput((caseInput as any).notificacion_demanda_fecha),
+      fecha_desistimiento: normalizeDateOnlyInput((caseInput as any).fecha_desistimiento),
 
       fecha_inicio: caseInput.fecha_inicio ?? null,
       abogado_responsable:
         caseInput.abogado_responsable ??
         (profile.role === 'abogado' ? profile.id : null),
 
-      estado: caseInput.estado ?? 'activo',
+      estado: (caseInput.estado ?? 'activo') as any,
       workflow_state: parseWorkflow(
         caseInput.workflow_state ?? (marcar_validado ? 'en_revision' : 'preparacion')
       ),
@@ -440,7 +438,7 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
 
     const nowIso = new Date().toISOString();
 
-    const updatePayload: CaseUpdate = {
+    const updatePayload: CaseUpdate & Record<string, any> = {
       updated_at: nowIso,
 
       ...(rest.caratulado !== undefined && { caratulado: rest.caratulado }),
@@ -472,10 +470,10 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
         notificacion_demanda_estado: sOrNull(rest.notificacion_demanda_estado),
       }),
       ...(rest.notificacion_demanda_fecha !== undefined && {
-        notificacion_demanda_fecha:
-          rest.notificacion_demanda_fecha && rest.notificacion_demanda_fecha.trim().length > 0
-            ? rest.notificacion_demanda_fecha
-            : null,
+        notificacion_demanda_fecha: normalizeDateOnlyInput(rest.notificacion_demanda_fecha as any),
+      }),
+      ...(rest.fecha_desistimiento !== undefined && {
+        fecha_desistimiento: normalizeDateOnlyInput(rest.fecha_desistimiento as any),
       }),
       ...(rest.valor_estimado !== undefined && { valor_estimado: nOrNull(rest.valor_estimado) }),
       ...(rest.honorario_total_uf !== undefined && { honorario_total_uf: nOrNull(rest.honorario_total_uf) }),
@@ -522,7 +520,7 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       }),
     };
 
-    if (rest.estado !== undefined) updatePayload.estado = rest.estado;
+    if (rest.estado !== undefined) updatePayload.estado = rest.estado as any;
     if (rest.prioridad !== undefined) updatePayload.prioridad = rest.prioridad;
     if (rest.workflow_state !== undefined) updatePayload.workflow_state = parseWorkflow(rest.workflow_state);
 
@@ -1119,19 +1117,14 @@ async function upsertPrimaryClients(caseId: string, clientProfileIds: Array<stri
 
   try {
     const supabase = await getSB();
+    // Normalizamos flags: primero desmarcamos todos, luego marcamos solo los seleccionados.
+    await supabase.from('case_clients').update({ is_primary: false }).eq('case_id', caseId);
     await supabase
       .from('case_clients')
       .upsert(
         ids.map((id) => ({ case_id: caseId, client_profile_id: id, is_primary: true })),
         { onConflict: 'case_id,client_profile_id' },
       );
-
-    const inList = `(${ids.map((id) => `'${id}'`).join(',')})`;
-    await supabase
-      .from('case_clients')
-      .update({ is_primary: false })
-      .eq('case_id', caseId)
-      .not('client_profile_id', 'in', inList);
   } catch (error) {
     console.error('Error actualizando clientes principales del caso:', error);
   }

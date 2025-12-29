@@ -293,7 +293,12 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
 
     const audienceStages = sorted.filter((stage) => {
       if (stage.audiencia_tipo) return true;
-      return normalize(stage.etapa ?? '').includes('audiencia');
+      const name = normalize(stage.etapa ?? '');
+      if (name.includes('audiencia')) return true;
+      if (name.includes('preparator') || name.includes('preliminar')) return true;
+      if (name.includes('juicio')) return true;
+      if (name.includes('alegatos') && name.includes('vista')) return true;
+      return false;
     });
     const nextAudience = (() => {
       const candidates = stagesWithDate(
@@ -348,12 +353,13 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     const primaryClients = (() => {
       const seen = new Set<string>();
       const out: Array<(typeof allClients)[number]> = [];
+      const useLegacy = primaryFromFlag.length === 0;
       for (const c of primaryFromFlag) {
         if (!c?.id || seen.has(c.id)) continue;
         seen.add(c.id);
         out.push(c);
       }
-      if (primaryFromLegacy && !seen.has(primaryFromLegacy.id)) out.push(primaryFromLegacy);
+      if (useLegacy && primaryFromLegacy && !seen.has(primaryFromLegacy.id)) out.push(primaryFromLegacy);
       return out;
     })();
 
@@ -524,6 +530,14 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       suspendido: 'bg-yellow-100 text-yellow-800',
       archivado: 'bg-gray-100 text-gray-800',
       terminado: 'bg-blue-100 text-blue-800',
+      terminado_desistido_demandante: 'bg-blue-100 text-blue-800',
+    };
+    const labels: Record<string, string> = {
+      activo: 'Activo',
+      suspendido: 'Suspendido',
+      archivado: 'Archivado',
+      terminado: 'Terminado',
+      terminado_desistido_demandante: 'Terminada (Desistida)',
     };
 
     return (
@@ -532,7 +546,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           variants[status] || 'bg-gray-100 text-gray-800'
         }`}
       >
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {labels[status] ?? status}
       </span>
     );
   };
@@ -1119,6 +1133,14 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         {caseData.sentencia_fecha && (
                           <p>
                             Sentencia · <span className="font-medium text-foreground">{formatDate(caseData.sentencia_fecha)}</span>
+                          </p>
+                        )}
+                        {(caseData as any).fecha_desistimiento && (
+                          <p>
+                            Desistimiento ·{' '}
+                            <span className="font-medium text-foreground">
+                              {formatDate((caseData as any).fecha_desistimiento)}
+                            </span>
                           </p>
                         )}
                         {caseData.fecha_termino && (

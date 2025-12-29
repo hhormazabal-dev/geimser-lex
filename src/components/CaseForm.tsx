@@ -273,6 +273,7 @@ export function CaseForm({
     sentencia_estado: 'Estado de sentencia',
     sentencia_fecha: 'Fecha de sentencia',
     audiencia_inicial_fecha: 'Fecha de audiencia',
+    fecha_desistimiento: 'Fecha de desistimiento',
     honorario_total_uf: 'Honorario total',
     honorario_pagado_uf: 'Monto pagado',
     honorario_variable_porcentaje: 'Porcentaje variable',
@@ -301,6 +302,7 @@ export function CaseForm({
     'notificacion_demanda_fecha',
     'etapa_actual',
     'estado',
+    'fecha_desistimiento',
     'prioridad',
     'sentencia_estado',
     'sentencia_fecha',
@@ -429,6 +431,7 @@ export function CaseForm({
         notificacion_demanda_estado:
           (existingCase as any).notificacion_demanda_estado ?? initialFormMeta.notification ?? null,
         notificacion_demanda_fecha: (existingCase as any).notificacion_demanda_fecha ?? '',
+        fecha_desistimiento: (existingCase as any).fecha_desistimiento ?? '',
         abogado_responsable: existingLawyerId || defaultLawyerId,
         cliente_principal_id: existingCase.cliente_principal_id ?? '',
         clientes_principales_extra_ids:
@@ -472,6 +475,7 @@ export function CaseForm({
         fecha_inicio: new Date().toISOString().split('T')[0],
         notificacion_demanda_estado: null,
         notificacion_demanda_fecha: '',
+        fecha_desistimiento: '',
         abogado_responsable: defaultLawyerId,
         cliente_principal_id: '',
         clientes_principales_extra_ids: [],
@@ -581,6 +585,7 @@ export function CaseForm({
   const audienciaInicialFecha = watch('audiencia_inicial_fecha');
   const audienciaInicialRequiereTestigos = watch('audiencia_inicial_requiere_testigos');
   const sentenciaEstado = watch('sentencia_estado');
+  const estadoExpediente = watch('estado');
   const honorarioPagado = watch('honorario_pagado_uf');
   const honorarioPendiente =
     typeof honorarioTotal === 'number' && !Number.isNaN(honorarioTotal)
@@ -594,6 +599,7 @@ export function CaseForm({
   const step3Done = (descripcionInicialValue ?? '').trim().length >= 20;
   const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
   const showSentenciaFecha = sentenciaEstado === 'programada' || sentenciaEstado === 'dictada';
+  const showDesistimientoFecha = estadoExpediente === 'terminado_desistido_demandante';
   const isWizard = variant === 'wizard' && !existingCase;
   const canSubmit = Boolean(existingCase) || (step1Done && step2Done && step3Done);
 
@@ -1145,6 +1151,14 @@ export function CaseForm({
       setValue('audiencia_inicial_fecha', '', { shouldDirty: true, shouldValidate: true });
     }
   }, [audienciaInicialFecha, audienciaInicialTipo, setValue]);
+
+  useEffect(() => {
+    const current = watch('fecha_desistimiento');
+    if (!showDesistimientoFecha && current) {
+      setValue('fecha_desistimiento', '', { shouldDirty: true, shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDesistimientoFecha, setValue]);
 
   return (
     <div
@@ -2155,6 +2169,23 @@ export function CaseForm({
 	                )}
 	              </div>
 	            </div>
+
+            {showDesistimientoFecha && (
+              <div className='mt-4 grid grid-cols-1 md:grid-cols-3 gap-4'>
+                <div className='space-y-2'>
+                  <Label htmlFor='fecha_desistimiento'>Fecha de desistimiento</Label>
+                  <Input
+                    id='fecha_desistimiento'
+                    type='date'
+                    {...register('fecha_desistimiento')}
+                    disabled={isLoading}
+                  />
+                  {errors.fecha_desistimiento && (
+                    <p className='text-sm text-red-600'>{errors.fecha_desistimiento.message}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className='space-y-2'>
               <Label htmlFor='observaciones'>Observaciones internas</Label>

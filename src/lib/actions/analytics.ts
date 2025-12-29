@@ -230,7 +230,10 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
 
     const cases = (casesResult.data as Array<Record<string, any>> | null) ?? [];
     const activeCases = cases.filter((c) => (c.estado as string | null) === 'activo').length;
-    const completedCases = cases.filter((c) => (c.estado as string | null) === 'terminado').length;
+    const completedCases = cases.filter((c) => {
+      const status = (c.estado as string | null) ?? null;
+      return status === 'terminado' || status === 'terminado_desistido_demandante';
+    }).length;
 
     const stats: DashboardStats = {
       totalCases: cases.length,
@@ -530,7 +533,7 @@ export async function getMonthlyStats(): Promise<{ success: boolean; data?: Mont
     let completedCasesQuery = supabase
       .from('cases')
       .select('updated_at, valor_estimado')
-      .eq('estado', 'terminado')
+      .in('estado', ['terminado', 'terminado_desistido_demandante'])
       .gte('updated_at', startDate.toISOString());
 
     if (role === 'abogado') {
@@ -625,7 +628,11 @@ export async function getAbogadoWorkload(): Promise<{ success: boolean; data?: A
     const workloadPromises = abogadosData.map(async (abogado) => {
       const [activeCasesResult, completedCasesResult] = await Promise.all([
         supabase.from('cases').select('valor_estimado').eq('abogado_responsable', abogado.id).eq('estado', 'activo'),
-        supabase.from('cases').select('valor_estimado').eq('abogado_responsable', abogado.id).eq('estado', 'terminado'),
+        supabase
+          .from('cases')
+          .select('valor_estimado')
+          .eq('abogado_responsable', abogado.id)
+          .in('estado', ['terminado', 'terminado_desistido_demandante']),
       ]);
 
       const activeCases = (activeCasesResult.data as Array<{ valor_estimado: number | null }> | null) ?? [];
@@ -751,7 +758,9 @@ export async function getLawyerDetail(abogadoId: string): Promise<{ success: boo
     });
 
     const activeCases = caseSummaries.filter((c) => c.estado === 'activo');
-    const completedCases = caseSummaries.filter((c) => c.estado === 'terminado');
+    const completedCases = caseSummaries.filter(
+      (c) => c.estado === 'terminado' || c.estado === 'terminado_desistido_demandante'
+    );
     const totalValue = caseSummaries.reduce(
       (sum, caseItem) => sum + ((caseItem.valor_estimado as number | null) ?? 0),
       0

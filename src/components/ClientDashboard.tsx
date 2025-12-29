@@ -122,7 +122,9 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
 
     const totalCases = cases.length;
     const activeCases = cases.filter((item) => item.estado === 'activo').length;
-    const closedCases = cases.filter((item) => item.estado === 'terminado' || item.estado === 'archivado').length;
+    const closedCases = cases.filter(
+      (item) => item.estado === 'terminado' || item.estado === 'terminado_desistido_demandante' || item.estado === 'archivado'
+    ).length;
     const ufCases = cases.filter((item) => (item.honorario_moneda ?? 'UF') === 'UF');
     const totalUf = ufCases.reduce((acc, item) => acc + (item.honorario_total_uf ?? 0), 0);
     const paidUf = ufCases.reduce((acc, item) => acc + (item.honorario_pagado_uf ?? 0), 0);
@@ -152,6 +154,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
       suspendido: 'secondary',
       archivado: 'outline',
       terminado: 'destructive',
+      terminado_desistido_demandante: 'destructive',
     };
 
     const colors: Record<string, string> = {
@@ -159,11 +162,19 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
       suspendido: 'bg-yellow-100 text-yellow-800',
       archivado: 'bg-gray-100 text-gray-800',
       terminado: 'bg-blue-100 text-blue-800',
+      terminado_desistido_demandante: 'bg-blue-100 text-blue-800',
+    };
+    const labels: Record<string, string> = {
+      activo: 'Activo',
+      suspendido: 'Suspendido',
+      archivado: 'Archivado',
+      terminado: 'Terminado',
+      terminado_desistido_demandante: 'Terminada (Desistida)',
     };
 
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {labels[status] ?? status}
       </span>
     );
   };

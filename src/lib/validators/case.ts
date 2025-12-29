@@ -48,7 +48,7 @@ const baseCaseSchema = z.object({
     .max(1000, 'El nombre no puede exceder 1000 caracteres'),
   contraparte: z.string().optional(),
   etapa_actual: z.string().default('Ingreso Demanda'),
-  estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado']).default('activo'),
+  estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado', 'terminado_desistido_demandante']).default('activo'),
   fecha_inicio: z.string().optional(),
   sentencia_estado: z
     .enum(['no_registra', 'pendiente', 'programada', 'dictada'])
@@ -81,10 +81,9 @@ const baseCaseSchema = z.object({
     .optional(),
   notificacion_demanda_estado: z.enum(['realizada', 'no_realizada']).optional().nullable(),
   notificacion_demanda_fecha: z.preprocess(
-    (value) => (value === '' ? undefined : value),
+    (value) => (value === '' ? null : value),
     z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD')
+      .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD'), z.null()])
       .optional(),
   ),
   audiencia_inicial_tipo: z.preprocess(
@@ -92,13 +91,18 @@ const baseCaseSchema = z.object({
     z.enum(['preparatoria', 'juicio', 'preparatoria_sin_fecha', 'juicio_sin_fecha']).optional(),
   ),
   audiencia_inicial_fecha: z.preprocess(
-    (value) => (value === '' ? undefined : value),
+    (value) => (value === '' ? null : value),
     z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha de audiencia debe tener formato AAAA-MM-DD')
+      .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha de audiencia debe tener formato AAAA-MM-DD'), z.null()])
       .optional(),
   ),
   audiencia_inicial_requiere_testigos: z.boolean().optional(),
+  fecha_desistimiento: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z
+      .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD'), z.null()])
+      .optional(),
+  ),
   alcance_cliente_solicitado: z
     .number()
     .int('El alcance solicitado debe ser un número entero')
@@ -147,6 +151,12 @@ function validateWorkflowCommon(data: Partial<BaseCaseSchema>, ctx: z.Refinement
       });
     }
   }
+}
+
+function isMissingDate(value: unknown) {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return value.trim().length === 0;
+  return true;
 }
 
 // ---------- Schemas públicos ----------
@@ -200,7 +210,7 @@ export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
   if (!skipMilestones) {
     if (
       data.notificacion_demanda_estado === 'realizada' &&
-      (!data.notificacion_demanda_fecha || data.notificacion_demanda_fecha.trim().length === 0)
+      isMissingDate(data.notificacion_demanda_fecha)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -212,7 +222,7 @@ export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
     if (
       data.audiencia_inicial_tipo &&
       (data.audiencia_inicial_tipo === 'preparatoria' || data.audiencia_inicial_tipo === 'juicio') &&
-      (!data.audiencia_inicial_fecha || data.audiencia_inicial_fecha.trim().length === 0)
+      isMissingDate(data.audiencia_inicial_fecha)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -220,6 +230,14 @@ export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
         path: ['audiencia_inicial_fecha'],
       });
     }
+  }
+
+  if (data.estado === 'terminado_desistido_demandante' && isMissingDate(data.fecha_desistimiento)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Debes indicar la fecha de desistimiento.',
+      path: ['fecha_desistimiento'],
+    });
   }
 });
 
@@ -266,7 +284,7 @@ export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx)
   if (!skipMilestones) {
     if (
       data.notificacion_demanda_estado === 'realizada' &&
-      (!data.notificacion_demanda_fecha || data.notificacion_demanda_fecha.trim().length === 0)
+      isMissingDate(data.notificacion_demanda_fecha)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -278,7 +296,7 @@ export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx)
     if (
       data.audiencia_inicial_tipo &&
       (data.audiencia_inicial_tipo === 'preparatoria' || data.audiencia_inicial_tipo === 'juicio') &&
-      (!data.audiencia_inicial_fecha || data.audiencia_inicial_fecha.trim().length === 0)
+      isMissingDate(data.audiencia_inicial_fecha)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -286,6 +304,14 @@ export const updateCaseSchema = baseCaseSchema.partial().superRefine((data, ctx)
         path: ['audiencia_inicial_fecha'],
       });
     }
+  }
+
+  if (data.estado === 'terminado_desistido_demandante' && isMissingDate(data.fecha_desistimiento)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Debes indicar la fecha de desistimiento.',
+      path: ['fecha_desistimiento'],
+    });
   }
 });
 
@@ -303,7 +329,7 @@ export const assignLawyerSchema = z.object({
 });
 
 export const caseFiltersSchema = z.object({
-  estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado']).optional(),
+  estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado', 'terminado_desistido_demandante']).optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'urgente']).optional(),
   workflow_state: z.enum(['preparacion', 'en_revision', 'activo', 'cerrado']).optional(),
   abogado_responsable: z.string().uuid().optional(),
@@ -335,6 +361,7 @@ export const CASE_STATUSES = [
   { value: 'suspendido', label: 'Suspendido' },
   { value: 'archivado', label: 'Archivado' },
   { value: 'terminado', label: 'Terminado' },
+  { value: 'terminado_desistido_demandante', label: 'Terminada - Desistida por Demandante' },
 ] as const;
 
 export const CASE_PRIORITIES = [

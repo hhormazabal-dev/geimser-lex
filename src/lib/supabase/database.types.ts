@@ -412,6 +412,7 @@ export type Database = {
           estado: Database["public"]["Enums"]["case_status"] | null
           etapa_actual: string | null
           fecha_inicio: string | null
+          fecha_desistimiento: string | null
           sentencia_estado: Database["public"]["Enums"]["case_sentence_status"] | null
           sentencia_fecha: string | null
           honorario_moneda: string
@@ -457,6 +458,7 @@ export type Database = {
           estado?: Database["public"]["Enums"]["case_status"] | null
           etapa_actual?: string | null
           fecha_inicio?: string | null
+          fecha_desistimiento?: string | null
           sentencia_estado?: Database["public"]["Enums"]["case_sentence_status"] | null
           sentencia_fecha?: string | null
           honorario_moneda?: string
@@ -502,6 +504,7 @@ export type Database = {
           estado?: Database["public"]["Enums"]["case_status"] | null
           etapa_actual?: string | null
           fecha_inicio?: string | null
+          fecha_desistimiento?: string | null
           sentencia_estado?: Database["public"]["Enums"]["case_sentence_status"] | null
           sentencia_fecha?: string | null
           honorario_moneda?: string
@@ -1243,7 +1246,12 @@ export type Database = {
     }
     Enums: {
       case_priority: "baja" | "media" | "alta" | "urgente"
-      case_status: "activo" | "suspendido" | "archivado" | "terminado"
+      case_status:
+        | "activo"
+        | "suspendido"
+        | "archivado"
+        | "terminado"
+        | "terminado_desistido_demandante"
       case_workflow_state: "preparacion" | "en_revision" | "activo" | "cerrado"
       case_sentence_status: "no_registra" | "pendiente" | "programada" | "dictada"
       document_visibility: "privado" | "cliente"
@@ -1400,7 +1408,13 @@ export const Constants = {
   public: {
     Enums: {
       case_priority: ["baja", "media", "alta", "urgente"],
-      case_status: ["activo", "suspendido", "archivado", "terminado"],
+      case_status: [
+        "activo",
+        "suspendido",
+        "archivado",
+        "terminado",
+        "terminado_desistido_demandante",
+      ],
       case_workflow_state: ["preparacion", "en_revision", "activo", "cerrado"],
       document_visibility: ["privado", "cliente"],
       note_type: ["privada", "publica"],

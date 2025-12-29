@@ -32,6 +32,15 @@ const STATUS_CHIPS: Record<string, string> = {
   suspendido: 'bg-amber-50 text-amber-700 border border-amber-100',
   archivado: 'bg-slate-100 text-slate-600 border border-slate-200',
   terminado: 'bg-sky-50 text-sky-700 border border-sky-100',
+  terminado_desistido_demandante: 'bg-sky-50 text-sky-700 border border-sky-100',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  activo: 'Activo',
+  suspendido: 'Suspendido',
+  archivado: 'Archivado',
+  terminado: 'Terminado',
+  terminado_desistido_demandante: 'Terminada (Desistida)',
 };
 
 const PRIORITY_CHIPS: Record<string, string> = {
@@ -270,7 +279,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                                     STATUS_CHIPS[caseItem.estado || ''] ?? 'bg-slate-100 text-slate-600 border border-slate-200'
                                   }`}
                                 >
-                                  {caseItem.estado || 'sin estado'}
+                                  {STATUS_LABELS[caseItem.estado || ''] ?? (caseItem.estado || 'Sin estado')}
                                 </span>
                                 <span
                                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
