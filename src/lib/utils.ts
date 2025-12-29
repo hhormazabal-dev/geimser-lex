@@ -9,7 +9,25 @@ function s(val: string | null | undefined): string {
 
 function toDate(input: string | Date | null | undefined): Date {
   if (!input) return new Date('Invalid Date')
-  const d = typeof input === 'string' ? new Date(input) : input
+  if (typeof input === 'string') {
+    const trimmed = input.trim()
+    if (!trimmed) return new Date('Invalid Date')
+
+    // Evita desfase por zona horaria: 'YYYY-MM-DD' debe interpretarse como fecha local.
+    const m = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (m) {
+      const year = Number(m[1])
+      const month = Number(m[2])
+      const day = Number(m[3])
+      const dLocal = new Date(year, month - 1, day)
+      return isNaN(dLocal.getTime()) ? new Date('Invalid Date') : dLocal
+    }
+
+    const d = new Date(trimmed)
+    return isNaN(d.getTime()) ? new Date('Invalid Date') : d
+  }
+
+  const d = input
   return isNaN(d.getTime()) ? new Date('Invalid Date') : d
 }
 

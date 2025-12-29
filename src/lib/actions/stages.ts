@@ -75,6 +75,12 @@ async function getSB() {
   return createServerClient();
 }
 
+function normalizeDateOnlyInput(value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.includes('T') ? (trimmed.split('T')[0] ?? trimmed) : trimmed;
+}
+
 // Helper: copia condicional leyendo por índice (evita TS2339 aunque el tipo sea {}).
 function copyIfPresent<T extends object, K extends keyof any>(
   src: any,
@@ -111,7 +117,7 @@ export async function createStage(input: CreateStageInput) {
       es_publica: vi.es_publica,
       responsable_id: vi.responsable_id ?? profile.id,
       descripcion: vi.descripcion ?? null,
-      fecha_programada: vi.fecha_programada ?? null,
+      fecha_programada: normalizeDateOnlyInput(vi.fecha_programada) ?? null,
       // validators -> DB
       fecha_cumplida: vi.fecha_completada ?? null,
       audiencia_tipo: vi.audiencia_tipo ?? null,
@@ -186,7 +192,7 @@ export async function updateStage(stageId: string, input: UpdateStageInput) {
     copyIfPresent(validatedInput, updatePayload, 'es_publica', 'es_publica');
     copyIfPresent(validatedInput, updatePayload, 'responsable_id', 'responsable_id');
     copyIfPresent(validatedInput, updatePayload, 'descripcion', 'descripcion', (v) => (v ?? null));
-    copyIfPresent(validatedInput, updatePayload, 'fecha_programada', 'fecha_programada', (v) => (v ?? null));
+    copyIfPresent(validatedInput, updatePayload, 'fecha_programada', 'fecha_programada', (v) => normalizeDateOnlyInput(v) ?? null);
     // validators -> DB
     copyIfPresent(validatedInput, updatePayload, 'fecha_completada', 'fecha_cumplida', (v) => (v ?? null));
     copyIfPresent(validatedInput, updatePayload, 'audiencia_tipo', 'audiencia_tipo', (v) => (v ?? null));

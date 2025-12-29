@@ -80,12 +80,24 @@ const baseCaseSchema = z.object({
     .max(1000, 'El identificador de tarifa no puede exceder 1000 caracteres')
     .optional(),
   notificacion_demanda_estado: z.enum(['realizada', 'no_realizada']).optional().nullable(),
-  notificacion_demanda_fecha: z.string().optional(),
+  notificacion_demanda_fecha: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD')
+      .optional(),
+  ),
   audiencia_inicial_tipo: z.preprocess(
     (value) => (value === '' ? undefined : value),
     z.enum(['preparatoria', 'juicio', 'preparatoria_sin_fecha', 'juicio_sin_fecha']).optional(),
   ),
-  audiencia_inicial_fecha: z.string().optional(),
+  audiencia_inicial_fecha: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha de audiencia debe tener formato AAAA-MM-DD')
+      .optional(),
+  ),
   audiencia_inicial_requiere_testigos: z.boolean().optional(),
   alcance_cliente_solicitado: z
     .number()

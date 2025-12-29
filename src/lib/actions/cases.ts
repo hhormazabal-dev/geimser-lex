@@ -118,6 +118,22 @@ async function getSB() {
   return createServerClient();
 }
 
+function canUseServiceClient() {
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+async function getPrivilegedSB() {
+  // Solo para escrituras internas post-validación (evita depender de RLS/policies para side-effects).
+  if (canUseServiceClient()) return createServiceClient();
+  return createServerClient();
+}
+
+function normalizeDateOnlyInput(value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.includes('T') ? (trimmed.split('T')[0] ?? trimmed) : trimmed;
+}
+
 /* -------------------------------------------------------------------------- */
 /*                         Tipado fuerte de WorkflowState                      */
 /* -------------------------------------------------------------------------- */
@@ -1122,7 +1138,7 @@ async function upsertPrimaryClients(caseId: string, clientProfileIds: Array<stri
 }
 
 async function createInitialStages(caseRecord: Case) {
-  const supabase = await getSB();
+  const supabase = await getPrivilegedSB();
 
   const templates: StageTemplate[] = getStageTemplatesByMateria(caseRecord.materia || 'Civil');
   const baseDate = caseRecord.fecha_inicio ? new Date(caseRecord.fecha_inicio) : new Date();
@@ -1187,7 +1203,10 @@ async function createInitialStages(caseRecord: Case) {
   });
 
   if (stages.length === 0) return;
-  await supabase.from('case_stages').insert(stages);
+  const { error } = await supabase.from('case_stages').insert(stages);
+  if (error) {
+    console.error('Error creando etapas iniciales:', { case_id: caseRecord.id, message: error.message });
+  }
 }
 
 async function applyInitialAudiencePreferences(
@@ -1198,54 +1217,121 @@ async function applyInitialAudiencePreferences(
   if (!audienciaTipo) return;
 
   try {
-    const supabase = await getSB();
+    const supabase = await getPrivilegedSB();
 
-    const targetNames =
-      audienciaTipo === 'preparatoria'
-        ? ['Audiencia preparatoria', 'Audiencia preliminar']
-        : ['Audiencia de juicio', 'Audiencia juicio', 'Juicio', 'Alegatos y vista de la causa'];
-
-    const { data: directMatch, error: directError } = await supabase
+    const { data: stages, error: stagesError } = await supabase
       .from('case_stages')
-      .select('id, etapa')
+      .select('id, etapa, orden, audiencia_tipo')
       .eq('case_id', caseRecord.id)
-      .in('etapa', targetNames)
-      .order('orden', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .order('orden', { ascending: true });
 
-    if (directError) {
-      console.error('Error buscando etapa de audiencia inicial:', directError);
+    if (stagesError) {
+      console.error('Error buscando etapas para audiencia inicial:', stagesError);
+      return;
     }
 
-    let stageId = directMatch?.id ?? null;
+    const normalize = (value: string) =>
+      value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
 
+    const normalizedFecha = normalizeDateOnlyInput(fechaProgramada);
+    const rows = (stages as any[] | null) ?? [];
+
+    const bestStage = (() => {
+      if (rows.length === 0) return null;
+      const candidates = rows
+        .map((row) => {
+          const etapa = String(row.etapa ?? '');
+          const etapaNorm = normalize(etapa);
+          const hasAudienceWord = etapaNorm.includes('audiencia');
+          const hasJuicioWord = etapaNorm.includes('juicio') || etapaNorm.includes('alegatos') || etapaNorm.includes('vista');
+          const hasPrepWord = etapaNorm.includes('preparator') || etapaNorm.includes('preliminar');
+          const typedMatch = row.audiencia_tipo === audienciaTipo;
+
+          const score = (() => {
+            if (typedMatch) return 0;
+            if (audienciaTipo === 'juicio' && hasJuicioWord) return 0;
+            if (audienciaTipo === 'preparatoria' && hasPrepWord) return 0;
+            if (hasAudienceWord) return 1;
+            return 2;
+          })();
+
+          return { row, score, orden: Number(row.orden ?? 0) };
+        })
+        .sort((a, b) => a.score - b.score || a.orden - b.orden);
+
+      return candidates[0]?.row ?? null;
+    })();
+
+    let stageId = (bestStage?.id as string | undefined) ?? null;
+
+    // Si no hay ninguna etapa (casos legacy), creamos una para no perder la fecha ingresada.
     if (!stageId) {
-      const { data: fallback, error: fallbackError } = await supabase
+      const etapa =
+        audienciaTipo === 'preparatoria' ? 'Audiencia preparatoria' : 'Audiencia de juicio';
+      const maxOrden = rows.reduce((max, row) => Math.max(max, Number(row.orden ?? 0)), 0);
+      const { data: inserted, error: insertError } = await supabase
         .from('case_stages')
-        .select('id, etapa')
-        .eq('case_id', caseRecord.id)
-        .ilike('etapa', '%audiencia%')
-        .order('orden', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .insert({
+          case_id: caseRecord.id,
+          etapa,
+          descripcion: 'Etapa creada automáticamente desde el formulario de audiencia inicial.',
+          estado: 'pendiente',
+          orden: Math.max(maxOrden + 1, 1),
+          es_publica: true,
+          responsable_id: null,
+          fecha_programada: normalizedFecha,
+          fecha_cumplida: null,
+          audiencia_tipo: audienciaTipo,
+          requiere_testigos: Boolean(requiereTestigos),
+        } as any)
+        .select('id')
+        .single();
 
-      if (fallbackError) {
-        console.error('Error buscando etapa de audiencia (fallback):', fallbackError);
+      if (insertError) {
+        console.error('Error creando etapa para audiencia inicial:', {
+          case_id: caseRecord.id,
+          message: insertError.message,
+        });
+        return;
       }
-      stageId = fallback?.id ?? null;
+      stageId = inserted?.id ?? null;
     }
 
     if (!stageId) return;
 
-    await supabase
+    // 1) Actualizamos fecha siempre por separado (evita fallas por columnas ausentes / payload mixto).
+    if (normalizedFecha) {
+      const { error: fechaError } = await supabase
+        .from('case_stages')
+        .update({ fecha_programada: normalizedFecha })
+        .eq('id', stageId);
+      if (fechaError) {
+        console.error('Error actualizando fecha de audiencia inicial:', {
+          case_id: caseRecord.id,
+          stage_id: stageId,
+          message: fechaError.message,
+        });
+      }
+    }
+
+    // 2) Intentamos guardar metadata de audiencia (si la DB aún no tiene columnas, lo logueamos y seguimos).
+    const { error: metaError } = await supabase
       .from('case_stages')
       .update({
         audiencia_tipo: audienciaTipo,
         requiere_testigos: Boolean(requiereTestigos),
-        ...(fechaProgramada && fechaProgramada.trim().length > 0 ? { fecha_programada: fechaProgramada } : {}),
       })
       .eq('id', stageId);
+    if (metaError) {
+      console.error('Error actualizando metadata de audiencia inicial:', {
+        case_id: caseRecord.id,
+        stage_id: stageId,
+        message: metaError.message,
+      });
+    }
   } catch (error) {
     console.error('Error aplicando preferencia de audiencia inicial:', error);
   }
