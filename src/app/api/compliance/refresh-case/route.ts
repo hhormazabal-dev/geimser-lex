@@ -16,6 +16,15 @@ function jsonError(message: string, status: number) {
 const bodySchema = z.object({
   caseId: z.string().uuid(),
   sources: z.array(z.string().min(1)).optional(),
+  pjud: z
+    .object({
+      baseUrl: z.string().url().optional(),
+      contextSelectName: z.string().min(1),
+      contextValue: z.string().min(1),
+      courtSelectName: z.string().min(1).optional(),
+      courtValue: z.string().min(1).optional(),
+    })
+    .optional(),
 });
 
 function normalizeText(v: string) {
@@ -133,6 +142,7 @@ export async function POST(req: Request) {
 
     const caseId = parsed.data.caseId;
     const requestedSources = (parsed.data.sources ?? []).map((s) => String(s).trim()).filter(Boolean);
+    const pjudOverride = parsed.data.pjud ?? null;
 
     const { data: hasAccess, error: accessErr } = await supabase.rpc('has_case_access', { case_uuid: caseId });
     if (accessErr) return jsonError(accessErr.message ?? 'Error validando permisos', 500);
@@ -278,6 +288,18 @@ export async function POST(req: Request) {
         ? requestedSources.filter((s) => enabledSources.has(s))
         : Array.from(enabledSources);
 
+    if (sourcesToRun.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        subjects: (upsertedSubjects ?? []).length,
+        refreshed: 0,
+        errors: 0,
+        truncated,
+        sources: [],
+        message: 'No hay fuentes habilitadas para ejecutar (revisa configuración/credenciales).',
+      });
+    }
+
     const snapshotsToInsert: any[] = [];
 
     // Fuente: ChileCompra (supplier lookup). Rápida, por RUT.
@@ -331,36 +353,63 @@ export async function POST(req: Request) {
     }
 
     let ojvConfig: OJVConfig | null = null;
-    try {
-      ojvConfig = await getOJVConfig();
-    } catch (e: any) {
-      // Guardamos snapshots de error (para que el usuario vea el motivo)
-      const errMsg = e?.message ?? 'Error obteniendo configuración PJUD.';
-      const snapshotsError = (upsertedSubjects ?? []).map((s: any) => ({
-        case_id: caseId,
-        subject_id: s.id,
-        source: 'pjud_ojv',
-        summary: { total_causes: 0, latest_date: null, distinct_courts: 0 },
-        payload: { config_error: errMsg },
-        error: errMsg,
-      }));
+    if (sourcesToRun.includes('pjud_ojv')) {
+      try {
+        if (pjudOverride) {
+          ojvConfig = {
+            baseUrl: pjudOverride.baseUrl ?? (await getOJVConfig()).baseUrl,
+            contextSelectName: pjudOverride.contextSelectName,
+            contextValue: pjudOverride.contextValue,
+            courtSelectName: pjudOverride.courtSelectName ?? null,
+            courtValue: pjudOverride.courtValue ?? null,
+          };
+        } else {
+          // Env override (opcional) -> si no hay, scrapea selects.
+          const envContextSelectName = process.env.PJUD_OJV_CONTEXT_SELECT_NAME?.trim() || '';
+          const envContextValue = process.env.PJUD_OJV_CONTEXT_VALUE?.trim() || '';
+          const envCourtSelectName = process.env.PJUD_OJV_COURT_SELECT_NAME?.trim() || '';
+          const envCourtValue = process.env.PJUD_OJV_COURT_VALUE?.trim() || '';
 
-      if (snapshotsError.length > 0) {
-        const { error: snapErr } = await supabase.from('compliance_subject_snapshots').insert([
-          ...snapshotsToInsert,
-          ...snapshotsError,
-        ]);
+          if (envContextSelectName && envContextValue) {
+            const base = await getOJVConfig();
+            ojvConfig = {
+              baseUrl: base.baseUrl,
+              contextSelectName: envContextSelectName,
+              contextValue: envContextValue,
+              courtSelectName: envCourtSelectName || null,
+              courtValue: envCourtValue || null,
+            };
+          } else {
+            ojvConfig = await getOJVConfig();
+          }
+        }
+      } catch (e: any) {
+        // Guardamos snapshots de error (para que el usuario vea el motivo)
+        const errMsg = e?.message ?? 'Error obteniendo configuración PJUD.';
+        const snapshotsError = (upsertedSubjects ?? []).map((s: any) => ({
+          case_id: caseId,
+          subject_id: s.id,
+          source: 'pjud_ojv',
+          summary: { total_causes: 0, latest_date: null, distinct_courts: 0 },
+          payload: { config_error: errMsg },
+          error: errMsg,
+        }));
+
+        const { error: snapErr } = await supabase
+          .from('compliance_subject_snapshots')
+          .insert([...snapshotsToInsert, ...snapshotsError]);
         if (snapErr) return jsonError(snapErr.message ?? 'Error guardando snapshots', 500);
-      }
 
-      return NextResponse.json({
-        ok: true,
-        refreshed: 0,
-        subjects: (upsertedSubjects ?? []).length,
-        truncated,
-        pj_config_ok: false,
-        error: errMsg,
-      });
+        return NextResponse.json({
+          ok: true,
+          refreshed: 0,
+          subjects: (upsertedSubjects ?? []).length,
+          truncated,
+          pj_config_ok: false,
+          sources: sourcesToRun,
+          error: errMsg,
+        });
+      }
     }
 
     const targets = (upsertedSubjects ?? []) as any[];
@@ -413,6 +462,17 @@ export async function POST(req: Request) {
       : [];
 
     const snapshots = [...snapshotsToInsert, ...results.map((r: any) => r.snapshot)];
+    if (snapshots.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        subjects: targets.length,
+        refreshed: 0,
+        errors: 0,
+        truncated,
+        sources: sourcesToRun,
+        message: 'No se generaron snapshots (sin fuentes o sin datos).',
+      });
+    }
     const { error: snapErr } = await supabase.from('compliance_subject_snapshots').insert(snapshots);
     if (snapErr) return jsonError(snapErr.message ?? 'Error guardando snapshots', 500);
 
@@ -425,14 +485,18 @@ export async function POST(req: Request) {
       refreshed,
       errors,
       truncated,
-      pj_config_ok: true,
+      pj_config_ok: sourcesToRun.includes('pjud_ojv') ? true : null,
       sources: sourcesToRun,
-      config: {
-        contextSelectName: ojvConfig.contextSelectName,
-        contextValue: ojvConfig.contextValue,
-        courtSelectName: ojvConfig.courtSelectName,
-        courtValue: ojvConfig.courtValue,
-      },
+      ...(ojvConfig
+        ? {
+            config: {
+              contextSelectName: ojvConfig.contextSelectName,
+              contextValue: ojvConfig.contextValue,
+              courtSelectName: ojvConfig.courtSelectName,
+              courtValue: ojvConfig.courtValue,
+            },
+          }
+        : {}),
     });
   } catch (e: any) {
     console.error('[api/compliance/refresh-case] error', e);

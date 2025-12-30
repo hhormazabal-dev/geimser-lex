@@ -25,6 +25,126 @@ function pickSnapshot(subject: ComplianceSubjectDTO, source: string) {
   return subject.latest_snapshots?.[source] ?? null;
 }
 
+function normalizeText(v: string) {
+  return v
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+type OJVSelectOption = { value: string; text: string };
+type OJVSelect = {
+  id: string | null;
+  name: string | null;
+  label: string | null;
+  valueTypeHint: 'numeric-string' | 'string' | 'mixed';
+  options: OJVSelectOption[];
+};
+
+const CHANNEL_REQUEST = 'PJUD_COMPANION_REQUEST';
+const CHANNEL_RESPONSE = 'PJUD_COMPANION_RESPONSE';
+
+function randomId() {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+function companionRequest<T>(action: 'PING' | 'OPTIONS', payload?: any, timeoutMs = 4000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const requestId = randomId();
+    const timer = window.setTimeout(() => {
+      window.removeEventListener('message', onMessage);
+      reject(new Error('Companion no disponible.'));
+    }, timeoutMs);
+
+    function onMessage(event: MessageEvent) {
+      if (event.source !== window) return;
+      const msg = event.data;
+      if (!msg || msg.type !== CHANNEL_RESPONSE) return;
+      if (msg.requestId !== requestId) return;
+      window.clearTimeout(timer);
+      window.removeEventListener('message', onMessage);
+
+      if (msg.ok) resolve(msg.data as T);
+      else reject(new Error(msg.error ?? 'Error Companion'));
+    }
+
+    window.addEventListener('message', onMessage);
+    window.postMessage({ type: CHANNEL_REQUEST, requestId, action, payload }, '*');
+  });
+}
+
+function pickSelect(selects: OJVSelect[], keywords: string[]) {
+  const scored = selects
+    .filter((s) => s.name && s.options.length > 0)
+    .map((s) => {
+      const hay = normalizeText(`${s.label ?? ''} ${s.name ?? ''}`);
+      const score = keywords.reduce((acc, k) => acc + (hay.includes(k) ? 1 : 0), 0);
+      return { s, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  return scored[0]?.score ? scored[0].s : null;
+}
+
+async function getPjudConfig(): Promise<
+  | {
+      contextSelectName: string;
+      contextValue: string;
+      courtSelectName?: string;
+      courtValue?: string;
+    }
+  | null
+> {
+  // 1) Intentar vía Companion (más robusto si PJUD bloquea server-side)
+  try {
+    await companionRequest<{ ok: true; version: string }>('PING', null, 800);
+    const data = await companionRequest<{ baseUrl: string; selects: OJVSelect[] }>('OPTIONS', null, 15000);
+    const selects = data.selects ?? [];
+    const contextSel =
+      pickSelect(selects, ['compet', 'competencia', 'materia', 'jurisd']) ?? selects[0] ?? null;
+    const courtSel = pickSelect(selects, ['corte', 'tribunal', 'juzgado', 'court']);
+    if (!contextSel?.name) return null;
+    const ctxVal = contextSel.options?.find((o) => o.value)?.value ?? '';
+    if (!ctxVal) return null;
+    const crtVal = courtSel?.options?.find((o) => o.value)?.value ?? '';
+    return {
+      contextSelectName: contextSel.name,
+      contextValue: ctxVal,
+      ...(courtSel?.name ? { courtSelectName: courtSel.name } : {}),
+      ...(crtVal ? { courtValue: crtVal } : {}),
+    };
+  } catch {
+    // ignore
+  }
+
+  // 2) Fallback server-side options
+  try {
+    const res = await fetch('/v1/cl/services/pjud.cl/causes-per-legal-person/options', { method: 'GET' });
+    const json = (await res.json().catch(() => null)) as any;
+    if (!res.ok || !json?.success) return null;
+    const selects = (json.selects ?? []) as OJVSelect[];
+    const contextSel =
+      pickSelect(selects, ['compet', 'competencia', 'materia', 'jurisd']) ?? selects[0] ?? null;
+    const courtSel = pickSelect(selects, ['corte', 'tribunal', 'juzgado', 'court']);
+    if (!contextSel?.name) return null;
+    const ctxVal = contextSel.options?.find((o) => o.value)?.value ?? '';
+    if (!ctxVal) return null;
+    const crtVal = courtSel?.options?.find((o) => o.value)?.value ?? '';
+    return {
+      contextSelectName: contextSel.name,
+      contextValue: ctxVal,
+      ...(courtSel?.name ? { courtSelectName: courtSel.name } : {}),
+      ...(crtVal ? { courtValue: crtVal } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
   const { toast } = useToast();
   const [subjects, setSubjects] = useState<ComplianceSubjectDTO[]>([]);
@@ -69,10 +189,14 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
   const handleRefresh = () => {
     startRefresh(async () => {
       try {
+        // Si PJUD falla server-side, intentamos resolver config desde Companion/options y la enviamos.
+        const pjud = await getPjudConfig();
+        const forcedSources = pjud ? undefined : ['chilecompra_supplier']; // evita forzar PJUD si no hay config
+
         const res = await fetch('/api/compliance/refresh-case', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ caseId }),
+          body: JSON.stringify({ caseId, ...(pjud ? { pjud } : {}), ...(forcedSources ? { sources: forcedSources } : {}) }),
         });
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.ok) {
@@ -81,7 +205,7 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
 
         toast({
           title: 'Monitoreo actualizado',
-          description: `Consultado PJUD para ${json.refreshed ?? 0} RUT(s).`,
+          description: `Actualizado. Fuentes: ${(json.sources ?? []).join(', ') || '—'}.`,
         });
 
         await load();
@@ -157,7 +281,10 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
                 const total = Number(latest?.summary?.total_causes ?? 0);
                 const latestDate = typeof latest?.summary?.latest_date === 'string' ? latest.summary.latest_date : null;
                 const lastFetched = latest?.fetched_at ? formatRelativeTime(latest.fetched_at) : null;
-                const hasError = Boolean(latest?.error);
+                const snapshots = Object.values(s.latest_snapshots ?? {});
+                const hasAnyOk = snapshots.some((snap) => !snap.error);
+                const hasAnyError = snapshots.some((snap) => Boolean(snap.error));
+                const showError = !hasAnyOk && hasAnyError;
                 const sourcesPresent = Object.keys(s.latest_snapshots ?? {});
 
                 return (
@@ -172,7 +299,7 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
                         <p className="truncate text-sm font-semibold text-foreground">{s.display_name}</p>
                         <Badge variant="outline">{kindLabel(s.kind)}</Badge>
                         {s.role && <Badge variant="secondary">{s.role}</Badge>}
-                        {hasError && <Badge variant="destructive">Error</Badge>}
+                        {showError && <Badge variant="destructive">Error</Badge>}
                         {sourcesPresent.length > 1 && (
                           <Badge variant="secondary">+{sourcesPresent.length - 1} fuente(s)</Badge>
                         )}
