@@ -21,7 +21,7 @@ export default async function AdminGlobalOrganizationMembersPage(props: { params
     .eq('id', orgId)
     .maybeSingle();
 
-  if (!org) redirect('/admin-global');
+  if (!org) redirect('/admin-global/organizations');
 
   const { data: members } = await supabase
     .from('org_members')
@@ -90,4 +90,3 @@ export default async function AdminGlobalOrganizationMembersPage(props: { params
     </div>
   );
 }
-

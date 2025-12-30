@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createServerClient } from '@/lib/supabase/server';
+import { OrgBillingClient } from './OrgBillingClient';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,11 +18,13 @@ export default async function AdminGlobalOrganizationPage(props: { params: Promi
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, name, status, is_default, created_at')
+    .select(
+      'id, name, status, is_default, created_at, billing_currency, billing_user_seats, billing_price_per_user, billing_monthly_base_fee, billing_setup_fee, billing_notes',
+    )
     .eq('id', orgId)
     .maybeSingle();
 
-  if (!org) redirect('/admin-global');
+  if (!org) redirect('/admin-global/organizations');
 
   const [{ count: casesCount }, { count: membersCount }, { count: clientsCount }] = await Promise.all([
     supabase.from('cases').select('id', { head: true, count: 'exact' }).eq('organization_id', orgId),
@@ -42,7 +45,7 @@ export default async function AdminGlobalOrganizationPage(props: { params: Promi
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Link href="/admin-global" className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
+            <Link href="/admin-global/organizations" className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
               Volver
             </Link>
             <Link
@@ -68,9 +71,33 @@ export default async function AdminGlobalOrganizationPage(props: { params: Promi
       </div>
 
       <section className="rounded-xl border bg-white p-5">
+        <h2 className="text-base font-semibold">Setup & billing</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Define mensualidad por volumen (p × q) y costos de implementación.
+        </p>
+        <div className="mt-4">
+          <OrgBillingClient
+            orgId={orgId}
+            initial={{
+              billing_currency: (org.billing_currency ?? 'UF') as 'UF' | 'CLP' | 'USD',
+              billing_user_seats: Number(org.billing_user_seats ?? 0),
+              billing_price_per_user: Number(org.billing_price_per_user ?? 0),
+              billing_monthly_base_fee: Number(org.billing_monthly_base_fee ?? 0),
+              billing_setup_fee: Number(org.billing_setup_fee ?? 0),
+              billing_notes: (org.billing_notes ?? null) as string | null,
+            }}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-xl border bg-white p-5">
         <h2 className="text-base font-semibold">Acciones rápidas</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Para mover un abogado a esta empresa usa “Asignar / mover abogado” en <Link className="text-primary hover:text-primary/80" href="/admin-global">Admin Global</Link>.
+          Para mover un abogado a esta empresa usa “Asignar / mover abogado” en{' '}
+          <Link className="text-primary hover:text-primary/80" href="/admin-global/organizations">
+            Empresas
+          </Link>
+          .
         </p>
       </section>
     </div>
@@ -86,4 +113,3 @@ function StatCard(props: { title: string; value: number; href: string }) {
     </Link>
   );
 }
-

@@ -24,11 +24,19 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
     : [
         {
           href: '/admin-global',
+          label: 'Dashboard',
+          description: 'MRR, clientes y KPIs',
+          icon: <LayoutDashboard className="h-4 w-4" />,
+          group: 'Super Admin',
+          keywords: ['dashboard', 'kpis', 'mrr', 'saas'],
+        },
+        {
+          href: '/admin-global/organizations',
           label: 'Empresas',
-          description: 'Crear y gestionar organizaciones',
+          description: 'Setup, pricing y estado',
           icon: <Crown className="h-4 w-4" />,
           group: 'Super Admin',
-          keywords: ['empresas', 'organizaciones', 'multi-tenant', 'tenants'],
+          keywords: ['empresas', 'organizaciones', 'tenants', 'billing'],
         },
         {
           href: '/admin-global/transfers',
@@ -40,9 +48,11 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
         },
       ];
 
+  // Super admin: solo navegación de negocio (evita menús operativos).
+  if (isSuperAdmin) return superAdminItems;
+
   if (role === 'admin_firma') {
     return [
-      ...superAdminItems,
       {
         href: '/dashboard/admin',
         label: 'Panel ejecutivo',

@@ -17,22 +17,27 @@ export async function POST(req: Request) {
     if (!isSuper) return jsonError('Sin permisos', 403);
 
     const body = await req.json().catch(() => null);
+    const userId = String(body?.userId ?? '').trim();
     const email = String(body?.email ?? '').trim().toLowerCase();
     const organizationId = String(body?.organizationId ?? '').trim();
     const mode = String(body?.mode ?? 'A').trim().toUpperCase();
 
-    if (!email) return jsonError('email requerido', 400);
+    if (!userId && !email) return jsonError('userId (o email) requerido', 400);
     if (!organizationId) return jsonError('organizationId requerido', 400);
     if (!['A', 'B'].includes(mode)) return jsonError('mode inválido (A|B)', 400);
 
-    const { data: profile, error: profileErr } = await supabase
+    const profileQuery = supabase
       .from('profiles')
-      .select('id, user_id, email, role')
-      .eq('email', email)
-      .maybeSingle();
+      .select('id, user_id, email, role, activo')
+      .eq('activo', true);
+
+    const { data: profile, error: profileErr } = userId
+      ? await profileQuery.eq('user_id', userId).maybeSingle()
+      : await profileQuery.eq('email', email).maybeSingle();
 
     if (profileErr) return jsonError(profileErr.message ?? 'Error buscando usuario', 500);
-    if (!profile?.user_id) return jsonError('Usuario no encontrado (no existe profiles para ese email)', 404);
+    if (!profile?.user_id) return jsonError('Usuario no encontrado', 404);
+    if (profile.role !== 'abogado') return jsonError('El usuario seleccionado no es abogado', 400);
 
     const { data: result, error: rpcErr } = await supabase.rpc('transfer_lawyer_to_org', {
       p_user_id: profile.user_id,
@@ -47,4 +52,3 @@ export async function POST(req: Request) {
     return jsonError(e?.message ?? 'Error interno', 500);
   }
 }
-

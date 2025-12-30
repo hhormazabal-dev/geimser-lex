@@ -46,7 +46,7 @@ export default async function AdminGlobalTransfersPage() {
             <h1 className="text-xl font-semibold">Transferencias</h1>
             <p className="mt-1 text-sm text-muted-foreground">Últimos traslados ejecutados por el RPC.</p>
           </div>
-          <Link href="/admin-global" className="text-sm text-primary hover:text-primary/80">
+          <Link href="/admin-global/organizations" className="text-sm text-primary hover:text-primary/80">
             Volver a empresas
           </Link>
         </div>
@@ -110,4 +110,3 @@ export default async function AdminGlobalTransfersPage() {
     </div>
   );
 }
-
