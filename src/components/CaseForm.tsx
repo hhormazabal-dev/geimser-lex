@@ -999,55 +999,58 @@ export function CaseForm({
       // Regla de negocio: si el caso se marca como "Terminado", debe existir un documento de término asociado.
       // Para edición, subimos el archivo y guardamos su ID en `termino_documento_id` antes de llamar al server action.
       if (payload.estado === 'terminado') {
-        if (!existingCase) {
-          toast({
-            title: 'Documento requerido',
-            description:
-              'Para marcar un expediente como “Terminado” primero crea el caso y luego adjunta el documento de término en la edición.',
-            variant: 'destructive',
-          });
-          setIsLoading(false);
-          return;
-        }
-
-        let terminoId = (payload.termino_documento_id as string | null | undefined) ?? null;
-        if (!terminoId && typeof terminoDocumentoId === 'string' && terminoDocumentoId.length > 0) {
-          terminoId = terminoDocumentoId;
-        }
-
-        if (terminoFile) {
-          const formData = new FormData();
-          formData.append('case_id', existingCase.id);
-          formData.append('file', terminoFile);
-          formData.append('nombre', terminoFile.name);
-          formData.append('visibilidad', 'privado');
-
-          const uploadResult = await uploadDocument(formData);
-          if (!uploadResult.success || !uploadResult.document?.id) {
+        const legacyNoDoc = Boolean((existingCase as any)?.termino_sin_documento);
+        if (!legacyNoDoc) {
+          if (!existingCase) {
             toast({
-              title: 'No se pudo cargar el documento de término',
-              description: uploadResult.error ?? 'Error desconocido al cargar el documento.',
+              title: 'Documento requerido',
+              description:
+                'Para marcar un expediente como “Terminado” primero crea el caso y luego adjunta el documento de término en la edición.',
               variant: 'destructive',
             });
             setIsLoading(false);
             return;
           }
 
-          terminoId = uploadResult.document.id as string;
-          setValue('termino_documento_id', terminoId as any, { shouldDirty: true, shouldValidate: false });
-        }
+          let terminoId = (payload.termino_documento_id as string | null | undefined) ?? null;
+          if (!terminoId && typeof terminoDocumentoId === 'string' && terminoDocumentoId.length > 0) {
+            terminoId = terminoDocumentoId;
+          }
 
-        if (!terminoId) {
-          toast({
-            title: 'Documento requerido',
-            description: 'Debes adjuntar un documento de término para guardar el estado “Terminado”.',
-            variant: 'destructive',
-          });
-          setIsLoading(false);
-          return;
-        }
+          if (terminoFile) {
+            const formData = new FormData();
+            formData.append('case_id', existingCase.id);
+            formData.append('file', terminoFile);
+            formData.append('nombre', terminoFile.name);
+            formData.append('visibilidad', 'privado');
 
-        payload.termino_documento_id = terminoId as any;
+            const uploadResult = await uploadDocument(formData);
+            if (!uploadResult.success || !uploadResult.document?.id) {
+              toast({
+                title: 'No se pudo cargar el documento de término',
+                description: uploadResult.error ?? 'Error desconocido al cargar el documento.',
+                variant: 'destructive',
+              });
+              setIsLoading(false);
+              return;
+            }
+
+            terminoId = uploadResult.document.id as string;
+            setValue('termino_documento_id', terminoId as any, { shouldDirty: true, shouldValidate: false });
+          }
+
+          if (!terminoId) {
+            toast({
+              title: 'Documento requerido',
+              description: 'Debes adjuntar un documento de término para guardar el estado “Terminado”.',
+              variant: 'destructive',
+            });
+            setIsLoading(false);
+            return;
+          }
+
+          payload.termino_documento_id = terminoId as any;
+        }
       }
 
       let result;

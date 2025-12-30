@@ -451,8 +451,9 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       rest.termino_documento_id !== undefined
         ? rest.termino_documento_id
         : ((existingCase as any).termino_documento_id ?? null);
+    const hasLegacyTerminoException = Boolean((existingCase as any).termino_sin_documento);
 
-    if (nextEstado === 'terminado' && !nextTerminoDocumentoId) {
+    if (nextEstado === 'terminado' && !nextTerminoDocumentoId && !hasLegacyTerminoException) {
       throw new Error('Debes adjuntar y asociar un documento de término antes de marcar el caso como “Terminado”.');
     }
 
