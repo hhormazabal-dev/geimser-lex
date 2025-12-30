@@ -5,6 +5,7 @@ import { cn, getInitials, stringToColor } from '@/lib/utils';
 import { formatRoleLabel } from '@/lib/navigation/role-label';
 import { Menu, Search, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { IndicatorsPill } from '@/components/layout/IndicatorsPill';
 
 export function AppTopbar({
   title,
@@ -66,6 +67,8 @@ export function AppTopbar({
           >
             <Search className="h-4 w-4" />
           </Button>
+
+          <IndicatorsPill />
 
           {canCreateCase && (
             <Button
