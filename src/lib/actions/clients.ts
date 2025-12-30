@@ -39,8 +39,8 @@ export async function createClientProfile(input: CreateClientInput): Promise<Cre
   try {
     await requireAuth(['analista', 'admin_firma']);
 
-    if (!process.env.SUPABASE_SERVICE_KEY) {
-      throw new Error('Falta configurar SUPABASE_SERVICE_KEY en el entorno.');
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_SERVICE_KEY) {
+      throw new Error('Falta configurar SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_SERVICE_KEY) en el entorno.');
     }
 
     const payload = createClientSchema.parse(input);
@@ -131,7 +131,7 @@ export type AssignClientToCaseResult =
   | { success: false; error: string };
 
 function resolveClientSupabase() {
-  if (process.env.SUPABASE_SERVICE_KEY) {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY) {
     return createServiceClient();
   }
   return createServerClient();

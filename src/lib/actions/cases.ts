@@ -113,13 +113,13 @@ const formatZodError = (error: ZodError) => {
 
 async function getSB() {
   // si existe service key => usar cliente de servicio (bypassa RLS para jobs controlados)
-  if (process.env.SUPABASE_SERVICE_KEY) return createServiceClient();
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY) return createServiceClient();
   // si no, usar el cliente SSR ligado a cookies/sesión
   return createServerClient();
 }
 
 function canUseServiceClient() {
-  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY);
 }
 
 async function getPrivilegedSB() {

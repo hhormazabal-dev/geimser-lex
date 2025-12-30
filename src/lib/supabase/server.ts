@@ -6,7 +6,8 @@ import type { Database } from '@/lib/supabase/types';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Compatibilidad: algunos entornos antiguos usan SUPABASE_SERVICE_KEY.
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY;
 
 // Cliente ligado a cookies (SSR/App Router)
 export async function createServerClient() {
@@ -49,6 +50,9 @@ export async function createServerClient() {
 
 // Cliente de servicio (bypassa RLS para jobs/upserts controlados)
 export function createServiceClient() {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Falta configurar SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_SERVICE_KEY) en el entorno.');
+  }
   return createSupabaseClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });

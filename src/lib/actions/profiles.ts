@@ -11,7 +11,7 @@ function canUseServiceClient(role: Profile['role']) {
 }
 
 async function getSupabaseClientForDirectory(role: Profile['role']) {
-  if (canUseServiceClient(role) && process.env.SUPABASE_SERVICE_KEY) {
+  if (canUseServiceClient(role) && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)) {
     return createServiceClient();
   }
   return createServerClient();
