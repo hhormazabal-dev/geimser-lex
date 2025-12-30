@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServerClient, createServiceClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { getCurrentProfile, requireAuth, canAccessCase } from '@/lib/auth/roles';
 import { logAuditAction } from '@/lib/audit/log';
 import {
@@ -68,10 +68,7 @@ type UpdateStageDB = Partial<
 >;
 type CompleteStageDB = Partial<Pick<CaseStage, 'estado' | 'fecha_cumplida' | 'descripcion'>>;
 
-const hasServiceKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
-
 async function getSB() {
-  if (hasServiceKey) return createServiceClient();
   return createServerClient();
 }
 

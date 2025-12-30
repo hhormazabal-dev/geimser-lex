@@ -37,7 +37,11 @@ function resolveDefaultPassword() {
 
 export async function createClientProfile(input: CreateClientInput): Promise<CreateClientResult> {
   try {
-    await requireAuth(['analista', 'admin_firma']);
+    const actor = await requireAuth(['analista', 'admin_firma']);
+    const activeOrgId = (actor as any)?.active_organization_id ?? null;
+    if (!activeOrgId) {
+      return { success: false, error: 'Debes seleccionar una empresa activa antes de crear clientes.' };
+    }
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_SERVICE_KEY) {
       throw new Error('Falta configurar SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_SERVICE_KEY) en el entorno.');
@@ -71,6 +75,7 @@ export async function createClientProfile(input: CreateClientInput): Promise<Cre
           email: payload.email,
           nombre: payload.nombre,
           role: 'cliente',
+          organization_id: activeOrgId,
           rut: payload.rut || null,
           telefono: payload.telefono || null,
           activo: true,
@@ -131,9 +136,6 @@ export type AssignClientToCaseResult =
   | { success: false; error: string };
 
 function resolveClientSupabase() {
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY) {
-    return createServiceClient();
-  }
   return createServerClient();
 }
 

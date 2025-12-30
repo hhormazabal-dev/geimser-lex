@@ -3,7 +3,6 @@ import 'server-only';
 
 import { createServerClient } from '@/lib/supabase/server';
 import type { Database } from '@/lib/supabase/types';
-import type { User } from '@supabase/supabase-js';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
@@ -11,59 +10,6 @@ type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 type ProfileWithOverride = ProfileRow & { _role_override: Role | null };
 
 export type Role = 'admin_firma' | 'abogado' | 'analista' | 'cliente';
-
-const ROLE_NORMALIZATION_MAP: Record<string, Role> = {
-  admin: 'admin_firma',
-  admin_firma: 'admin_firma',
-  adminfirma: 'admin_firma',
-  'admin-firma': 'admin_firma',
-  adminlex: 'admin_firma',
-  firma_admin: 'admin_firma',
-  abogado: 'abogado',
-  analista: 'analista',
-  cliente: 'cliente',
-  usuario: 'cliente',
-};
-
-function normalizeRole(value: unknown): Role | null {
-  if (value === null || value === undefined) return null;
-
-  if (Array.isArray(value)) {
-    return value.length ? normalizeRole(value[0]) : null;
-  }
-
-  if (typeof value === 'boolean') {
-    return value ? 'admin_firma' : null;
-  }
-
-  const raw = String(value).trim();
-  if (!raw) return null;
-
-  const key = raw.toLowerCase().replace(/[\s-]+/g, '_');
-  return ROLE_NORMALIZATION_MAP[key] ?? null;
-}
-
-function resolveRoleFromAuth(user: User): Role | null {
-  const candidates: unknown[] = [];
-
-  const appMeta = (user.app_metadata ?? {}) as Record<string, unknown>;
-  const userMeta = (user.user_metadata ?? {}) as Record<string, unknown>;
-
-  candidates.push(appMeta.role, (appMeta.roles as unknown[] | undefined)?.[0], appMeta.user_role);
-  candidates.push(userMeta.role, (userMeta.roles as unknown[] | undefined)?.[0], userMeta.user_role);
-  candidates.push(userMeta.perfil_rol, userMeta.profile_role, userMeta.tipo, userMeta.rol);
-
-  if (appMeta.claims_admin === true || userMeta.is_admin === true) {
-    candidates.push('admin_firma');
-  }
-
-  for (const candidate of candidates) {
-    const normalized = normalizeRole(candidate);
-    if (normalized) return normalized;
-  }
-
-  return null;
-}
 
 /**
  * Busca o crea el perfil del usuario autenticado.
@@ -82,8 +28,6 @@ async function ensureProfile(): Promise<ProfileWithOverride | null> {
 
   const user = auth.user;
   const authId = user.id;
-  const metadataRole = resolveRoleFromAuth(user);
-
   // 1) Buscar por ID (único válido)
   const { data: found, error: selErr } = await supabase
     .from('profiles')
@@ -130,56 +74,21 @@ async function ensureProfile(): Promise<ProfileWithOverride | null> {
           .eq('id', authId)
           .maybeSingle();
         if (refreshed) {
-          const override = metadataRole && metadataRole !== refreshed.role ? metadataRole : null;
           return {
             ...refreshed,
-            _role_override: override,
+            _role_override: null,
           } satisfies ProfileWithOverride;
         }
-        const fallbackOverride =
-          metadataRole && metadataRole !== found.role ? metadataRole : null;
         return {
           ...found,
-          _role_override: fallbackOverride,
-        } satisfies ProfileWithOverride;
-      }
-    }
-
-    if (metadataRole && metadataRole !== found.role) {
-      const { data: updated, error: upRoleErr } = await supabase
-        .from('profiles')
-        .update({ role: metadataRole } satisfies Partial<ProfileRow>)
-        .eq('id', authId)
-        .select('*')
-        .maybeSingle();
-
-      if (upRoleErr) {
-        console.warn('[AUTH] No se pudo sincronizar rol en profiles:', upRoleErr);
-        return {
-          ...found,
-          _role_override: metadataRole ?? null,
-        } satisfies ProfileWithOverride;
-      }
-
-      if (updated) {
-        return {
-          ...updated,
           _role_override: null,
         } satisfies ProfileWithOverride;
       }
-
-      console.warn('[AUTH] Actualización de rol no devolvió datos, usando override local');
-      return {
-        ...found,
-        _role_override: metadataRole ?? null,
-      } satisfies ProfileWithOverride;
     }
 
-    const finalOverride =
-      metadataRole && metadataRole !== found.role ? metadataRole : null;
     return {
       ...found,
-      _role_override: finalOverride,
+      _role_override: null,
     } satisfies ProfileWithOverride;
   }
 
@@ -195,7 +104,7 @@ async function ensureProfile(): Promise<ProfileWithOverride | null> {
     user_id: authId,       // espejo
     email: user.email ?? '',
     nombre: String(displayName),   // <- REQUERIDO
-    role: metadataRole ?? 'cliente',       // por defecto; luego lo cambias en DB si corresponde
+    role: 'cliente',
     activo: true,
     // rut, telefono y otros son opcionales en tu esquema; no se envían
   };
@@ -215,17 +124,13 @@ async function ensureProfile(): Promise<ProfileWithOverride | null> {
     id: created?.id,
     email: created?.email,
     role: created?.role,
-    metadataRole,
   });
 
   if (!created) return null;
 
-  const createOverride =
-    metadataRole && metadataRole !== created.role ? metadataRole : null;
-
   return {
     ...created,
-    _role_override: createOverride,
+    _role_override: null,
   } satisfies ProfileWithOverride;
 }
 
@@ -237,17 +142,14 @@ export async function getCurrentProfile(): Promise<(ProfileRow & { role: Role })
   const profile = await ensureProfile();
   if (!profile) return null;
 
-  const override = profile._role_override;
-  const role = override ?? (profile.role ?? 'cliente');
-
-  const effectiveRole = (role as Role) ?? 'cliente';
+  const effectiveRole = ((profile.role ?? 'cliente') as Role) ?? 'cliente';
 
   console.warn('[ROLE DEBUG] getCurrentProfile()', {
     auth_id: profile.id,
     table_user_id: profile.user_id,
     email: profile.email,
     role_db: profile.role,
-    role_override: override,
+    role_override: null,
     role_effective: effectiveRole,
   });
 
@@ -281,5 +183,19 @@ export function canSeeStatsRole(role: Role) {
  * Tu helper (déjalo como lo tenías si luego filtras por RLS).
  */
 export async function canAccessCase(_caseId: string): Promise<boolean> {
-  return true;
+  const caseId = String(_caseId ?? '').trim();
+  if (!caseId) return false;
+
+  try {
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('cases')
+      .select('id')
+      .eq('id', caseId)
+      .maybeSingle();
+    if (error) return false;
+    return Boolean(data?.id);
+  } catch {
+    return false;
+  }
 }

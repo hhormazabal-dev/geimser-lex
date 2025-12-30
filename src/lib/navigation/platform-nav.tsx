@@ -4,10 +4,12 @@ import {
   Bell,
   Building2,
   ClipboardList,
+  Crown,
   FolderOpen,
   Gavel,
   Inbox,
   LayoutDashboard,
+  ListChecks,
   Settings,
   ShieldAlert,
   Users,
@@ -15,9 +17,32 @@ import {
   Wallet,
 } from 'lucide-react';
 
-export function buildSidebarItems(role: Role): SidebarItem[] {
+export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean }): SidebarItem[] {
+  const isSuperAdmin = Boolean(opts?.isSuperAdmin);
+  const superAdminItems: SidebarItem[] = !isSuperAdmin
+    ? []
+    : [
+        {
+          href: '/admin-global',
+          label: 'Empresas',
+          description: 'Crear y gestionar organizaciones',
+          icon: <Crown className="h-4 w-4" />,
+          group: 'Super Admin',
+          keywords: ['empresas', 'organizaciones', 'multi-tenant', 'tenants'],
+        },
+        {
+          href: '/admin-global/transfers',
+          label: 'Transferencias',
+          description: 'Historial de traslados',
+          icon: <ListChecks className="h-4 w-4" />,
+          group: 'Super Admin',
+          keywords: ['transferencias', 'migración', 'auditoría'],
+        },
+      ];
+
   if (role === 'admin_firma') {
     return [
+      ...superAdminItems,
       {
         href: '/dashboard/admin',
         label: 'Panel ejecutivo',
@@ -91,6 +116,14 @@ export function buildSidebarItems(role: Role): SidebarItem[] {
         keywords: ['usuarios', 'roles', 'permisos'],
       },
       {
+        href: '/empresa',
+        label: 'Empresa',
+        description: 'Miembros y abogados',
+        icon: <Building2 className="h-4 w-4" />,
+        group: 'Administración',
+        keywords: ['empresa', 'organización', 'miembros'],
+      },
+      {
         href: '/admin/security',
         label: 'Seguridad',
         description: 'Auditoría y alertas críticas',
@@ -112,6 +145,7 @@ export function buildSidebarItems(role: Role): SidebarItem[] {
 
   if (role === 'abogado') {
     return [
+      ...superAdminItems,
       {
         href: '/dashboard/abogado',
         label: 'Mi tablero',
@@ -165,6 +199,7 @@ export function buildSidebarItems(role: Role): SidebarItem[] {
 
   if (role === 'analista') {
     return [
+      ...superAdminItems,
       {
         href: '/dashboard/analista',
         label: 'Panel analista',
@@ -226,6 +261,7 @@ export function buildSidebarItems(role: Role): SidebarItem[] {
 
   // cliente/usuario
   return [
+    ...superAdminItems,
     {
       href: '/dashboard/cliente',
       label: 'Mi portal',

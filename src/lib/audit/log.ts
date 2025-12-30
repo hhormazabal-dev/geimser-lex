@@ -30,6 +30,7 @@ export async function logAuditAction(input: LogAuditActionInput) {
     const auditData: AuditLogInsert = {
       action: input.action,
       actor_id: profile.id,
+      organization_id: (profile as any)?.active_organization_id ?? null,
       entity_type: input.entity_type,
       entity_id: input.entity_id ?? null, // <- null, no undefined
       diff_json: input.diff_json as any, // si tu tipo es Json en supabase, castea
@@ -39,7 +40,7 @@ export async function logAuditAction(input: LogAuditActionInput) {
           'unknown') as unknown, // la columna es unknown en tus types
       user_agent: headersList.get('user-agent') ?? 'unknown',
       // created_at lo pone la DB si es default
-    };
+    } as AuditLogInsert & { organization_id?: string | null };
 
     const { error } = await supabase.from('audit_log').insert(auditData);
     if (error) {

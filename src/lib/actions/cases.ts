@@ -2,7 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServerClient, createServiceClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { getCurrentProfile, requireAuth } from '@/lib/auth/roles';
 import { logAuditAction } from '@/lib/audit/log';
 
@@ -112,19 +112,14 @@ const formatZodError = (error: ZodError) => {
 };
 
 async function getSB() {
-  // si existe service key => usar cliente de servicio (bypassa RLS para jobs controlados)
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY) return createServiceClient();
-  // si no, usar el cliente SSR ligado a cookies/sesión
   return createServerClient();
 }
 
 function canUseServiceClient() {
-  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY);
+  return false;
 }
 
 async function getPrivilegedSB() {
-  // Solo para escrituras internas post-validación (evita depender de RLS/policies para side-effects).
-  if (canUseServiceClient()) return createServiceClient();
   return createServerClient();
 }
 

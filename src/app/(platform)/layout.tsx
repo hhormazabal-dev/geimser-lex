@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { PlatformChrome } from '@/components/layout/PlatformChrome';
 import { getCurrentProfile, type Role } from '@/lib/auth/roles';
 import { buildSidebarItems } from '@/lib/navigation/platform-nav';
+import { createServerClient } from '@/lib/supabase/server';
 
 interface PlatformLayoutProps {
   children: ReactNode;
@@ -19,8 +20,17 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
     redirect('/login');
   }
 
-  const role = ((profile as any)._role_override as Role | null) ?? profile.role;
-  const sidebarItems = buildSidebarItems(role);
+  const role = profile.role as Role;
+  const activeOrgId = (profile as any)?.active_organization_id ?? null;
+
+  // Staff interno requiere empresa activa para aplicar RLS multi-tenant.
+  const supabase = (await createServerClient()) as any;
+  const { data: isSuperAdmin } = await supabase.rpc('is_super_admin');
+
+  if (!isSuperAdmin && role !== 'cliente' && !activeOrgId) {
+    redirect('/select-org');
+  }
+  const sidebarItems = buildSidebarItems(role, { isSuperAdmin: Boolean(isSuperAdmin) });
 
   const footerHint = (
     <div className="space-y-2">

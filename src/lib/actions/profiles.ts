@@ -1,19 +1,13 @@
 'use server';
 
-import { createServerClient, createServiceClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth/roles';
 import type { Profile } from '@/lib/supabase/types';
 
 interface DirectoryProfile extends Pick<Profile, 'id' | 'nombre' | 'role' | 'telefono' | 'rut' | 'email'> {}
 
-function canUseServiceClient(role: Profile['role']) {
-  return role === 'admin_firma' || role === 'analista';
-}
-
 async function getSupabaseClientForDirectory(role: Profile['role']) {
-  if (canUseServiceClient(role) && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)) {
-    return createServiceClient();
-  }
+  void role;
   return createServerClient();
 }
 
