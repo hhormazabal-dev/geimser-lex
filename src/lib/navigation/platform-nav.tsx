@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Settings,
+  ShieldCheck,
   ShieldAlert,
   Users,
   UserPlus,
@@ -45,6 +46,14 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
           icon: <ListChecks className="h-4 w-4" />,
           group: 'Super Admin',
           keywords: ['transferencias', 'migración', 'auditoría'],
+        },
+        {
+          href: '/compliance',
+          label: 'Compliance',
+          description: 'Monitoreo y fuentes',
+          icon: <ShieldCheck className="h-4 w-4" />,
+          group: 'Super Admin',
+          keywords: ['compliance', 'monitoreo', 'pjud', 'fuentes'],
         },
       ];
 
@@ -116,6 +125,14 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
         icon: <Gavel className="h-4 w-4" />,
         group: 'Herramientas',
         keywords: ['poder judicial', 'rut', 'consulta'],
+      },
+      {
+        href: '/compliance',
+        label: 'Compliance',
+        description: 'Monitoreo 24/7 y fuentes',
+        icon: <ShieldCheck className="h-4 w-4" />,
+        group: 'Herramientas',
+        keywords: ['compliance', 'monitoreo', 'stakeholders', 'rut'],
       },
       {
         href: '/dashboard/admin/users',
@@ -204,6 +221,14 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
         group: 'Herramientas',
         keywords: ['poder judicial', 'rut'],
       },
+      {
+        href: '/compliance',
+        label: 'Compliance',
+        description: 'Monitoreo y sujetos por RUT',
+        icon: <ShieldCheck className="h-4 w-4" />,
+        group: 'Herramientas',
+        keywords: ['compliance', 'monitoreo', 'rut'],
+      },
     ];
   }
 
@@ -265,6 +290,14 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
         icon: <Gavel className="h-4 w-4" />,
         group: 'Herramientas',
         keywords: ['poder judicial', 'rut'],
+      },
+      {
+        href: '/compliance',
+        label: 'Compliance',
+        description: 'Monitoreo y fuentes',
+        icon: <ShieldCheck className="h-4 w-4" />,
+        group: 'Herramientas',
+        keywords: ['compliance', 'monitoreo'],
       },
     ];
   }

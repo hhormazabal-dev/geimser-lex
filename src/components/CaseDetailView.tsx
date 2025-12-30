@@ -14,6 +14,7 @@ import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { DailyStatementsPanel } from '@/components/DailyStatementsPanel';
+import { ComplianceMonitoringPanel } from '@/components/ComplianceMonitoringPanel';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
@@ -45,6 +46,7 @@ import {
   Loader2,
   Trash2,
   ListChecks,
+  ShieldCheck,
 } from 'lucide-react';
 import type { Profile, Case, CaseStage, CaseCounterparty } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
@@ -131,7 +133,17 @@ interface CaseDetailViewProps {
 
 export function CaseDetailView({ case: caseData, profile, messages }: CaseDetailViewProps) {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'timeline' | 'documents' | 'activity' | 'daily' | 'notes' | 'messages' | 'requests' | 'checklist' | 'clients'
+    | 'overview'
+    | 'timeline'
+    | 'documents'
+    | 'activity'
+    | 'monitoring'
+    | 'daily'
+    | 'notes'
+    | 'messages'
+    | 'requests'
+    | 'checklist'
+    | 'clients'
   >('overview');
   const router = useRouter();
   const { toast } = useToast();
@@ -739,6 +751,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         | 'timeline'
         | 'documents'
         | 'activity'
+        | 'monitoring'
         | 'daily'
         | 'notes'
         | 'messages'
@@ -753,6 +766,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       { id: 'timeline', label: 'Timeline', icon: Clock },
       { id: 'documents', label: 'Documentos', icon: FileText },
       { id: 'activity', label: 'Actividad', icon: ClipboardList, count: caseEvents.length },
+      { id: 'monitoring', label: 'Monitoreo', icon: ShieldCheck },
       { id: 'daily', label: 'Estado Diario', icon: Calendar },
       { id: 'notes', label: 'Notas', icon: MessageCircle },
       { id: 'messages', label: 'Mensajes', icon: MessageCircle, count: messages.length },
@@ -1501,6 +1515,13 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             <DailyStatementsPanel
               caseId={caseData.id}
               caseNumeroCausa={caseData.numero_causa ?? null}
+            />
+          )}
+
+          {activeTab === 'monitoring' && (
+            <ComplianceMonitoringPanel
+              caseId={caseData.id}
+              canRefresh={profile.role !== 'cliente'}
             />
           )}
 
