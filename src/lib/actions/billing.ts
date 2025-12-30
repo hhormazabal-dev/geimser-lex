@@ -34,6 +34,25 @@ export type BillingAccountDetail = BillingAccountSummary & {
   }>;
 };
 
+export type BillableStageSummary = {
+  id: string;
+  case_id: string;
+  case: { id: string; caratulado: string; numero_causa: string | null } | null;
+  etapa: string;
+  orden: number | null;
+  estado: string | null;
+  fecha_programada: string | null;
+  requiere_pago: boolean;
+  costo_uf: number | null;
+  porcentaje_variable: number | null;
+  monto_variable_base: string | null;
+  estado_pago: string | null;
+  enlace_pago: string | null;
+  notas_pago: string | null;
+  monto_pagado_uf: number | null;
+  solicitado_at: string | null;
+};
+
 const toNumber = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim().length > 0) {
@@ -42,6 +61,77 @@ const toNumber = (value: unknown) => {
   }
   return 0;
 };
+
+export async function listBillableStages(input?: {
+  case_id?: string;
+}): Promise<{ success: boolean; stages: BillableStageSummary[]; error?: string }> {
+  try {
+    await requireAuth();
+    const supabase = await createServerClient();
+
+    let query = supabase
+      .from('case_stages')
+      .select(
+        `
+          id,
+          case_id,
+          etapa,
+          orden,
+          estado,
+          fecha_programada,
+          requiere_pago,
+          costo_uf,
+          porcentaje_variable,
+          monto_variable_base,
+          estado_pago,
+          enlace_pago,
+          notas_pago,
+          monto_pagado_uf,
+          solicitado_at,
+          case:cases(id, caratulado, numero_causa)
+        `,
+      )
+      .eq('requiere_pago', true)
+      .neq('estado_pago', 'pagado');
+
+    if (input?.case_id) {
+      query = query.eq('case_id', input.case_id);
+    }
+
+    const { data, error } = await query.order('case_id', { ascending: true }).order('orden', { ascending: true });
+    if (error) throw error;
+
+    const stages: BillableStageSummary[] = (data ?? []).map((row: any) => ({
+      id: row.id,
+      case_id: row.case_id,
+      case: row.case?.id
+        ? {
+            id: row.case.id,
+            caratulado: row.case.caratulado ?? 'Caso',
+            numero_causa: row.case.numero_causa ?? null,
+          }
+        : null,
+      etapa: row.etapa ?? 'Etapa',
+      orden: row.orden ?? null,
+      estado: row.estado ?? null,
+      fecha_programada: row.fecha_programada ?? null,
+      requiere_pago: Boolean(row.requiere_pago),
+      costo_uf: row.costo_uf ?? null,
+      porcentaje_variable: row.porcentaje_variable ?? null,
+      monto_variable_base: row.monto_variable_base ?? null,
+      estado_pago: row.estado_pago ?? null,
+      enlace_pago: row.enlace_pago ?? null,
+      notas_pago: row.notas_pago ?? null,
+      monto_pagado_uf: row.monto_pagado_uf ?? null,
+      solicitado_at: row.solicitado_at ?? null,
+    }));
+
+    return { success: true, stages };
+  } catch (error) {
+    console.error('[billing] listBillableStages error', error);
+    return { success: false, stages: [], error: (error as Error).message };
+  }
+}
 
 export async function listBillingAccounts(): Promise<{ success: boolean; accounts: BillingAccountSummary[]; error?: string }> {
   try {
@@ -255,4 +345,3 @@ export async function addBillingPayment(input: AddBillingPaymentInput) {
     return { success: false as const, error: (error as Error).message };
   }
 }
-

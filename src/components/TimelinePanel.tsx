@@ -12,8 +12,7 @@ import {
   deleteStage, 
   getStages 
 } from '@/lib/actions/stages';
-import { requestCaseAdvance } from '@/lib/actions/cases';
-import { cn, formatDate, formatRelativeTime, isDateInPast } from '@/lib/utils';
+import { cn, formatDate, isDateInPast } from '@/lib/utils';
 import { 
   Clock, 
   CheckCircle, 
@@ -38,6 +37,9 @@ interface TimelinePanelProps {
   caseMateria?: string;
   canManageStages?: boolean;
   showPrivateStages?: boolean;
+  // Si es false, la UI del timeline NO debe mostrar información ni acciones de cobro/pagos.
+  // La gestión de cobros se mueve a la sección /billing.
+  showBillingSection?: boolean;
   clientContext?: {
     role: 'admin_firma' | 'analista' | 'abogado' | 'cliente';
     alcanceAutorizado: number;
@@ -55,14 +57,6 @@ type DraftStageState = {
   isCustom: boolean;
   audiencia_tipo: '' | NonNullable<CreateStageInput['audiencia_tipo']>;
   requiere_testigos: boolean;
-  requiere_pago: boolean;
-  costo_uf: string;
-  porcentaje_variable: string;
-  enlace_pago: string;
-  notas_pago: string;
-  monto_variable_base: string;
-  estado_pago: CreateStageInput['estado_pago'];
-  monto_pagado_uf: string;
 };
 
 export function TimelinePanel({
@@ -70,6 +64,7 @@ export function TimelinePanel({
   caseMateria = 'Civil',
   canManageStages = false,
   showPrivateStages = true,
+  showBillingSection = false,
   clientContext,
   onClientProgressChange,
   onStagesLoaded,
@@ -86,14 +81,6 @@ export function TimelinePanel({
     isCustom: false,
     audiencia_tipo: '',
     requiere_testigos: false,
-    requiere_pago: false,
-    costo_uf: '',
-    porcentaje_variable: '',
-    enlace_pago: '',
-    notas_pago: '',
-    monto_variable_base: '',
-    estado_pago: 'pendiente' as CreateStageInput['estado_pago'],
-    monto_pagado_uf: '',
   });
   const { toast } = useToast();
   const [processingStage, setProcessingStage] = useState<string | null>(null);
@@ -106,8 +93,7 @@ export function TimelinePanel({
     solicitado: alcanceSolicitado,
     autorizado: alcanceAutorizado,
   });
-  const [isRequestingStage, setIsRequestingStage] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'proceso' | 'cobro'>('cobro');
+  const [activeSection, setActiveSection] = useState<'proceso' | 'cobro'>('proceso');
   const [hasInitializedSection, setHasInitializedSection] = useState(false);
 
   const loadStages = async () => {
@@ -143,7 +129,7 @@ export function TimelinePanel({
 
   useEffect(() => {
     setHasInitializedSection(false);
-    setActiveSection('cobro');
+    setActiveSection('proceso');
   }, [caseId]);
 
   useEffect(() => {
@@ -173,60 +159,6 @@ export function TimelinePanel({
       return;
     }
 
-    const costoUf = newStage.costo_uf ? Number(newStage.costo_uf) : undefined;
-    if (newStage.requiere_pago && (costoUf === undefined || Number.isNaN(costoUf))) {
-      toast({
-        title: 'Costo requerido',
-        description: 'Debes indicar el costo en UF de la etapa para poder cobrarla.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (costoUf !== undefined && costoUf < 0) {
-      toast({
-        title: 'Monto inválido',
-        description: 'El costo en UF debe ser un número positivo.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const porcentajeVariable = newStage.porcentaje_variable
-      ? Number(newStage.porcentaje_variable)
-      : undefined;
-    if (
-      porcentajeVariable !== undefined &&
-      (Number.isNaN(porcentajeVariable) || porcentajeVariable < 0 || porcentajeVariable > 100)
-    ) {
-      toast({
-        title: 'Porcentaje inválido',
-        description: 'El porcentaje variable debe estar entre 0% y 100%.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const montoPagadoUf = newStage.monto_pagado_uf ? Number(newStage.monto_pagado_uf) : undefined;
-    if (montoPagadoUf !== undefined && (Number.isNaN(montoPagadoUf) || montoPagadoUf < 0)) {
-      toast({
-        title: 'Monto pagado inválido',
-        description: 'El monto pagado debe ser un número positivo.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const enlacePago = newStage.enlace_pago?.trim();
-    if (enlacePago && !/^https?:\/\//i.test(enlacePago)) {
-      toast({
-        title: 'URL inválida',
-        description: 'El enlace de pago debe comenzar con http:// o https://',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsCreating(true);
     try {
       const maxOrden = Math.max(...stages.map(s => s.orden || 0), 0);
@@ -245,14 +177,8 @@ export function TimelinePanel({
         orden: maxOrden + 1,
         audiencia_tipo: audienciaTipo,
         requiere_testigos: newStage.requiere_testigos,
-        requiere_pago: newStage.requiere_pago,
-        costo_uf: costoUf,
-        porcentaje_variable: porcentajeVariable,
-        estado_pago: newStage.estado_pago || 'pendiente',
-        enlace_pago: enlacePago || undefined,
-        notas_pago: newStage.notas_pago?.trim() || undefined,
-        monto_variable_base: newStage.monto_variable_base?.trim() || undefined,
-        monto_pagado_uf: montoPagadoUf,
+        requiere_pago: false,
+        estado_pago: 'pendiente',
       };
 
       const result = await createStage(stageData);
@@ -270,14 +196,6 @@ export function TimelinePanel({
           isCustom: false,
           audiencia_tipo: '',
           requiere_testigos: false,
-          requiere_pago: false,
-          costo_uf: '',
-          porcentaje_variable: '',
-          enlace_pago: '',
-          notas_pago: '',
-          monto_variable_base: '',
-          estado_pago: 'pendiente',
-          monto_pagado_uf: '',
         });
         setShowAddForm(false);
         await loadStages();
@@ -303,8 +221,8 @@ export function TimelinePanel({
   const handleCompleteStage = async (stage: CaseStage) => {
     if (stage.requiere_pago && stage.estado_pago !== 'pagado') {
       toast({
-        title: 'Pago pendiente',
-        description: 'Debes registrar el pago de esta etapa antes de marcarla como completada.',
+        title: 'Gestión pendiente en Cobros',
+        description: 'Esta etapa tiene un cobro pendiente. Registra el pago en Cobros para poder completarla.',
         variant: 'destructive',
       });
       return;
@@ -478,41 +396,6 @@ export function TimelinePanel({
         {status.label}
       </Badge>
     );
-  };
-
-  const handleRequestAdvance = async (stage: CaseStage) => {
-    if (!clientMode || !stage.id) return;
-
-    setIsRequestingStage(stage.id);
-    try {
-      const result = await requestCaseAdvance(caseId, stage.id);
-      if (result.success) {
-        setClientProgress((prev) => ({
-          autorizado: prev.autorizado,
-          solicitado: result.requestedOrder ?? prev.solicitado,
-        }));
-        toast({
-          title: 'Solicitud enviada',
-          description: `Solicitaste avanzar hasta la etapa "${stage.etapa}".`,
-        });
-        await loadStages();
-      } else {
-        toast({
-          title: 'No se pudo solicitar el avance',
-          description: result.error ?? 'Intenta nuevamente en unos minutos.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error requesting case advance:', error);
-      toast({
-        title: 'Error inesperado',
-        description: 'No pudimos registrar tu solicitud, intenta nuevamente.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsRequestingStage(null);
-    }
   };
 
   const handleAssignPaymentLink = async (stage: CaseStage) => {
@@ -712,9 +595,8 @@ export function TimelinePanel({
   const totalPagadoEtapas = stages.reduce((sum, stage) => sum + (stage.monto_pagado_uf ?? 0), 0);
   const etapasRequierenPago = stages.filter((stage) => stage.requiere_pago);
   const etapasCobroOrdenadas = [...etapasRequierenPago].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
-  const showPaymentTimeline = etapasCobroOrdenadas.length > 0;
+  const showPaymentTimeline = showBillingSection && etapasCobroOrdenadas.length > 0;
   const etapasPagadas = etapasRequierenPago.filter((stage) => stage.estado_pago === 'pagado').length;
-  const etapasSolicitadas = etapasRequierenPago.filter((stage) => stage.estado_pago === 'solicitado').length;
 
   const findStageLabelByOrder = (order: number) => {
     if (!order) return null;
@@ -737,12 +619,6 @@ export function TimelinePanel({
     }
   }, [activeSection, showPaymentTimeline]);
 
-  useEffect(() => {
-    if (showAddForm && etapasRequierenPago.length > 0) {
-      setNewStage((prev) => ({ ...prev, requiere_pago: true }));
-    }
-  }, [showAddForm, etapasRequierenPago.length]);
-
 	  if (isLoading) {
 	    return (
 	      <Card className='w-full shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)]'>
@@ -763,35 +639,33 @@ export function TimelinePanel({
 
 	  return (
 	    <Card className='w-full shadow-[0_30px_60px_-35px_rgba(15,23,42,0.45)] lg:col-span-full'>
-	      <CardHeader>
-	        <div className='flex items-center justify-between'>
-	          <CardTitle className='flex items-center gap-2'>
-	            <Clock className='h-5 w-5' />
-	            {activeSection === 'cobro'
-	              ? `Etapas de cobro (${etapasCobroOrdenadas.length})`
-	              : `Timeline Procesal (${filteredStages.length})`}
-	          </CardTitle>
-	          <div className='flex items-center gap-2'>
-	            {showPaymentTimeline && (
-	              <>
-	                <Button
-	                  size='sm'
-	                  variant={activeSection === 'proceso' ? 'default' : 'outline'}
+		      <CardHeader>
+		        <div className='flex items-center justify-between'>
+		          <CardTitle className='flex items-center gap-2'>
+		            <Clock className='h-5 w-5' />
+		            {`Timeline Procesal (${filteredStages.length})`}
+		          </CardTitle>
+		          <div className='flex items-center gap-2'>
+		            {showBillingSection && showPaymentTimeline && (
+		              <>
+		                <Button
+		                  size='sm'
+		                  variant={activeSection === 'proceso' ? 'default' : 'outline'}
 	                  className='rounded-full px-4'
 	                  onClick={() => setActiveSection('proceso')}
 	                >
 	                  Procesal
 	                </Button>
-	                <Button
-	                  size='sm'
-	                  variant={activeSection === 'cobro' ? 'default' : 'outline'}
-	                  className='rounded-full px-4'
-	                  onClick={() => setActiveSection('cobro')}
-	                >
-	                  Cobro
-	                </Button>
-	              </>
-	            )}
+		                <Button
+		                  size='sm'
+		                  variant={activeSection === 'cobro' ? 'default' : 'outline'}
+		                  className='rounded-full px-4'
+		                  onClick={() => setActiveSection('cobro')}
+		                >
+		                  Cobro
+		                </Button>
+		              </>
+		            )}
 	            {activeSection === 'proceso' && canManageStages && (
 	              <Button
 	                size='sm'
@@ -807,39 +681,28 @@ export function TimelinePanel({
 	        </div>
       </CardHeader>
       <CardContent className='space-y-6'>
-        {activeSection === 'proceso' && clientMode && (
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">Alcance solicitado</p>
-              <p className="mt-3 text-base font-semibold text-slate-900">
-                {clientProgress.solicitado > 0
-                  ? requestedStageLabel ?? `Etapa ${clientProgress.solicitado}`
-                  : 'Aún no definido'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">Autorizado por el estudio</p>
-              <p className="mt-3 text-base font-semibold text-slate-900">
-                {clientProgress.autorizado > 0
-                  ? authorizedStageLabel ?? `Etapa ${clientProgress.autorizado}`
-                  : 'Pendiente'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">Etapas solicitadas</p>
-              <p className="mt-3 text-base font-semibold text-slate-900">
-                {etapasSolicitadas} / {etapasRequierenPago.length}
-              </p>
-            </div>
-            {clientProgress.solicitado > clientProgress.autorizado && (
-              <div className="sm:col-span-3 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-700 shadow-sm">
-                Estamos revisando tu solicitud para avanzar. Te notificaremos cuando esté aprobada.
-              </div>
-            )}
-          </div>
-        )}
+	        {activeSection === 'proceso' && clientMode && (
+	          <div className="grid gap-4 sm:grid-cols-3">
+	            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
+	              <p className="text-sm font-medium text-slate-500">Alcance solicitado</p>
+	              <p className="mt-3 text-base font-semibold text-slate-900">
+	                {clientProgress.solicitado > 0
+	                  ? requestedStageLabel ?? `Etapa ${clientProgress.solicitado}`
+	                  : 'Aún no definido'}
+	              </p>
+	            </div>
+	            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 shadow-sm">
+	              <p className="text-sm font-medium text-slate-500">Autorizado por el estudio</p>
+	              <p className="mt-3 text-base font-semibold text-slate-900">
+	                {clientProgress.autorizado > 0
+	                  ? authorizedStageLabel ?? `Etapa ${clientProgress.autorizado}`
+	                  : 'Pendiente'}
+	              </p>
+	            </div>
+	          </div>
+	        )}
 
-        {activeSection === 'cobro' && etapasCobroOrdenadas.length > 0 && (
+        {showBillingSection && activeSection === 'cobro' && etapasCobroOrdenadas.length > 0 && (
           <div className='rounded-3xl border border-white/40 bg-white/70 p-6 shadow-inner'>
             <div className='flex flex-wrap items-end justify-between gap-3'>
               <div>
@@ -986,25 +849,16 @@ export function TimelinePanel({
                         return;
                       }
 
-                      const template = stageTemplates.find(stage => stage.etapa === value);
-                      setNewStage({
-                        ...newStage,
-                        etapa: value,
-                        descripcion: template?.descripcion || newStage.descripcion,
-                        isCustom: false,
-                        requiere_pago: template?.requierePago ?? newStage.requiere_pago,
-                        costo_uf: template?.costoUF !== undefined ? template.costoUF.toString() : '',
-                        porcentaje_variable:
-                          template?.porcentajeVariable !== undefined
-                            ? template.porcentajeVariable.toString()
-                            : '',
-                        monto_variable_base: template?.notasPago || '',
-                        estado_pago: 'pendiente',
-                        notas_pago: template?.notasPago || '',
-                      });
-                    }}
-                    className='input-field'
-                  >
+	                      const template = stageTemplates.find(stage => stage.etapa === value);
+	                      setNewStage({
+	                        ...newStage,
+	                        etapa: value,
+	                        descripcion: template?.descripcion || newStage.descripcion,
+	                        isCustom: false,
+	                      });
+	                    }}
+	                    className='input-field'
+	                  >
                     <option value=''>Seleccionar etapa</option>
                     {stageTemplates.map(stage => (
                       <option key={stage.etapa} value={stage.etapa}>
@@ -1119,169 +973,41 @@ export function TimelinePanel({
                   </div>
                 </div>
 
-                <div className='space-y-4 border-t border-white/40 pt-4'>
-                  <label className='flex items-center gap-2 text-sm font-medium text-foreground/70'>
-                    <input
-                      type='checkbox'
-                      className='rounded border-white/40'
-                      checked={newStage.requiere_pago}
-                      onChange={(e) =>
-                        setNewStage({
-                          ...newStage,
-                          requiere_pago: e.target.checked,
-                          estado_pago: 'pendiente',
-                        })
-                      }
-                    />
-                    Esta etapa requiere pago para avanzar
-                  </label>
-
-                  {newStage.requiere_pago && (
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                      <div className='space-y-2'>
-                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
-                          Monto fijo (UF)
-                        </label>
-                        <input
-                          type='number'
-                          min='0'
-                          step='0.01'
-                          value={newStage.costo_uf}
-                          onChange={(e) => setNewStage({ ...newStage, costo_uf: e.target.value })}
-                          className='input-field'
-                          placeholder='Ej: 5.0'
-                        />
-                      </div>
-                      <div className='space-y-2'>
-                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
-                          Componente variable (%)
-                        </label>
-                        <input
-                          type='number'
-                          min='0'
-                          max='100'
-                          step='0.1'
-                          value={newStage.porcentaje_variable}
-                          onChange={(e) => setNewStage({ ...newStage, porcentaje_variable: e.target.value })}
-                          className='input-field'
-                          placeholder='Ej: 10'
-                        />
-                      </div>
-                      <div className='md:col-span-2 space-y-2'>
-                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
-                          Base del variable
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={newStage.monto_variable_base}
-                          onChange={(e) => setNewStage({ ...newStage, monto_variable_base: e.target.value })}
-                          className='input-field min-h-[90px] resize-y'
-                          placeholder='Ej: 10% de lo obtenido o ahorrado.'
-                        />
-                      </div>
-                      <div className='space-y-2'>
-                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
-                          Link de pago (Payku)
-                        </label>
-                        <input
-                          type='url'
-                          value={newStage.enlace_pago}
-                          onChange={(e) => setNewStage({ ...newStage, enlace_pago: e.target.value })}
-                          className='input-field'
-                          placeholder='https://...'
-                        />
-                      </div>
-                      <div className='space-y-2'>
-                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
-                          Notas internas
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={newStage.notas_pago}
-                          onChange={(e) => setNewStage({ ...newStage, notas_pago: e.target.value })}
-                          className='input-field min-h-[90px] resize-y'
-                          placeholder='Instrucciones u observaciones sobre el cobro.'
-                        />
-                      </div>
-                      <div className='space-y-2'>
-                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
-                          Estado inicial del pago
-                        </label>
-                        <select
-                          value={newStage.estado_pago}
-                          onChange={(e) =>
-                            setNewStage({ ...newStage, estado_pago: e.target.value as CreateStageInput['estado_pago'] })
-                          }
-                          className='input-field'
-                        >
-                          {STAGE_PAYMENT_STATUSES.map((status) => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className='space-y-2'>
-                        <label className='block text-[12px] font-semibold uppercase tracking-[0.28em] text-foreground/45'>
-                          Monto ya pagado (UF)
-                        </label>
-                        <input
-                          type='number'
-                          min='0'
-                          step='0.01'
-                          value={newStage.monto_pagado_uf}
-                          onChange={(e) => setNewStage({ ...newStage, monto_pagado_uf: e.target.value })}
-                          className='input-field'
-                          placeholder='0.00'
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className='flex justify-end space-x-2'>
-                    <Button
-                      variant='outline'
-                      className='rounded-full px-4'
-                      onClick={() => {
-                        setShowAddForm(false);
-                        setNewStage({
-                          etapa: '',
-                          descripcion: '',
-                          fecha_programada: '',
-                          es_publica: true,
-                          isCustom: false,
-                          audiencia_tipo: '',
-                          requiere_testigos: false,
-                          requiere_pago: false,
-                          costo_uf: '',
-                          porcentaje_variable: '',
-                          enlace_pago: '',
-                          notas_pago: '',
-                          monto_variable_base: '',
-                          estado_pago: 'pendiente',
-                          monto_pagado_uf: '',
-                        });
-                      }}
-                      disabled={isCreating}
-                    >
+	                <div className='flex justify-end space-x-2'>
+	                    <Button
+	                      variant='outline'
+	                      className='rounded-full px-4'
+	                      onClick={() => {
+	                        setShowAddForm(false);
+	                        setNewStage({
+	                          etapa: '',
+	                          descripcion: '',
+	                          fecha_programada: '',
+	                          es_publica: true,
+	                          isCustom: false,
+	                          audiencia_tipo: '',
+	                          requiere_testigos: false,
+	                        });
+	                      }}
+	                      disabled={isCreating}
+	                    >
                       Cancelar
                     </Button>
-                    <Button className='rounded-full px-5' onClick={handleCreateStage} disabled={isCreating}>
-                      {isCreating ? (
-                        <>
-                          <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                          Creando...
-                        </>
-                      ) : (
-                        'Crear Etapa'
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+	                    <Button className='rounded-full px-5' onClick={handleCreateStage} disabled={isCreating}>
+	                      {isCreating ? (
+	                        <>
+	                          <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+	                          Creando...
+	                        </>
+	                      ) : (
+	                        'Crear Etapa'
+	                      )}
+	                    </Button>
+	                </div>
+	              </div>
+	            </CardContent>
+	          </Card>
+	        )}
 
         {activeSection === 'proceso' && (
           <>
@@ -1300,32 +1026,23 @@ export function TimelinePanel({
               </>
             )}
             <div className='flex gap-4 overflow-x-auto pb-4 pl-2 pr-10 scroll-smooth snap-x snap-mandatory sm:pl-4 sm:pr-14 lg:grid lg:[grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] lg:gap-4 lg:overflow-visible lg:p-0 lg:snap-none'>
-              {filteredStages.map((stage, index) => {
-                const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
-                const stageOrder = stage.orden ?? index + 1;
-                const isAuthorizedStage = clientMode && stageOrder <= clientProgress.autorizado;
-                const isRequestedStage = clientMode && stageOrder <= clientProgress.solicitado && stageOrder > clientProgress.autorizado;
-                const isStageCompleted = stage.estado === 'completado';
+	              {filteredStages.map((stage, index) => {
+	                const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
+	                const stageOrder = stage.orden ?? index + 1;
+	                const isAuthorizedStage = clientMode && stageOrder <= clientProgress.autorizado;
+	                const isRequestedStage = clientMode && stageOrder <= clientProgress.solicitado && stageOrder > clientProgress.autorizado;
+	                const isStageCompleted = stage.estado === 'completado';
                 const cardStateClasses = cn(
                   'h-full border border-white/35 bg-white/80 shadow-sm backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl',
                   isStageCompleted && 'border-emerald-200/70 bg-emerald-50/70',
                   !isStageCompleted && isAuthorizedStage && 'border-emerald-200/60 bg-emerald-50/45',
                   !isStageCompleted && !isAuthorizedStage && isRequestedStage && 'border-sky-200/60 bg-sky-50/45'
                 );
-                const requestDisabled =
-                  isAuthorizedStage ||
-                  isStageCompleted ||
-                  (stage.estado_pago ?? 'pendiente') === 'pagado' ||
-                  stageOrder <= clientProgress.solicitado ||
-                  isRequestingStage === stage.id;
-                const audienceLabel = stage.audiencia_tipo
-                  ? STAGE_AUDIENCE_TYPES.find((option) => option.value === stage.audiencia_tipo)?.label ??
-                    `Audiencia ${stage.audiencia_tipo}`
-                  : null;
-                const statusBadge = getStatusBadge(stage.estado || 'pendiente');
-                const paymentBadge = !showPaymentTimeline && stage.requiere_pago
-                  ? getPaymentStatusBadge(stage.estado_pago ?? 'pendiente')
-                  : null;
+	                const audienceLabel = stage.audiencia_tipo
+	                  ? STAGE_AUDIENCE_TYPES.find((option) => option.value === stage.audiencia_tipo)?.label ??
+	                    `Audiencia ${stage.audiencia_tipo}`
+	                  : null;
+	                const statusBadge = getStatusBadge(stage.estado || 'pendiente');
 
                 return (
                   <div
@@ -1349,25 +1066,23 @@ export function TimelinePanel({
                                 </h4>
                               </div>
                             </div>
-                            <div className='flex flex-col items-end gap-2'>
-                              {statusBadge}
-                              {paymentBadge}
-                              {!stage.es_publica && (
-                                <Badge variant='outline' className='px-3 py-1 text-xs text-foreground/55'>Privada</Badge>
-                              )}
-                            </div>
-                          </div>
+	                            <div className='flex flex-col items-end gap-2'>
+	                              {statusBadge}
+	                              {!stage.es_publica && (
+	                                <Badge variant='outline' className='px-3 py-1 text-xs text-foreground/55'>Privada</Badge>
+	                              )}
+	                            </div>
+	                          </div>
                           {stage.descripcion && (
                             <p className='text-sm leading-relaxed text-foreground/65'>
                               {stage.descripcion}
                             </p>
                           )}
-                          {(audienceLabel ||
-                            stage.requiere_testigos ||
-                            stageResponsable ||
-                            stage.fecha_programada ||
-                            (!showPaymentTimeline && stage.requiere_pago)) && (
-                            <div className='grid grid-cols-1 gap-3 text-xs text-foreground/60 sm:grid-cols-2'>
+	                          {(audienceLabel ||
+	                            stage.requiere_testigos ||
+	                            stageResponsable ||
+	                            stage.fecha_programada) && (
+	                            <div className='grid grid-cols-1 gap-3 text-xs text-foreground/60 sm:grid-cols-2'>
                               {stage.fecha_programada && (
                                 <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
                                   <p className='text-[10px] uppercase tracking-[0.22em] text-foreground/40'>
@@ -1391,8 +1106,8 @@ export function TimelinePanel({
                                   </p>
                                 </div>
                               )}
-                              {audienceLabel && (
-                                <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
+	                              {audienceLabel && (
+	                                <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
                                   <p className='text-[10px] uppercase tracking-[0.22em] text-foreground/40'>
                                     Audiencia
                                   </p>
@@ -1403,155 +1118,24 @@ export function TimelinePanel({
                                   {stage.requiere_testigos && (
                                     <p className='mt-1 text-xs text-foreground/55'>Con coordinación de testigos.</p>
                                   )}
-                                </div>
-                              )}
-                              {stage.requiere_pago && !showPaymentTimeline && (
-                                <div className='rounded-2xl border border-white/40 bg-white/70 px-3 py-2'>
-                                  <p className='text-[10px] uppercase tracking-[0.22em] text-foreground/40'>
-                                    Cobranza
-                                  </p>
-                                  <p className='mt-1 text-sm font-medium text-foreground'>
-                                    {formatUf(stage.costo_uf)}
-                                  </p>
-                                  {typeof stage.porcentaje_variable === 'number' && stage.porcentaje_variable > 0 && (
-                                    <p className='mt-1 text-xs text-foreground/55'>
-                                      Variable: {stage.porcentaje_variable}%{stage.monto_variable_base ? ` · ${stage.monto_variable_base}` : ''}
-                                    </p>
-                                  )}
-                                  <p className='mt-1 text-xs text-foreground/55'>
-                                    {stage.monto_pagado_uf && stage.monto_pagado_uf > 0
-                                      ? `Pagado ${formatUf(stage.monto_pagado_uf)}`
-                                      : 'Pago pendiente'}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {stage.notas_pago && (
-                            <p className='rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-xs text-foreground/60 shadow-inner'>
-                              {stage.notas_pago}
-                            </p>
-                          )}
-                          {stage.estado_pago === 'solicitado' && (
-                            <p className='flex items-center gap-2 text-xs text-amber-600'>
-                              <AlertCircle className='h-3 w-3' />
-                              Solicitud enviada{' '}
-                              {stage.solicitado_at ? formatRelativeTime(stage.solicitado_at) : 'recientemente'}.
-                            </p>
-                          )}
-                        </div>
-                        <div className='flex flex-col gap-3'>
-                          <div className='flex flex-wrap items-center gap-2'>
-                            {stage.enlace_pago && (
-                              <Button size='sm' variant='outline' className='rounded-full px-4' asChild>
-                                <a href={stage.enlace_pago} target='_blank' rel='noopener noreferrer'>
-                                  <ExternalLink className='h-4 w-4 mr-2' />
-                                  Abrir enlace Payku
-                                </a>
-                              </Button>
-                            )}
-                            {canManageStages && !showPaymentTimeline && (
-                              <>
-                                <Button
-                                  size='sm'
-                                  variant='ghost'
-                                  className='rounded-full px-4'
-                                  onClick={() => handleAssignPaymentLink(stage)}
-                                  disabled={paymentActionStage === stage.id}
-                                >
-                                  {paymentActionStage === stage.id ? (
-                                    <>
-                                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                      Guardando…
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Link2 className='h-4 w-4 mr-2' />
-                                      {stage.enlace_pago ? 'Editar enlace' : 'Asignar enlace'}
-                                    </>
-                                  )}
-                                </Button>
-                                <Button
-                                  size='sm'
-                                  variant='ghost'
-                                  className='rounded-full px-4'
-                                  onClick={() => handleRegisterPartialPayment(stage)}
-                                  disabled={paymentActionStage === stage.id}
-                                >
-                                  {paymentActionStage === stage.id ? (
-                                    <>
-                                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                      Registrando…
-                                    </>
-                                  ) : (
-                                    <>
-                                      <PiggyBank className='h-4 w-4 mr-2' />
-                                      Registrar pago
-                                    </>
-                                  )}
-                                </Button>
-                                <Button
-                                  size='sm'
-                                  variant='outline'
-                                  className='rounded-full px-4'
-                                  onClick={() => handleMarkStagePaid(stage)}
-                                  disabled={paymentActionStage === stage.id}
-                                >
-                                  {paymentActionStage === stage.id ? (
-                                    <>
-                                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                      Confirmando…
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Wallet className='h-4 w-4 mr-2' />
-                                      Marcar pagado
-                                    </>
-                                  )}
-                                </Button>
-                              </>
-                            )}
-                            {clientMode && !canManageStages && (
-                              <Button
-                                size='sm'
-                                variant='outline'
-                                className='rounded-full px-4'
-                                onClick={() => handleRequestAdvance(stage)}
-                                disabled={requestDisabled}
-                              >
-                                {isRequestingStage === stage.id ? (
-                                  <>
-                                    <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                                    Enviando…
-                                  </>
-                                ) : (
-                                  <>
-                                    <DollarSign className='h-4 w-4 mr-2' />
-                                    Solicitar prepago
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                          {stage.estado_pago !== 'pagado' && stage.enlace_pago && (
-                            <p className='flex items-center gap-1 text-xs text-foreground/55'>
-                              <AlertCircle className='h-3 w-3' />
-                              Comparte el enlace con el cliente para liberar esta etapa.
-                            </p>
-                          )}
-                          {canManageStages && (
-                            <div className='flex flex-wrap items-center gap-2 border-t border-white/30 pt-3'>
-                              {stage.estado !== 'completado' && (
-                                <Button
+	                                </div>
+	                              )}
+	                            </div>
+	                          )}
+	                        </div>
+	                        <div className='flex flex-col gap-3'>
+	                          {canManageStages && (
+	                            <div className='flex flex-wrap items-center gap-2 border-t border-white/30 pt-3'>
+	                              {stage.estado !== 'completado' && (
+	                                <Button
                                   size='sm'
                                   variant='outline'
                                   className='rounded-full px-4'
                                   onClick={() => handleCompleteStage(stage)}
-                                  disabled={
-                                    processingStage === stage.id ||
-                                    (stage.requiere_pago && stage.estado_pago !== 'pagado')
-                                  }
-                                >
+	                                  disabled={
+	                                    processingStage === stage.id
+	                                  }
+	                                >
                                   {processingStage === stage.id ? (
                                     <>
                                       <Loader2 className='h-4 w-4 mr-1 animate-spin' />

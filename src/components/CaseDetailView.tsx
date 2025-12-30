@@ -574,14 +574,6 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     );
   };
 
-  const formatUf = (value?: number | null) => {
-    if (value === undefined || value === null || Number.isNaN(value)) return '—';
-    return `${new Intl.NumberFormat('es-CL', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value)} UF`;
-  };
-
   const handleReassignLawyer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canReassign) return;
@@ -652,11 +644,6 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       setIsReassigning(false);
     }
   };
-
-  const honorarioTotal = caseData.honorario_total_uf ?? null;
-  const honorarioPagado = caseData.honorario_pagado_uf ?? 0;
-  const honorarioPendiente =
-    honorarioTotal !== null ? Math.max(honorarioTotal - honorarioPagado, 0) : null;
 
   const handleAuthorizeAdvance = async (targetOrder: number) => {
     if (!targetOrder || targetOrder <= 0) return;
@@ -832,21 +819,32 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         }
         actions={
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-2xl border border-white/25 bg-white/50 px-3 text-foreground/70 shadow-sm hover:bg-white hover:text-foreground"
-              onClick={() => router.back()}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
-            </Button>
-            {canEdit && (
-              <Button
-                asChild
-                size="sm"
-                className="rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
-              >
+	            <Button
+	              variant="ghost"
+	              size="sm"
+	              className="rounded-2xl border border-white/25 bg-white/50 px-3 text-foreground/70 shadow-sm hover:bg-white hover:text-foreground"
+	              onClick={() => router.back()}
+	            >
+	              <ArrowLeft className="mr-2 h-4 w-4" />
+	              Volver
+	            </Button>
+	            <Button
+	              asChild
+	              size="sm"
+	              variant="outline"
+	              className="rounded-2xl border border-white/25 bg-white/60 px-3 text-foreground/70 shadow-sm hover:bg-white hover:text-foreground"
+	            >
+	              <Link href={`/billing?caseId=${caseData.id}`}>
+	                <Wallet className="mr-2 h-4 w-4" />
+	                Cobros
+	              </Link>
+	            </Button>
+	            {canEdit && (
+	              <Button
+	                asChild
+	                size="sm"
+	                className="rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
+	              >
                 <Link href={`/cases/${caseData.id}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
                   Editar
@@ -1262,54 +1260,6 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                 </div>
               )}
 
-              {(honorarioTotal !== null || caseData.tarifa_referencia) && (
-                <div className="group relative overflow-hidden rounded-2xl border border-violet-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                  />
-                  <div className="relative z-10 space-y-3 text-sm text-foreground/65">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
-                          Honorarios
-                        </p>
-                        <div className="mt-3 space-y-1.5">
-                          {caseData.modalidad_cobro && (
-                            <p className="text-xs uppercase tracking-[0.2em] text-foreground/50">
-                              {caseData.modalidad_cobro}
-                            </p>
-                          )}
-                          {honorarioTotal !== null && (
-                            <p className="text-base font-semibold text-foreground">
-                              Total · {formatUf(honorarioTotal)}
-                            </p>
-                          )}
-                          {honorarioTotal !== null && <p>Pagado · {formatUf(honorarioPagado)}</p>}
-                          {honorarioPendiente !== null && <p>Pendiente · {formatUf(honorarioPendiente)}</p>}
-                          {caseData.honorario_variable_porcentaje && (
-                            <p>
-                              Variable · {caseData.honorario_variable_porcentaje}%
-                              {caseData.honorario_variable_base ? ` (${caseData.honorario_variable_base})` : ''}
-                            </p>
-                          )}
-                          {caseData.tarifa_referencia && (
-                            <p className="text-xs text-foreground/45">Tarifa base · {caseData.tarifa_referencia}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 via-violet-500/10 to-transparent text-violet-600">
-                        <Wallet className="h-5 w-5" />
-                      </div>
-                    </div>
-                    {caseData.honorario_notas && (
-                      <p className="rounded-2xl bg-white/60 p-3 text-xs text-foreground/55 shadow-inner">
-                        {caseData.honorario_notas}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Contraparte */}
