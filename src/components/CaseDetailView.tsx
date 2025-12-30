@@ -44,9 +44,11 @@ import {
   Wallet,
   Loader2,
   Trash2,
+  ListChecks,
 } from 'lucide-react';
 import type { Profile, Case, CaseStage, CaseCounterparty } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
+import { LawyerChecklistPanel } from '@/components/LawyerChecklistPanel';
 
 const SENTENCE_STATUS_LABELS: Record<string, string> = CASE_SENTENCE_STATUSES.reduce(
   (acc, item) => {
@@ -129,7 +131,7 @@ interface CaseDetailViewProps {
 
 export function CaseDetailView({ case: caseData, profile, messages }: CaseDetailViewProps) {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'timeline' | 'documents' | 'activity' | 'daily' | 'notes' | 'messages' | 'requests' | 'clients'
+    'overview' | 'timeline' | 'documents' | 'activity' | 'daily' | 'notes' | 'messages' | 'requests' | 'checklist' | 'clients'
   >('overview');
   const router = useRouter();
   const { toast } = useToast();
@@ -529,6 +531,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       activo: 'bg-green-100 text-green-800',
       suspendido: 'bg-yellow-100 text-yellow-800',
       archivado: 'bg-gray-100 text-gray-800',
+      terminado_apelacion: 'bg-violet-100 text-violet-800',
       terminado: 'bg-blue-100 text-blue-800',
       terminado_desistido_demandante: 'bg-blue-100 text-blue-800',
     };
@@ -536,6 +539,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       activo: 'Activo',
       suspendido: 'Suspendido',
       archivado: 'Archivado',
+      terminado_apelacion: 'Terminado – Apelación',
       terminado: 'Terminado',
       terminado_desistido_demandante: 'Terminada (Desistida)',
     };
@@ -752,6 +756,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         | 'notes'
         | 'messages'
         | 'requests'
+        | 'checklist'
         | 'clients';
       label: string;
       icon: any;
@@ -767,6 +772,14 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
     ];
 
+    if (showPrivateContent) {
+      base.push({
+        id: 'checklist',
+        label: 'Checklist',
+        icon: ListChecks,
+      });
+    }
+
     if (canManageClients) {
       base.push({
         id: 'clients',
@@ -777,7 +790,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     }
 
     return base;
-  }, [canManageClients, caseData.clients?.length, caseEvents.length, messages.length]);
+  }, [canManageClients, caseData.clients?.length, caseEvents.length, messages.length, showPrivateContent]);
 
   useEffect(() => {
     const raw = window.location.hash?.replace('#', '').trim();
@@ -1568,10 +1581,14 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             />
           )}
 
+          {activeTab === 'checklist' && showPrivateContent && (
+            <LawyerChecklistPanel caseId={caseData.id} canEdit={canEdit} />
+          )}
+
           {activeTab === 'clients' && canManageClients && (
             <div className="space-y-6">
               {/* Lista de clientes asociados */}
-	              {caseData.clients && caseData.clients.length > 0 && (
+		              {caseData.clients && caseData.clients.length > 0 && (
 	                <Card>
 	                  <CardHeader>
 	                    <CardTitle className="flex items-center gap-2">

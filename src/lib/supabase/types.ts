@@ -29,6 +29,7 @@ export type NoteType = PublicEnums['note_type'];
 export type DocumentVisibility = PublicEnums['document_visibility'];
 export type RequestType = PublicEnums['request_type'];
 export type RequestStatus = PublicEnums['request_status'];
+export type BillingStatus = PublicEnums['billing_status'];
 
 export type Profile = Tables<'profiles'>;
 export type Case = Tables<'cases'>;
@@ -44,6 +45,10 @@ export type PortalToken = Tables<'portal_tokens'>;
 export type UserSession = Tables<'user_sessions'>;
 export type LoginAttempt = Tables<'login_attempts'>;
 export type CaseCounterparty = Tables<'case_counterparties'>;
+export type CaseLawyerChecklistItem = Tables<'case_lawyer_checklist_items'>;
+export type BillingAccount = Tables<'billing_accounts'>;
+export type BillingAccountCase = Tables<'billing_account_cases'>;
+export type BillingPayment = Tables<'billing_payments'>;
 
 export type ProfileInsert = TablesInsert<'profiles'>;
 export type CaseInsert = TablesInsert<'cases'>;
@@ -59,6 +64,10 @@ export type PortalTokenInsert = TablesInsert<'portal_tokens'>;
 export type UserSessionInsert = TablesInsert<'user_sessions'>;
 export type LoginAttemptInsert = TablesInsert<'login_attempts'>;
 export type CaseCounterpartyInsert = TablesInsert<'case_counterparties'>;
+export type CaseLawyerChecklistItemInsert = TablesInsert<'case_lawyer_checklist_items'>;
+export type BillingAccountInsert = TablesInsert<'billing_accounts'>;
+export type BillingAccountCaseInsert = TablesInsert<'billing_account_cases'>;
+export type BillingPaymentInsert = TablesInsert<'billing_payments'>;
 
 export type ProfileUpdate = TablesUpdate<'profiles'>;
 export type CaseUpdate = TablesUpdate<'cases'>;
@@ -74,6 +83,10 @@ export type PortalTokenUpdate = TablesUpdate<'portal_tokens'>;
 export type UserSessionUpdate = TablesUpdate<'user_sessions'>;
 export type LoginAttemptUpdate = TablesUpdate<'login_attempts'>;
 export type CaseCounterpartyUpdate = TablesUpdate<'case_counterparties'>;
+export type CaseLawyerChecklistItemUpdate = TablesUpdate<'case_lawyer_checklist_items'>;
+export type BillingAccountUpdate = TablesUpdate<'billing_accounts'>;
+export type BillingAccountCaseUpdate = TablesUpdate<'billing_account_cases'>;
+export type BillingPaymentUpdate = TablesUpdate<'billing_payments'>;
 
 export type SecurityAlert = {
   severity: 'low' | 'info' | 'warning' | 'high' | 'critical';

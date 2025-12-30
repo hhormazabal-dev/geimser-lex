@@ -174,6 +174,13 @@ export async function createCase(input: CreateCaseInput) {
       ...caseInput
     } = parsed;
 
+    if (caseInput.estado === 'terminado' && !caseInput.termino_documento_id) {
+      return {
+        success: false,
+        error: 'Para marcar un expediente como “Terminado” debes adjuntar y asociar un documento de término.',
+      };
+    }
+
     if (!caseInput.cliente_principal_id) {
       throw new Error('Debes seleccionar un cliente principal antes de crear el caso.');
     }
@@ -226,6 +233,7 @@ export async function createCase(input: CreateCaseInput) {
         (profile.role === 'abogado' ? profile.id : null),
 
       estado: (caseInput.estado ?? 'activo') as any,
+      termino_documento_id: sOrNull((caseInput as any).termino_documento_id),
       workflow_state: parseWorkflow(
         caseInput.workflow_state ?? (marcar_validado ? 'en_revision' : 'preparacion')
       ),
@@ -438,6 +446,16 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
 
     const nowIso = new Date().toISOString();
 
+    const nextEstado = (rest.estado ?? existingCase.estado ?? 'activo') as string;
+    const nextTerminoDocumentoId =
+      rest.termino_documento_id !== undefined
+        ? rest.termino_documento_id
+        : ((existingCase as any).termino_documento_id ?? null);
+
+    if (nextEstado === 'terminado' && !nextTerminoDocumentoId) {
+      throw new Error('Debes adjuntar y asociar un documento de término antes de marcar el caso como “Terminado”.');
+    }
+
     const updatePayload: CaseUpdate & Record<string, any> = {
       updated_at: nowIso,
 
@@ -459,6 +477,7 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       ...(rest.descripcion_inicial !== undefined && { descripcion_inicial: rest.descripcion_inicial }),
       ...(rest.documentacion_recibida !== undefined && { documentacion_recibida: rest.documentacion_recibida }),
       ...(rest.observaciones !== undefined && { observaciones: sanitizeObservaciones(rest.observaciones) }),
+      ...(rest.termino_documento_id !== undefined && { termino_documento_id: rest.termino_documento_id }),
       ...(rest.sentencia_estado !== undefined && { sentencia_estado: rest.sentencia_estado }),
       ...(rest.sentencia_fecha !== undefined && {
         sentencia_fecha:
@@ -589,6 +608,15 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       if (!existingDemandados) {
         await syncDemandadoCounterparties(supabase, caseId, existingCase.contraparte);
       }
+    }
+
+    if (rest.fecha_inicio !== undefined || rest.materia !== undefined) {
+      // Mantiene cuadratura entre fechas del expediente y fechas programadas del timeline (solo etapas pendientes).
+      await syncPendingStageSchedule({
+        id: updatedCase.id,
+        materia: (updatedCase as any).materia ?? null,
+        fecha_inicio: (updatedCase as any).fecha_inicio ?? null,
+      } as any);
     }
 
     await logAuditAction({
@@ -1200,6 +1228,55 @@ async function createInitialStages(caseRecord: Case) {
   if (error) {
     console.error('Error creando etapas iniciales:', { case_id: caseRecord.id, message: error.message });
   }
+}
+
+async function syncPendingStageSchedule(caseRecord: Pick<Case, 'id' | 'materia' | 'fecha_inicio'>) {
+  const baseIso = caseRecord.fecha_inicio ?? null;
+  if (!baseIso) return;
+
+  const baseDate = new Date(baseIso);
+  if (Number.isNaN(baseDate.getTime())) return;
+
+  const templates: StageTemplate[] = getStageTemplatesByMateria(caseRecord.materia || 'Civil');
+  if (templates.length === 0) return;
+
+  const scheduleByOrder = new Map<number, string>();
+  let cumulativeDays = 0;
+  for (let index = 0; index < templates.length; index += 1) {
+    const template = templates[index]!;
+    cumulativeDays += template.diasEstimados;
+    const scheduledDate = new Date(baseDate.getTime());
+    scheduledDate.setDate(scheduledDate.getDate() + cumulativeDays);
+    scheduleByOrder.set(index + 1, scheduledDate.toISOString().split('T')[0]!);
+  }
+
+  const supabase = await getPrivilegedSB();
+  const { data: stages, error } = await supabase
+    .from('case_stages')
+    .select('id, orden, estado, fecha_cumplida')
+    .eq('case_id', caseRecord.id);
+  if (error) throw error;
+
+  const nowIso = new Date().toISOString();
+  const pending = (stages as any[] | null) ?? [];
+  const updates = pending
+    .map((stage) => {
+      const order = Number(stage.orden ?? 0);
+      if (!order || order <= 0) return null;
+      const nextDate = scheduleByOrder.get(order);
+      if (!nextDate) return null;
+      if (stage.estado === 'completado' || stage.fecha_cumplida) return null;
+      return { id: stage.id as string, fecha_programada: nextDate, updated_at: nowIso };
+    })
+    .filter(Boolean) as Array<{ id: string; fecha_programada: string; updated_at: string }>;
+
+  if (updates.length === 0) return;
+
+  await Promise.all(
+    updates.map((u) =>
+      supabase.from('case_stages').update({ fecha_programada: u.fecha_programada, updated_at: u.updated_at }).eq('id', u.id),
+    ),
+  );
 }
 
 async function applyInitialAudiencePreferences(

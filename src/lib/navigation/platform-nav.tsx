@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   Users,
   UserPlus,
+  Wallet,
 } from 'lucide-react';
 
 export function buildSidebarItems(role: Role): SidebarItem[] {
@@ -40,6 +41,14 @@ export function buildSidebarItems(role: Role): SidebarItem[] {
         icon: <FolderOpen className="h-4 w-4" />,
         group: 'Operación',
         keywords: ['expedientes', 'causas', 'pipeline'],
+      },
+      {
+        href: '/billing',
+        label: 'Cobros',
+        description: 'Pagos, estados y montos',
+        icon: <Wallet className="h-4 w-4" />,
+        group: 'Finanzas',
+        keywords: ['cobros', 'pagos', 'honorarios'],
       },
       {
         href: '/clients',
@@ -128,6 +137,14 @@ export function buildSidebarItems(role: Role): SidebarItem[] {
         keywords: ['expedientes', 'causas'],
       },
       {
+        href: '/billing',
+        label: 'Cobros',
+        description: 'Pagos y estados por expediente',
+        icon: <Wallet className="h-4 w-4" />,
+        group: 'Finanzas',
+        keywords: ['cobros', 'pagos', 'honorarios'],
+      },
+      {
         href: '/notifications',
         label: 'Notificaciones',
         description: 'Recordatorios y alertas',
@@ -171,6 +188,14 @@ export function buildSidebarItems(role: Role): SidebarItem[] {
         icon: <ClipboardList className="h-4 w-4" />,
         group: 'Operación',
         keywords: ['expedientes', 'causas', 'workflow'],
+      },
+      {
+        href: '/billing',
+        label: 'Cobros',
+        description: 'Pagos, estados y montos',
+        icon: <Wallet className="h-4 w-4" />,
+        group: 'Finanzas',
+        keywords: ['cobros', 'pagos', 'honorarios'],
       },
       {
         href: '/clients',
@@ -219,4 +244,3 @@ export function buildSidebarItems(role: Role): SidebarItem[] {
     },
   ];
 }
-

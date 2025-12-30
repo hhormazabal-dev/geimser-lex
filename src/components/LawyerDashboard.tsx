@@ -31,6 +31,7 @@ const STATUS_CHIPS: Record<string, string> = {
   activo: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
   suspendido: 'bg-amber-50 text-amber-700 border border-amber-100',
   archivado: 'bg-slate-100 text-slate-600 border border-slate-200',
+  terminado_apelacion: 'bg-violet-50 text-violet-700 border border-violet-100',
   terminado: 'bg-sky-50 text-sky-700 border border-sky-100',
   terminado_desistido_demandante: 'bg-sky-50 text-sky-700 border border-sky-100',
 };
@@ -39,6 +40,7 @@ const STATUS_LABELS: Record<string, string> = {
   activo: 'Activo',
   suspendido: 'Suspendido',
   archivado: 'Archivado',
+  terminado_apelacion: 'Terminado – Apelación',
   terminado: 'Terminado',
   terminado_desistido_demandante: 'Terminada (Desistida)',
 };
@@ -67,7 +69,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     );
   }
 
-  const activeCases = cases.filter((c) => c.estado === 'activo');
+  const activeCases = cases.filter((c) => c.estado === 'activo' || c.estado === 'terminado_apelacion');
   const recentCases = [...cases]
     .sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))
     .slice(0, 6);

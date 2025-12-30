@@ -235,6 +235,8 @@ export function CaseForm({
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const terminoFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [terminoFile, setTerminoFile] = useState<File | null>(null);
   const [clientOptions, setClientOptions] = useState<LightweightProfile[]>(clients);
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
@@ -266,6 +268,7 @@ export function CaseForm({
     notificacion_demanda_fecha: 'Fecha de notificación',
     etapa_actual: 'Acto / etapa actual',
     estado: 'Estado del expediente',
+    termino_documento_id: 'Documento de término',
     prioridad: 'Prioridad',
     valor_estimado: 'Cuantía (monto en disputa)',
     abogado_responsable: 'Abogado patrocinante',
@@ -302,6 +305,7 @@ export function CaseForm({
     'notificacion_demanda_fecha',
     'etapa_actual',
     'estado',
+    'termino_documento_id',
     'fecha_desistimiento',
     'prioridad',
     'sentencia_estado',
@@ -432,6 +436,7 @@ export function CaseForm({
           (existingCase as any).notificacion_demanda_estado ?? initialFormMeta.notification ?? null,
         notificacion_demanda_fecha: (existingCase as any).notificacion_demanda_fecha ?? '',
         fecha_desistimiento: (existingCase as any).fecha_desistimiento ?? '',
+        termino_documento_id: (existingCase as any).termino_documento_id ?? null,
         abogado_responsable: existingLawyerId || defaultLawyerId,
         cliente_principal_id: existingCase.cliente_principal_id ?? '',
         clientes_principales_extra_ids:
@@ -476,6 +481,7 @@ export function CaseForm({
         notificacion_demanda_estado: null,
         notificacion_demanda_fecha: '',
         fecha_desistimiento: '',
+        termino_documento_id: null,
         abogado_responsable: defaultLawyerId,
         cliente_principal_id: '',
         clientes_principales_extra_ids: [],
@@ -586,6 +592,7 @@ export function CaseForm({
   const audienciaInicialRequiereTestigos = watch('audiencia_inicial_requiere_testigos');
   const sentenciaEstado = watch('sentencia_estado');
   const estadoExpediente = watch('estado');
+  const terminoDocumentoId = watch('termino_documento_id');
   const honorarioPagado = watch('honorario_pagado_uf');
   const honorarioPendiente =
     typeof honorarioTotal === 'number' && !Number.isNaN(honorarioTotal)
@@ -600,8 +607,20 @@ export function CaseForm({
   const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
   const showSentenciaFecha = sentenciaEstado === 'programada' || sentenciaEstado === 'dictada';
   const showDesistimientoFecha = estadoExpediente === 'terminado_desistido_demandante';
+  const showTerminoDocumento = estadoExpediente === 'terminado';
   const isWizard = variant === 'wizard' && !existingCase;
   const canSubmit = Boolean(existingCase) || (step1Done && step2Done && step3Done);
+
+  const terminoDocumento = useMemo(() => {
+    if (!existingCase) return null;
+    const docs = (existingCase as any).documents as Array<{ id: string; nombre?: string; url?: string }> | undefined;
+    const id =
+      (typeof terminoDocumentoId === 'string' && terminoDocumentoId.length > 0
+        ? terminoDocumentoId
+        : ((existingCase as any).termino_documento_id as string | null | undefined)) ?? null;
+    if (!docs || !id) return null;
+    return docs.find((doc) => doc.id === id) ?? null;
+  }, [existingCase, terminoDocumentoId]);
 
   const timelinePreview = (() => {
     const materia = (materiaValue ?? '').trim();
@@ -881,6 +900,13 @@ export function CaseForm({
     }
   };
 
+  const resetTerminoFileSelection = () => {
+    setTerminoFile(null);
+    if (terminoFileInputRef.current) {
+      terminoFileInputRef.current.value = '';
+    }
+  };
+
   const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
@@ -913,6 +939,24 @@ export function CaseForm({
       });
     }
 
+    event.target.value = '';
+  };
+
+  const handleTerminoFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+      toast({
+        title: 'Archivo demasiado grande',
+        description: 'El documento de término no puede superar 20 MB.',
+        variant: 'destructive',
+      });
+      event.target.value = '';
+      return;
+    }
+
+    setTerminoFile(file);
     event.target.value = '';
   };
 
@@ -951,6 +995,60 @@ export function CaseForm({
             ? 'en_revision'
             : 'preparacion',
       };
+
+      // Regla de negocio: si el caso se marca como "Terminado", debe existir un documento de término asociado.
+      // Para edición, subimos el archivo y guardamos su ID en `termino_documento_id` antes de llamar al server action.
+      if (payload.estado === 'terminado') {
+        if (!existingCase) {
+          toast({
+            title: 'Documento requerido',
+            description:
+              'Para marcar un expediente como “Terminado” primero crea el caso y luego adjunta el documento de término en la edición.',
+            variant: 'destructive',
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        let terminoId = (payload.termino_documento_id as string | null | undefined) ?? null;
+        if (!terminoId && typeof terminoDocumentoId === 'string' && terminoDocumentoId.length > 0) {
+          terminoId = terminoDocumentoId;
+        }
+
+        if (terminoFile) {
+          const formData = new FormData();
+          formData.append('case_id', existingCase.id);
+          formData.append('file', terminoFile);
+          formData.append('nombre', terminoFile.name);
+          formData.append('visibilidad', 'privado');
+
+          const uploadResult = await uploadDocument(formData);
+          if (!uploadResult.success || !uploadResult.document?.id) {
+            toast({
+              title: 'No se pudo cargar el documento de término',
+              description: uploadResult.error ?? 'Error desconocido al cargar el documento.',
+              variant: 'destructive',
+            });
+            setIsLoading(false);
+            return;
+          }
+
+          terminoId = uploadResult.document.id as string;
+          setValue('termino_documento_id', terminoId as any, { shouldDirty: true, shouldValidate: false });
+        }
+
+        if (!terminoId) {
+          toast({
+            title: 'Documento requerido',
+            description: 'Debes adjuntar un documento de término para guardar el estado “Terminado”.',
+            variant: 'destructive',
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        payload.termino_documento_id = terminoId as any;
+      }
 
       let result;
       
@@ -1019,6 +1117,7 @@ export function CaseForm({
         }
 
         if (existingCase) {
+          resetTerminoFileSelection();
           window.location.assign(`/cases/${existingCase.id}`);
           return;
         }
@@ -2131,24 +2230,25 @@ export function CaseForm({
 	                )}
 	              </div>
 
-	              <div className='space-y-2'>
-	                <Label htmlFor='estado'>Estado del expediente</Label>
-	                <select
-	                  id='estado'
-                  className='form-input'
-                  {...register('estado')}
-                  disabled={isLoading}
-                >
-                  {CASE_STATUSES.map(status => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-	                {errors.estado && (
-	                  <p className='text-sm text-red-600'>{errors.estado.message}</p>
-	                )}
-	              </div>
+		              <div className='space-y-2'>
+		                <Label htmlFor='estado'>Estado del expediente</Label>
+		                <select
+		                  id='estado'
+	                  className='form-input'
+		                  {...register('estado')}
+		                  disabled={isLoading}
+	                >
+		                  {CASE_STATUSES.map(status => (
+		                    <option key={status.value} value={status.value}>
+		                      {status.label}
+		                    </option>
+		                  ))}
+	                </select>
+                    <input type="hidden" {...register('termino_documento_id')} />
+		                {errors.estado && (
+		                  <p className='text-sm text-red-600'>{errors.estado.message}</p>
+		                )}
+		              </div>
 
 	              <div className='space-y-2'>
 	                <Label htmlFor='prioridad'>Prioridad</Label>
@@ -2184,6 +2284,55 @@ export function CaseForm({
                     <p className='text-sm text-red-600'>{errors.fecha_desistimiento.message}</p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {showTerminoDocumento && (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900">Documento de término (obligatorio)</p>
+                    <p className="text-xs text-slate-500">
+                      Para guardar el estado “Terminado” debes asociar un documento (PDF, Word o imagen).
+                    </p>
+                    {terminoDocumento?.url && (
+                      <a
+                        className="inline-flex items-center gap-2 text-xs font-medium text-sky-700 hover:underline"
+                        href={terminoDocumento.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        {terminoDocumento.nombre ?? 'Ver documento de término'}
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Input
+                      ref={terminoFileInputRef}
+                      type="file"
+                      accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/gif,text/plain"
+                      onChange={handleTerminoFileSelected}
+                      disabled={isLoading}
+                    />
+                    {terminoFile && (
+                      <Button type="button" variant="outline" onClick={resetTerminoFileSelection} disabled={isLoading}>
+                        Quitar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {terminoFile && (
+                  <p className="mt-2 text-xs text-slate-600">
+                    Seleccionado: {terminoFile.name} ({formatFileSize(terminoFile.size)})
+                  </p>
+                )}
+
+                {errors.termino_documento_id && (
+                  <p className="mt-2 text-sm text-red-600">{errors.termino_documento_id.message}</p>
+                )}
               </div>
             )}
 

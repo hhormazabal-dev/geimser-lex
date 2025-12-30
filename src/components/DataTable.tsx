@@ -38,6 +38,7 @@ const STATUS_VARIANTS: Record<string, { label: string; chipClass: string }> = {
   activo: { label: 'Activo', chipClass: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
   suspendido: { label: 'Suspendido', chipClass: 'bg-amber-50 text-amber-700 border border-amber-100' },
   archivado: { label: 'Archivado', chipClass: 'bg-slate-100 text-slate-600 border border-slate-200' },
+  terminado_apelacion: { label: 'Terminado – Apelación', chipClass: 'bg-violet-50 text-violet-700 border border-violet-100' },
   terminado: { label: 'Terminado', chipClass: 'bg-sky-50 text-sky-700 border border-sky-100' },
   terminado_desistido_demandante: {
     label: 'Terminada (Desistida)',
@@ -222,12 +223,13 @@ export function DataTable({
                   className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
                 >
                   <option value=''>Todos</option>
-                  <option value='activo'>Activo</option>
-                  <option value='suspendido'>Suspendido</option>
-                  <option value='archivado'>Archivado</option>
-                  <option value='terminado'>Terminado</option>
-                  <option value='terminado_desistido_demandante'>Terminada - Desistida por Demandante</option>
-                </select>
+	                  <option value='activo'>Activo</option>
+	                  <option value='suspendido'>Suspendido</option>
+	                  <option value='archivado'>Archivado</option>
+	                  <option value='terminado_apelacion'>Terminado – Apelación</option>
+	                  <option value='terminado'>Terminado</option>
+	                  <option value='terminado_desistido_demandante'>Terminada - Desistida por Demandante</option>
+	                </select>
               </div>
 
               <div>

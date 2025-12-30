@@ -121,7 +121,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
     }
 
     const totalCases = cases.length;
-    const activeCases = cases.filter((item) => item.estado === 'activo').length;
+    const activeCases = cases.filter((item) => item.estado === 'activo' || item.estado === 'terminado_apelacion').length;
     const closedCases = cases.filter(
       (item) => item.estado === 'terminado' || item.estado === 'terminado_desistido_demandante' || item.estado === 'archivado'
     ).length;
@@ -148,29 +148,32 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
     [selectedCase?.observaciones]
   );
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      activo: 'default',
-      suspendido: 'secondary',
-      archivado: 'outline',
-      terminado: 'destructive',
-      terminado_desistido_demandante: 'destructive',
-    };
+    const getStatusBadge = (status: string) => {
+      const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+        activo: 'default',
+        suspendido: 'secondary',
+        archivado: 'outline',
+        terminado_apelacion: 'secondary',
+        terminado: 'destructive',
+        terminado_desistido_demandante: 'destructive',
+      };
 
-    const colors: Record<string, string> = {
-      activo: 'bg-green-100 text-green-800',
-      suspendido: 'bg-yellow-100 text-yellow-800',
-      archivado: 'bg-gray-100 text-gray-800',
-      terminado: 'bg-blue-100 text-blue-800',
-      terminado_desistido_demandante: 'bg-blue-100 text-blue-800',
-    };
-    const labels: Record<string, string> = {
-      activo: 'Activo',
-      suspendido: 'Suspendido',
-      archivado: 'Archivado',
-      terminado: 'Terminado',
-      terminado_desistido_demandante: 'Terminada (Desistida)',
-    };
+      const colors: Record<string, string> = {
+        activo: 'bg-green-100 text-green-800',
+        suspendido: 'bg-yellow-100 text-yellow-800',
+        archivado: 'bg-gray-100 text-gray-800',
+        terminado_apelacion: 'bg-violet-100 text-violet-800',
+        terminado: 'bg-blue-100 text-blue-800',
+        terminado_desistido_demandante: 'bg-blue-100 text-blue-800',
+      };
+      const labels: Record<string, string> = {
+        activo: 'Activo',
+        suspendido: 'Suspendido',
+        archivado: 'Archivado',
+        terminado_apelacion: 'Terminado – Apelación',
+        terminado: 'Terminado',
+        terminado_desistido_demandante: 'Terminada (Desistida)',
+      };
 
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-100 text-gray-800'}`}>

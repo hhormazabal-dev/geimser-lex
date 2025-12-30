@@ -173,32 +173,33 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
 
     const supabase = await createServerClient();
 
-    // Construir consultas base según el rol
     let caseQuery = supabase.from('cases').select('*');
+    if (role === 'abogado') {
+      // Mantiene consistencia con la vista "Mis casos" (asignados).
+      caseQuery = caseQuery.eq('abogado_responsable', profile.id);
+    }
 
-    const clientQueryPromise = (async () => {
+    const { data: caseRows, error: casesError } = await caseQuery;
+    if (casesError) throw casesError;
+
+    const cases = (caseRows as Array<Record<string, any>> | null) ?? [];
+    const caseIds = cases.map((c) => c.id as string).filter(Boolean);
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const clientsPromise = (async () => {
       if (role === 'abogado') {
-        const { data: rawAbogadoCases, error: casesError } = await supabase
-          .from('cases')
-          .select('id')
-          .eq('abogado_responsable', profile.id);
-
-        if (casesError) return { data: null, error: casesError };
-
-        const abogadoCases = rawAbogadoCases as Array<{ id: string }> | null;
-        const caseIds = abogadoCases?.map((c) => c.id) || [];
-        if (caseIds.length === 0) return { data: [], error: null };
-
+        if (caseIds.length === 0) return { data: [], error: null } as const;
         const { data, error } = await supabase
           .from('case_clients')
           .select('client_profile_id')
           .in('case_id', caseIds);
+        if (error) return { data: null, error } as const;
 
-        if (error) return { data: null, error };
-
-        const clientRows = data as Array<{ client_profile_id: string }> | null;
-        const clientIds = clientRows?.map((cc) => cc.client_profile_id) || [];
-        if (clientIds.length === 0) return { data: [], error: null };
+        const clientIds = ((data as Array<{ client_profile_id: string }> | null) ?? [])
+          .map((row) => row.client_profile_id)
+          .filter(Boolean);
+        if (clientIds.length === 0) return { data: [], error: null } as const;
 
         return supabase.from('profiles').select('*').in('id', clientIds);
       }
@@ -206,30 +207,35 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
       return supabase.from('profiles').select('*').eq('role', 'cliente');
     })();
 
-    if (role === 'abogado') {
-      // Los abogados solo ven estadísticas de sus casos
-      caseQuery = caseQuery.eq('abogado_responsable', profile.id);
-    }
+    const documentsQuery = caseIds.length > 0 ? supabase.from('documents').select('*').in('case_id', caseIds) : null;
+    const notesQuery = caseIds.length > 0 ? supabase.from('notes').select('*').in('case_id', caseIds) : null;
+    const requestsQuery =
+      caseIds.length > 0
+        ? supabase.from('info_requests').select('*').eq('estado', 'pendiente').in('case_id', caseIds)
+        : null;
+    const stagesQuery =
+      caseIds.length > 0
+        ? supabase.from('case_stages').select('*').eq('estado', 'pendiente').lt('fecha_programada', today).in('case_id', caseIds)
+        : null;
 
-    // Ejecutar consultas en paralelo
-    const [casesResult, clientsResult, documentsResult, notesResult, requestsResult, stagesResult] = await Promise.all([
-      caseQuery,
-      clientQueryPromise,
-      supabase.from('documents').select('*'),
-      supabase.from('notes').select('*'),
-      supabase.from('info_requests').select('*').eq('estado', 'pendiente'),
-      supabase.from('case_stages').select('*').eq('estado', 'pendiente').lt('fecha_programada', new Date().toISOString()),
+    const [clientsResult, documentsResult, notesResult, requestsResult, stagesResult] = await Promise.all([
+      clientsPromise,
+      documentsQuery ?? Promise.resolve({ data: [] } as any),
+      notesQuery ?? Promise.resolve({ data: [] } as any),
+      requestsQuery ?? Promise.resolve({ data: [] } as any),
+      stagesQuery ?? Promise.resolve({ data: [] } as any),
     ]);
 
-    if (casesResult.error) throw casesResult.error;
-    if (clientsResult.error) throw clientsResult.error;
-    if (documentsResult.error) throw documentsResult.error;
-    if (notesResult.error) throw notesResult.error;
-    if (requestsResult.error) throw requestsResult.error;
-    if (stagesResult.error) throw stagesResult.error;
+    if ((clientsResult as any).error) throw (clientsResult as any).error;
+    if ((documentsResult as any).error) throw (documentsResult as any).error;
+    if ((notesResult as any).error) throw (notesResult as any).error;
+    if ((requestsResult as any).error) throw (requestsResult as any).error;
+    if ((stagesResult as any).error) throw (stagesResult as any).error;
 
-    const cases = (casesResult.data as Array<Record<string, any>> | null) ?? [];
-    const activeCases = cases.filter((c) => (c.estado as string | null) === 'activo').length;
+    const activeCases = cases.filter((c) => {
+      const status = (c.estado as string | null) ?? null;
+      return status === 'activo' || status === 'terminado_apelacion';
+    }).length;
     const completedCases = cases.filter((c) => {
       const status = (c.estado as string | null) ?? null;
       return status === 'terminado' || status === 'terminado_desistido_demandante';
@@ -239,11 +245,11 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
       totalCases: cases.length,
       activeCases,
       completedCases,
-      totalClients: clientsResult.data?.length || 0,
-      totalDocuments: documentsResult.data?.length || 0,
-      totalNotes: notesResult.data?.length || 0,
-      pendingRequests: requestsResult.data?.length || 0,
-      overdueStages: stagesResult.data?.length || 0,
+      totalClients: ((clientsResult as any).data?.length as number | undefined) || 0,
+      totalDocuments: ((documentsResult as any).data?.length as number | undefined) || 0,
+      totalNotes: ((notesResult as any).data?.length as number | undefined) || 0,
+      pendingRequests: ((requestsResult as any).data?.length as number | undefined) || 0,
+      overdueStages: ((stagesResult as any).data?.length as number | undefined) || 0,
     };
 
     const highlights: DashboardHighlights = {
@@ -259,7 +265,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
           abogado_responsable: (caseItem.abogado_responsable as string | null) ?? null,
           valor_estimado: (caseItem.valor_estimado as number | null) ?? null,
         })),
-      clients: ((clientsResult.data as Array<Record<string, any>> | null) ?? [])
+      clients: ((((clientsResult as any).data as Array<Record<string, any>> | null) ?? [])
         .slice(0, 6)
         .map((client) => ({
           id: client.id as string,
@@ -267,8 +273,8 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
           email: (client.email as string | null) ?? null,
           telefono: (client.telefono as string | null) ?? null,
           created_at: (client.created_at as string | null) ?? null,
-        })),
-      documents: ((documentsResult.data as Array<Record<string, any>> | null) ?? [])
+        }))),
+      documents: ((((documentsResult as any).data as Array<Record<string, any>> | null) ?? [])
         .sort((a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime())
         .slice(0, 6)
         .map((doc) => ({
@@ -276,7 +282,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
           nombre: (doc.nombre as string) ?? 'Documento',
           case_id: (doc.case_id as string | null) ?? null,
           created_at: (doc.created_at as string | null) ?? null,
-        })),
+        }))),
       pending: [
         ...(((requestsResult.data as Array<Record<string, any>> | null) ?? []).map((req) => ({
           id: req.id as string,
@@ -627,7 +633,11 @@ export async function getAbogadoWorkload(): Promise<{ success: boolean; data?: A
     // Obtener estadísticas de casos por abogado
     const workloadPromises = abogadosData.map(async (abogado) => {
       const [activeCasesResult, completedCasesResult] = await Promise.all([
-        supabase.from('cases').select('valor_estimado').eq('abogado_responsable', abogado.id).eq('estado', 'activo'),
+        supabase
+          .from('cases')
+          .select('valor_estimado')
+          .eq('abogado_responsable', abogado.id)
+          .in('estado', ['activo', 'terminado_apelacion']),
         supabase
           .from('cases')
           .select('valor_estimado')
@@ -757,7 +767,7 @@ export async function getLawyerDetail(abogadoId: string): Promise<{ success: boo
       };
     });
 
-    const activeCases = caseSummaries.filter((c) => c.estado === 'activo');
+    const activeCases = caseSummaries.filter((c) => c.estado === 'activo' || c.estado === 'terminado_apelacion');
     const completedCases = caseSummaries.filter(
       (c) => c.estado === 'terminado' || c.estado === 'terminado_desistido_demandante'
     );
@@ -811,9 +821,12 @@ export async function getUpcomingDeadlines(): Promise<{ success: boolean; data?:
 
     const supabase = await createServerClient();
 
-    // Etapas con fechas programadas en los próximos 30 días
+    // Etapas con fechas programadas en los próximos 30 días (columna DATE -> usar YYYY-MM-DD).
+    const today = new Date();
+    const todayIso = today.toISOString().slice(0, 10);
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 30);
+    const futureIso = futureDate.toISOString().slice(0, 10);
 
     const query = supabase
       .from('case_stages')
@@ -824,8 +837,8 @@ export async function getUpcomingDeadlines(): Promise<{ success: boolean; data?:
       `
       )
       .eq('estado', 'pendiente')
-      .gte('fecha_programada', new Date().toISOString())
-      .lte('fecha_programada', futureDate.toISOString())
+      .gte('fecha_programada', todayIso)
+      .lte('fecha_programada', futureIso)
       .order('fecha_programada', { ascending: true });
 
     const { data: stages, error } = await query;
@@ -968,7 +981,7 @@ export async function getClientPortfolio(
 
     const portfolio = Array.from(byClient.values()).map((item) => {
       const totalCases = item.cases.length;
-      const activeCases = item.cases.filter((c) => c.estado === 'activo').length;
+      const activeCases = item.cases.filter((c) => c.estado === 'activo' || c.estado === 'terminado_apelacion').length;
       const urgentCases = item.cases.filter((c) => c.prioridad === 'urgente').length;
       const inReviewCases = item.cases.filter((c) => (c.workflow_state ?? '').toString() === 'en_revision').length;
 
@@ -1086,7 +1099,7 @@ export async function getClientPortfolioWithLawyers(
           } satisfies ClientPortfolioLawyer);
 
         summary.totalCases += 1;
-        if (caseRow.estado === 'activo') summary.activeCases += 1;
+        if (caseRow.estado === 'activo' || caseRow.estado === 'terminado_apelacion') summary.activeCases += 1;
         if (caseRow.prioridad === 'urgente') summary.urgentCases += 1;
         if ((caseRow.workflow_state ?? '').toString() === 'en_revision') summary.inReviewCases += 1;
         existing._lawyers.set(lawyer.id, summary);
@@ -1097,7 +1110,7 @@ export async function getClientPortfolioWithLawyers(
 
     const portfolio = Array.from(byClient.values()).map((item) => {
       const totalCases = item._caseIds.size;
-      const activeCases = item.cases.filter((c) => c.estado === 'activo').length;
+      const activeCases = item.cases.filter((c) => c.estado === 'activo' || c.estado === 'terminado_apelacion').length;
       const urgentCases = item.cases.filter((c) => c.prioridad === 'urgente').length;
       const inReviewCases = item.cases.filter((c) => (c.workflow_state ?? '').toString() === 'en_revision').length;
 
@@ -1222,7 +1235,7 @@ export async function getClientDetail(
             inReviewCases: 0,
           } satisfies ClientPortfolioLawyer);
         existing.totalCases += 1;
-        if (caseItem.estado === 'activo') existing.activeCases += 1;
+        if (caseItem.estado === 'activo' || caseItem.estado === 'terminado_apelacion') existing.activeCases += 1;
         if (caseItem.prioridad === 'urgente') existing.urgentCases += 1;
         if ((caseItem.workflow_state ?? '').toString() === 'en_revision') existing.inReviewCases += 1;
         lawyerMap.set(lawyer.id, existing);
@@ -1257,7 +1270,7 @@ export async function getClientDetail(
     });
 
     const totalCases = caseSummaries.length;
-    const activeCases = caseSummaries.filter((c) => c.estado === 'activo').length;
+    const activeCases = caseSummaries.filter((c) => c.estado === 'activo' || c.estado === 'terminado_apelacion').length;
     const urgentCases = caseSummaries.filter((c) => c.prioridad === 'urgente').length;
     const inReviewCases = caseSummaries.filter((c) => (c.workflow_state ?? '').toString() === 'en_revision').length;
     const totalLawyers = lawyerMap.size;

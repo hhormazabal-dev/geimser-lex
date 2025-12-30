@@ -242,6 +242,54 @@ export type Database = {
           },
         ]
       }
+      case_lawyer_checklist_items: {
+        Row: {
+          case_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_done: boolean
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_done?: boolean
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_done?: boolean
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_lawyer_checklist_items_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_lawyer_checklist_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_messages: {
         Row: {
           attachment_url: string | null
@@ -413,6 +461,7 @@ export type Database = {
           etapa_actual: string | null
           fecha_inicio: string | null
           fecha_desistimiento: string | null
+          termino_documento_id: string | null
           sentencia_estado: Database["public"]["Enums"]["case_sentence_status"] | null
           sentencia_fecha: string | null
           honorario_moneda: string
@@ -459,6 +508,7 @@ export type Database = {
           etapa_actual?: string | null
           fecha_inicio?: string | null
           fecha_desistimiento?: string | null
+          termino_documento_id?: string | null
           sentencia_estado?: Database["public"]["Enums"]["case_sentence_status"] | null
           sentencia_fecha?: string | null
           honorario_moneda?: string
@@ -505,6 +555,7 @@ export type Database = {
           etapa_actual?: string | null
           fecha_inicio?: string | null
           fecha_desistimiento?: string | null
+          termino_documento_id?: string | null
           sentencia_estado?: Database["public"]["Enums"]["case_sentence_status"] | null
           sentencia_fecha?: string | null
           honorario_moneda?: string
@@ -553,6 +604,150 @@ export type Database = {
           {
             foreignKeyName: "cases_cliente_principal_id_fkey"
             columns: ["cliente_principal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cases_termino_documento_id_fkey"
+            columns: ["termino_documento_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_accounts: {
+        Row: {
+          amount_paid: number
+          amount_total: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          due_date: string | null
+          id: string
+          status: Database["public"]["Enums"]["billing_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          amount_total?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["billing_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          amount_total?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["billing_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_account_cases: {
+        Row: {
+          billing_account_id: string
+          case_amount: number | null
+          case_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          billing_account_id: string
+          case_amount?: number | null
+          case_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          billing_account_id?: string
+          case_amount?: number | null
+          case_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_account_cases_billing_account_id_fkey"
+            columns: ["billing_account_id"]
+            isOneToOne: false
+            referencedRelation: "billing_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_account_cases_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_payments: {
+        Row: {
+          amount: number
+          billing_account_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          method: string | null
+          notes: string | null
+          paid_at: string
+        }
+        Insert: {
+          amount: number
+          billing_account_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_at?: string
+        }
+        Update: {
+          amount?: number
+          billing_account_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_payments_billing_account_id_fkey"
+            columns: ["billing_account_id"]
+            isOneToOne: false
+            referencedRelation: "billing_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_payments_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1245,11 +1440,13 @@ export type Database = {
       }
     }
     Enums: {
+      billing_status: "pendiente" | "parcial" | "pagado" | "vencido"
       case_priority: "baja" | "media" | "alta" | "urgente"
       case_status:
         | "activo"
         | "suspendido"
         | "archivado"
+        | "terminado_apelacion"
         | "terminado"
         | "terminado_desistido_demandante"
       case_workflow_state: "preparacion" | "en_revision" | "activo" | "cerrado"
@@ -1407,11 +1604,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      billing_status: ["pendiente", "parcial", "pagado", "vencido"],
       case_priority: ["baja", "media", "alta", "urgente"],
       case_status: [
         "activo",
         "suspendido",
         "archivado",
+        "terminado_apelacion",
         "terminado",
         "terminado_desistido_demandante",
       ],

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { AppSidebar, type SidebarItem } from '@/components/layout/AppSidebar';
 import { AppTopbar } from '@/components/layout/AppTopbar';
 import { CommandPalette } from '@/components/layout/CommandPalette';
+import { SupportFab } from '@/components/layout/SupportFab';
 
 function resolveTitle(pathname: string, items: SidebarItem[]): string {
   const candidates = items
@@ -86,6 +87,8 @@ export function PlatformChrome({
         canCreateCase={canCreateCase}
         role={profile.role}
       />
+
+      <SupportFab />
     </div>
   );
 }

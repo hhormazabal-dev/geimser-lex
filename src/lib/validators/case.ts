@@ -48,7 +48,18 @@ const baseCaseSchema = z.object({
     .max(1000, 'El nombre no puede exceder 1000 caracteres'),
   contraparte: z.string().optional(),
   etapa_actual: z.string().default('Ingreso Demanda'),
-  estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado', 'terminado_desistido_demandante']).default('activo'),
+  estado: z
+    .enum([
+      'activo',
+      'suspendido',
+      'archivado',
+      'terminado_apelacion',
+      'terminado',
+      'terminado_desistido_demandante',
+    ])
+    .default('activo'),
+  // UUID del documento asociado al término (obligatorio a nivel DB cuando estado = 'terminado').
+  termino_documento_id: z.string().uuid('ID de documento inválido').nullable().optional(),
   fecha_inicio: z.string().optional(),
   sentencia_estado: z
     .enum(['no_registra', 'pendiente', 'programada', 'dictada'])
@@ -329,7 +340,9 @@ export const assignLawyerSchema = z.object({
 });
 
 export const caseFiltersSchema = z.object({
-  estado: z.enum(['activo', 'suspendido', 'archivado', 'terminado', 'terminado_desistido_demandante']).optional(),
+  estado: z
+    .enum(['activo', 'suspendido', 'archivado', 'terminado_apelacion', 'terminado', 'terminado_desistido_demandante'])
+    .optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'urgente']).optional(),
   workflow_state: z.enum(['preparacion', 'en_revision', 'activo', 'cerrado']).optional(),
   abogado_responsable: z.string().uuid().optional(),
@@ -360,6 +373,7 @@ export const CASE_STATUSES = [
   { value: 'activo', label: 'Activo' },
   { value: 'suspendido', label: 'Suspendido' },
   { value: 'archivado', label: 'Archivado' },
+  { value: 'terminado_apelacion', label: 'Terminado – Apelación' },
   { value: 'terminado', label: 'Terminado' },
   { value: 'terminado_desistido_demandante', label: 'Terminada - Desistida por Demandante' },
 ] as const;

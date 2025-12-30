@@ -24,6 +24,7 @@ const STATUS_LABELS: Record<string, string> = {
   activo: 'Activo',
   suspendido: 'Suspendido',
   archivado: 'Archivado',
+  terminado_apelacion: 'Terminado – Apelación',
   terminado: 'Terminado',
   terminado_desistido_demandante: 'Terminada (Desistida)',
 };
