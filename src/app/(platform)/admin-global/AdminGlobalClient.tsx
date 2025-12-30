@@ -51,6 +51,10 @@ export function AdminGlobalClient(props: {
   const [newOrgPricePerUser, setNewOrgPricePerUser] = useState<number>(0);
   const [newOrgBaseFee, setNewOrgBaseFee] = useState<number>(0);
   const [newOrgSetupFee, setNewOrgSetupFee] = useState<number>(0);
+  const [newOrgAdminEmail, setNewOrgAdminEmail] = useState<string>('');
+  const [newOrgAdminName, setNewOrgAdminName] = useState<string>('');
+  const [newOrgAdminPassword, setNewOrgAdminPassword] = useState<string>('');
+  const [createdOrgAdminPassword, setCreatedOrgAdminPassword] = useState<string | null>(null);
   const [assignUserId, setAssignUserId] = useState<string>('');
   const [assignOrgId, setAssignOrgId] = useState<string>('');
   const [assignMode, setAssignMode] = useState<'A' | 'B'>('A');
@@ -95,8 +99,13 @@ export function AdminGlobalClient(props: {
 
   async function createOrg() {
     setMessage(null);
+    setCreatedOrgAdminPassword(null);
     const name = newOrgName.trim();
     if (!name) return setMessage('Nombre requerido');
+    const adminEmail = newOrgAdminEmail.trim().toLowerCase();
+    const adminName = newOrgAdminName.trim();
+    if (!adminEmail) return setMessage('Email de admin requerido');
+    if (!adminName) return setMessage('Nombre de admin requerido');
     const seats = Math.max(0, Math.trunc(Number(newOrgSeats || 0)));
     const pricePerUser = Math.max(0, Number(newOrgPricePerUser || 0));
     const baseFee = Math.max(0, Number(newOrgBaseFee || 0));
@@ -111,11 +120,20 @@ export function AdminGlobalClient(props: {
         billing_price_per_user: pricePerUser,
         billing_monthly_base_fee: baseFee,
         billing_setup_fee: setupFee,
+        admin_email: adminEmail,
+        admin_name: adminName,
+        admin_password: newOrgAdminPassword.trim() || undefined,
       }),
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) return setMessage(json?.error ?? 'Error creando empresa');
+
+    const pw = json?.org_admin?.password ? String(json.org_admin.password) : null;
+    if (pw) setCreatedOrgAdminPassword(pw);
     setNewOrgName('');
+    setNewOrgAdminEmail('');
+    setNewOrgAdminName('');
+    setNewOrgAdminPassword('');
     startTransition(() => router.refresh());
   }
 
@@ -167,6 +185,13 @@ export function AdminGlobalClient(props: {
       {message ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           {message}
+        </div>
+      ) : null}
+
+      {createdOrgAdminPassword ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Password inicial de admin generado:{' '}
+          <span className="font-mono font-semibold">{createdOrgAdminPassword}</span>
         </div>
       ) : null}
 
@@ -236,6 +261,24 @@ export function AdminGlobalClient(props: {
                 placeholder="Nombre de empresa"
               />
             </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-medium text-muted-foreground">Admin email</label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                value={newOrgAdminEmail}
+                onChange={(e) => setNewOrgAdminEmail(e.target.value)}
+                placeholder="admin@empresa.com"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-medium text-muted-foreground">Admin nombre</label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                value={newOrgAdminName}
+                onChange={(e) => setNewOrgAdminName(e.target.value)}
+                placeholder="Nombre Apellido"
+              />
+            </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Moneda</label>
               <select
@@ -289,6 +332,15 @@ export function AdminGlobalClient(props: {
                 step="0.01"
                 value={newOrgSetupFee}
                 onChange={(e) => setNewOrgSetupFee(Number(e.target.value))}
+              />
+            </div>
+            <div className="md:col-span-6">
+              <label className="text-xs font-medium text-muted-foreground">Admin password (opcional)</label>
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                value={newOrgAdminPassword}
+                onChange={(e) => setNewOrgAdminPassword(e.target.value)}
+                placeholder="(se genera automáticamente si lo dejas vacío)"
               />
             </div>
           </div>

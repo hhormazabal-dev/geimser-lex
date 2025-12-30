@@ -18,8 +18,14 @@ export function EmpresaAdminClient(props: { members: EmpresaMemberRow[] }) {
   const [mode, setMode] = useState<'A' | 'B'>('A');
   const [message, setMessage] = useState<string | null>(null);
 
+  const [newLawyerEmail, setNewLawyerEmail] = useState('');
+  const [newLawyerName, setNewLawyerName] = useState('');
+  const [newLawyerPassword, setNewLawyerPassword] = useState('');
+  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
+
   async function assign() {
     setMessage(null);
+    setCreatedPassword(null);
     const e = email.trim().toLowerCase();
     if (!e) return setMessage('Email requerido');
     const res = await fetch('/api/org-admin/assign-lawyer', {
@@ -34,6 +40,34 @@ export function EmpresaAdminClient(props: { members: EmpresaMemberRow[] }) {
     startTransition(() => router.refresh());
   }
 
+  async function createLawyer() {
+    setMessage(null);
+    setCreatedPassword(null);
+
+    const e = newLawyerEmail.trim().toLowerCase();
+    const n = newLawyerName.trim();
+    const p = newLawyerPassword.trim();
+    if (!e) return setMessage('Email requerido');
+    if (!n) return setMessage('Nombre requerido');
+
+    const res = await fetch('/api/org-admin/create-lawyer', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: e, nombre: n, password: p || undefined }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) return setMessage(json?.error ?? 'Error creando abogado');
+
+    if (json?.password) {
+      setCreatedPassword(String(json.password));
+    }
+    setNewLawyerEmail('');
+    setNewLawyerName('');
+    setNewLawyerPassword('');
+    setMessage('Abogado creado y asignado a la empresa');
+    startTransition(() => router.refresh());
+  }
+
   return (
     <div className="space-y-6">
       {message ? (
@@ -41,6 +75,57 @@ export function EmpresaAdminClient(props: { members: EmpresaMemberRow[] }) {
           {message}
         </div>
       ) : null}
+
+      {createdPassword ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Password inicial generado: <span className="font-mono font-semibold">{createdPassword}</span>
+        </div>
+      ) : null}
+
+      <section className="rounded-xl border bg-white p-5">
+        <h2 className="text-base font-semibold">Crear abogado (en esta empresa)</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Crea el usuario, su perfil y lo agrega a la empresa como abogado.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="md:col-span-1">
+            <label className="text-xs font-medium text-muted-foreground">Email</label>
+            <input
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              value={newLawyerEmail}
+              onChange={(e) => setNewLawyerEmail(e.target.value)}
+              placeholder="abogado@dominio.com"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+            <input
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              value={newLawyerName}
+              onChange={(e) => setNewLawyerName(e.target.value)}
+              placeholder="Nombre Apellido"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <label className="text-xs font-medium text-muted-foreground">Password (opcional)</label>
+            <input
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              value={newLawyerPassword}
+              onChange={(e) => setNewLawyerPassword(e.target.value)}
+              placeholder="(se genera automáticamente si lo dejas vacío)"
+            />
+          </div>
+        </div>
+        <div className="mt-4">
+          <button
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            onClick={() => void createLawyer()}
+            disabled={isPending}
+          >
+            Crear abogado
+          </button>
+        </div>
+      </section>
 
       <section className="rounded-xl border bg-white p-5">
         <h2 className="text-base font-semibold">Agregar / mover abogado a esta empresa</h2>
@@ -112,4 +197,3 @@ export function EmpresaAdminClient(props: { members: EmpresaMemberRow[] }) {
     </div>
   );
 }
-

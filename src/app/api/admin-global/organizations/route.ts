@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClient, createServiceClient } from '@/lib/supabase/server';
+import { randomBytes } from 'crypto';
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ ok: false, error: message }, { status });
@@ -16,6 +17,19 @@ function parseNonNegativeInt(value: unknown): number | null {
   const n = parseNonNegativeNumber(value);
   if (n === null) return null;
   return Math.trunc(n);
+}
+
+function normalizeEmail(value: unknown): string | null {
+  const s = String(value ?? '').trim().toLowerCase();
+  if (!s) return null;
+  if (!s.includes('@')) return null;
+  return s;
+}
+
+function resolvePassword(value: unknown): string {
+  const s = String(value ?? '').trim();
+  if (s) return s;
+  return randomBytes(12).toString('base64url');
 }
 
 export async function POST(req: Request) {
@@ -62,7 +76,89 @@ export async function POST(req: Request) {
 
     if (error) return jsonError(error.message ?? 'Error creando organización', 500);
 
-    return NextResponse.json({ ok: true, organization: data });
+    const orgId = data?.id as string | undefined;
+
+    // Opcional: crear org_admin automáticamente
+    const adminEmail = normalizeEmail(body?.admin_email ?? body?.admin?.email);
+    const adminNameRaw = String(body?.admin_name ?? body?.admin?.nombre ?? '').trim();
+    const shouldCreateAdmin = Boolean(adminEmail || adminNameRaw);
+
+    if (shouldCreateAdmin) {
+      if (!adminEmail) return jsonError('admin_email requerido para crear admin de empresa', 400);
+      if (!adminNameRaw) return jsonError('admin_name requerido para crear admin de empresa', 400);
+      if (!orgId) return jsonError('No se pudo obtener orgId para crear admin', 500);
+
+      const password = resolvePassword(body?.admin_password ?? body?.admin?.password);
+
+      let userId: string | null = null;
+      let createdPassword: string | null = null;
+
+      try {
+        const svc = createServiceClient() as any;
+        const created = await svc.auth.admin.createUser({
+          email: adminEmail,
+          password,
+          email_confirm: true,
+          app_metadata: { role: 'admin_firma' },
+          user_metadata: { nombre: adminNameRaw },
+        });
+
+        if (created.error || !created.data?.user?.id) {
+          const fallback = await svc
+            .from('profiles')
+            .select('user_id')
+            .eq('email', adminEmail)
+            .maybeSingle();
+          const existingUserId = fallback?.data?.user_id as string | undefined;
+          if (!existingUserId) {
+            return jsonError(created.error?.message ?? 'No se pudo crear usuario admin', 500);
+          }
+          userId = existingUserId;
+          createdPassword = null;
+        } else {
+          userId = created.data.user.id;
+          createdPassword = password;
+        }
+
+        await svc
+          .from('profiles')
+          .upsert(
+            {
+              id: userId,
+              user_id: userId,
+              email: adminEmail,
+              nombre: adminNameRaw,
+              role: 'admin_firma',
+              activo: true,
+              active_organization_id: orgId,
+            },
+            { onConflict: 'id' },
+          );
+
+        await svc.from('org_members').upsert(
+          {
+            organization_id: orgId,
+            user_id: userId,
+            role: 'org_admin',
+          },
+          { onConflict: 'organization_id,user_id' },
+        );
+
+        return NextResponse.json({
+          ok: true,
+          organization: data,
+          org_admin: {
+            email: adminEmail,
+            user_id: userId,
+            password: createdPassword,
+          },
+        });
+      } catch (e: any) {
+        return jsonError(e?.message ?? 'Error creando admin de empresa', 500);
+      }
+    }
+
+    return NextResponse.json({ ok: true, organization: data, org_admin: null });
   } catch (e: any) {
     return jsonError(e?.message ?? 'Error interno', 500);
   }
