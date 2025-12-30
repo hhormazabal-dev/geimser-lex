@@ -89,8 +89,7 @@ export async function uploadDocument(formData: FormData) {
       .insert(documentData)
       .select(`
         *,
-        uploader:profiles(nombre),
-        case:cases(caratulado)
+        uploader:profiles!documents_uploader_id_fkey(id, nombre)
       `)
       .single();
 
@@ -163,8 +162,7 @@ export async function updateDocument(documentId: string, input: UpdateDocumentIn
       .eq('id', documentId)
       .select(`
         *,
-        uploader:profiles(nombre),
-        case:cases(caratulado)
+        uploader:profiles!documents_uploader_id_fkey(id, nombre)
       `)
       .single();
 
@@ -286,8 +284,7 @@ export async function getDocuments(filters: DocumentFiltersInput = {} as Documen
       .select(
         `
         *,
-        uploader:profiles(id, nombre),
-        case:cases(id, caratulado)
+        uploader:profiles!documents_uploader_id_fkey(id, nombre)
       `,
         { count: 'exact' }
       );
@@ -375,8 +372,7 @@ export async function getDocumentById(documentId: string) {
       .from('documents')
       .select(`
         *,
-        uploader:profiles(id, nombre),
-        case:cases(id, caratulado)
+        uploader:profiles!documents_uploader_id_fkey(id, nombre)
       `)
       .eq('id', documentId)
       .single();
