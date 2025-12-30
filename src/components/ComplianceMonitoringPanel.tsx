@@ -53,7 +53,7 @@ function randomId() {
   }
 }
 
-function companionRequest<T>(action: 'PING' | 'OPTIONS', payload?: any, timeoutMs = 4000): Promise<T> {
+function companionRequest<T>(action: 'PING' | 'OPTIONS' | 'LOOKUP', payload?: any, timeoutMs = 4000): Promise<T> {
   return new Promise((resolve, reject) => {
     const requestId = randomId();
     const timer = window.setTimeout(() => {
@@ -145,6 +145,59 @@ async function getPjudConfig(): Promise<
   }
 }
 
+function normalizeCauseRowFromTable(row: Record<string, any>) {
+  const keys = Object.keys(row);
+  const get = (...needles: string[]) => {
+    const found = keys.find((k) => needles.some((n) => normalizeText(k).includes(n)));
+    const v = found ? row[found] : '';
+    return typeof v === 'string' ? v : v == null ? '' : String(v);
+  };
+
+  const sourceUrl = typeof row.SourceUrl === 'string' ? row.SourceUrl : null;
+
+  return {
+    administrativeStatus: get('situaci', 'admin') || '',
+    causeState: get('estado') || '',
+    court: get('tribunal', 'juzgado', 'corte') || '',
+    date: get('fecha') || '',
+    labeled: get('caratul', 'caratula', 'carátul') || '',
+    procedure: get('proced') || '',
+    resource: get('recurso') || '',
+    role: get('rol', 'rit') || '',
+    ruc: get('ruc') || '',
+    ubication: get('ubic') || '',
+    sourceUrl,
+  };
+}
+
+function summarizeCauseRows(rows: Array<{ date?: string | null; court?: string | null }>) {
+  const dates = rows
+    .map((c) => String(c.date ?? '').trim())
+    .filter(Boolean)
+    .map((d) => {
+      // Acepta YYYY-MM-DD o DD/MM/YYYY
+      const iso = d.match(/^(\d{4})-(\d{2})-(\d{2})$/) ? d : null;
+      if (iso) return iso;
+      const m = d.match(/^(\d{1,2})[\\/.-](\d{1,2})[\\/.-](\d{2,4})$/);
+      if (!m) return null;
+      const dd = String(m[1]).padStart(2, '0');
+      const mm = String(m[2]).padStart(2, '0');
+      const yyyy = String(m[3]).length === 2 ? `20${m[3]}` : String(m[3]);
+      return `${yyyy}-${mm}-${dd}`;
+    })
+    .filter((d): d is string => Boolean(d))
+    .sort()
+    .reverse();
+
+  const courts = new Set<string>();
+  for (const r of rows) {
+    const c = String(r.court ?? '').trim();
+    if (c) courts.add(c);
+  }
+
+  return { total_causes: rows.length, latest_date: dates[0] ?? null, distinct_courts: courts.size };
+}
+
 export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
   const { toast } = useToast();
   const [subjects, setSubjects] = useState<ComplianceSubjectDTO[]>([]);
@@ -153,15 +206,18 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
   const [sources, setSources] = useState<ComplianceSource[]>([]);
 
-  const load = async () => {
+  const load = async (): Promise<ComplianceSubjectDTO[]> => {
     setLoading(true);
     try {
       const res = await listComplianceSubjectsForCase(caseId);
       if (!res.success) throw new Error(res.error ?? 'No se pudo cargar monitoreo.');
-      setSubjects(res.subjects ?? []);
+      const nextSubjects = res.subjects ?? [];
+      setSubjects(nextSubjects);
+      return nextSubjects;
     } catch (e: any) {
       console.error('[ComplianceMonitoringPanel] load error', e);
       toast({ title: 'Monitoreo', description: e?.message ?? 'No se pudo cargar.', variant: 'destructive' });
+      return [];
     } finally {
       setLoading(false);
     }
@@ -189,23 +245,75 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
   const handleRefresh = () => {
     startRefresh(async () => {
       try {
-        // Si PJUD falla server-side, intentamos resolver config desde Companion/options y la enviamos.
-        const pjud = await getPjudConfig();
-        const forcedSources = pjud ? undefined : ['chilecompra_supplier']; // evita forzar PJUD si no hay config
-
+        // 1) Siempre: upsert de sujetos/links + otras fuentes server-side (on-demand, sin cron).
+        const otherSources = ['chilecompra_supplier'];
         const res = await fetch('/api/compliance/refresh-case', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ caseId, ...(pjud ? { pjud } : {}), ...(forcedSources ? { sources: forcedSources } : {}) }),
+          body: JSON.stringify({ caseId, sources: otherSources }),
         });
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.ok) {
           throw new Error(json?.error ?? `No se pudo actualizar (${res.status}).`);
         }
 
+        const current = await load();
+
+        // 2) PJUD via Companion: lookup por RUT en el browser (más robusto, on-demand).
+        const pjud = await getPjudConfig();
+        const canUseCompanion = Boolean(pjud);
+        if (canUseCompanion && current.length > 0) {
+          const lookups = await Promise.all(
+            current.map(async (s) => {
+              try {
+                const res = await companionRequest<{ rows: Record<string, any>[] }>(
+                  'LOOKUP',
+                  {
+                    rut: s.rut,
+                    contextValue: pjud!.contextValue,
+                    contextSelectName: pjud!.contextSelectName,
+                    ...(pjud!.courtValue ? { courtValue: pjud!.courtValue } : {}),
+                    ...(pjud!.courtSelectName ? { courtSelectName: pjud!.courtSelectName } : {}),
+                  },
+                  45000,
+                );
+
+                const normalized = (res?.rows ?? []).map(normalizeCauseRowFromTable);
+                return {
+                  subjectId: s.id,
+                  source: 'pjud_companion',
+                  summary: summarizeCauseRows(normalized),
+                  payload: { causes: normalized.slice(0, 200), via: 'companion' },
+                  error: null,
+                };
+              } catch (e: any) {
+                return {
+                  subjectId: s.id,
+                  source: 'pjud_companion',
+                  summary: { total_causes: 0, latest_date: null, distinct_courts: 0 },
+                  payload: { via: 'companion' },
+                  error: e?.message ?? 'Error consultando PJUD (Companion).',
+                };
+              }
+            }),
+          );
+
+          const ingestRes = await fetch('/api/compliance/ingest-snapshots', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ caseId, snapshots: lookups }),
+          });
+          const ingestJson = await ingestRes.json().catch(() => null);
+          if (!ingestRes.ok || !ingestJson?.ok) {
+            throw new Error(ingestJson?.error ?? `No se pudo guardar snapshots (${ingestRes.status}).`);
+          }
+        }
+
         toast({
           title: 'Monitoreo actualizado',
-          description: `Actualizado. Fuentes: ${(json.sources ?? []).join(', ') || '—'}.`,
+          description: `Actualizado. Fuentes: ${(json.sources ?? []).join(', ') || '—'}${
+            canUseCompanion ? ' + PJUD (Companion)' : ''
+          }.`,
         });
 
         await load();
@@ -277,7 +385,7 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
           ) : (
             <div className="space-y-2">
               {subjects.map((s) => {
-                const latest = pickSnapshot(s, 'pjud_ojv') ?? s.latest_snapshot;
+                const latest = pickSnapshot(s, 'pjud_companion') ?? pickSnapshot(s, 'pjud_ojv') ?? s.latest_snapshot;
                 const total = Number(latest?.summary?.total_causes ?? 0);
                 const latestDate = typeof latest?.summary?.latest_date === 'string' ? latest.summary.latest_date : null;
                 const lastFetched = latest?.fetched_at ? formatRelativeTime(latest.fetched_at) : null;
@@ -337,7 +445,7 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
               <div className="space-y-3">
                 {/* PJUD */}
                 {(() => {
-                  const snap = pickSnapshot(expanded, 'pjud_ojv');
+                  const snap = pickSnapshot(expanded, 'pjud_companion') ?? pickSnapshot(expanded, 'pjud_ojv');
                   if (!snap) return null;
                   if (snap.error) {
                     return (
@@ -349,7 +457,9 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
                   }
                   return (
                     <div className="space-y-3">
-                      <p className="text-xs text-foreground/55">PJUD · actualizado: {formatDate(snap.fetched_at)}</p>
+                      <p className="text-xs text-foreground/55">
+                        PJUD · actualizado: {formatDate(snap.fetched_at)} ({snap.source === 'pjud_companion' ? 'Companion' : 'Server'})
+                      </p>
                       <div className="space-y-2">
                         {(snap.payload?.causes ?? []).slice(0, 12).map((c: any, idx: number) => {
                           const sourceUrl = typeof c.sourceUrl === 'string' ? c.sourceUrl : null;
@@ -396,6 +506,13 @@ export function ComplianceMonitoringPanel({ caseId, canRefresh }: Props) {
                       )}
                     </div>
                   );
+                })()}
+
+                {(() => {
+                  const snap = pickSnapshot(expanded, 'pjud_ojv');
+                  if (!snap) return null;
+                  // If present, it's already rendered by unified PJUD block above; avoid duplicate.
+                  return null;
                 })()}
 
                 {/* ChileCompra */}
