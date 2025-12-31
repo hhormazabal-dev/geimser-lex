@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createServerClient } from '@/lib/supabase/server';
+import { AdminGlobalOrganizationMembersClient } from './AdminGlobalOrganizationMembersClient';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -52,6 +53,8 @@ export default async function AdminGlobalOrganizationMembersPage(props: { params
           </Link>
         </div>
       </div>
+
+      <AdminGlobalOrganizationMembersClient orgId={orgId} />
 
       <section className="rounded-xl border bg-white p-5">
         <div className="overflow-x-auto">
