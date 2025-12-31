@@ -16,12 +16,23 @@ import type { User as SupabaseAuthUser } from '@supabase/supabase-js';
 const ADMIN_USERS_PATH = '/dashboard/admin/users';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+type ProfileRowExtended = ProfileRow & {
+  active_organization_id?: string | null;
+  organization_id?: string | null;
+};
 type ServiceClient = ReturnType<typeof createServiceClient>;
 type AuthUserLite = {
   id: string;
   email: string | null;
   created_at: string | null;
   last_sign_in_at: string | null;
+};
+
+export type ManagedOrganization = {
+  id: string;
+  name: string;
+  status: 'active' | 'inactive';
+  isDefault: boolean;
 };
 
 export type ManagedUser = {
@@ -35,6 +46,8 @@ export type ManagedUser = {
   activo: boolean;
   createdAt: string | null;
   lastSignInAt: string | null;
+  activeOrganizationId: string | null;
+  organizationId: string | null;
 };
 
 export type ManagedUsersResult = {
@@ -43,7 +56,13 @@ export type ManagedUsersResult = {
   error?: string;
 };
 
-function mapRowToManagedUser(row: ProfileRow, authUser?: AuthUserLite | null): ManagedUser | null {
+export type ManagedOrganizationsResult = {
+  success: boolean;
+  organizations?: ManagedOrganization[];
+  error?: string;
+};
+
+function mapRowToManagedUser(row: ProfileRowExtended, authUser?: AuthUserLite | null): ManagedUser | null {
   const email = row.email ?? authUser?.email ?? null;
   if (!email) return null;
 
@@ -60,6 +79,8 @@ function mapRowToManagedUser(row: ProfileRow, authUser?: AuthUserLite | null): M
     activo: row.activo ?? true,
     createdAt: authUser?.created_at ?? row.created_at ?? null,
     lastSignInAt: authUser?.last_sign_in_at ?? null,
+    activeOrganizationId: row.active_organization_id ?? null,
+    organizationId: row.organization_id ?? null,
   };
 }
 
@@ -167,10 +188,12 @@ export async function fetchManagedUsers(): Promise<ManagedUsersResult> {
         rut,
         telefono,
         activo,
-        created_at
+        created_at,
+        active_organization_id,
+        organization_id
       `)
       .order('nombre', { ascending: true })
-      .returns<ProfileRow[]>();
+      .returns<ProfileRowExtended[]>();
 
     if (error) {
       console.error('[fetchManagedUsers] error', error);
@@ -199,6 +222,35 @@ export async function fetchManagedUsers(): Promise<ManagedUsersResult> {
   }
 }
 
+export async function fetchManagedOrganizations(): Promise<ManagedOrganizationsResult> {
+  try {
+    await ensureAdminAccess();
+    const supabase = await createServiceClient();
+
+    const { data, error } = await supabase
+      .from('organizations' as any)
+      .select('id, name, status, is_default')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('[fetchManagedOrganizations] error', error);
+      return { success: false, error: 'No se pudieron obtener las empresas' };
+    }
+
+    const organizations: ManagedOrganization[] = (data ?? []).map((row: any) => ({
+      id: String(row.id),
+      name: String(row.name ?? 'Empresa'),
+      status: (row.status === 'inactive' ? 'inactive' : 'active') as ManagedOrganization['status'],
+      isDefault: Boolean(row.is_default),
+    }));
+
+    return { success: true, organizations };
+  } catch (error) {
+    console.error('[fetchManagedOrganizations] unexpected', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error inesperado' };
+  }
+}
+
 export async function createManagedUser(formData: FormData): Promise<ManagedUsersResult> {
   try {
     await ensureAdminAccess();
@@ -210,6 +262,45 @@ export async function createManagedUser(formData: FormData): Promise<ManagedUser
     const rutValue = typeof rut === 'string' ? rut : null;
     const telefonoValue = typeof telefono === 'string' ? telefono : null;
     const activoValue = typeof activo === 'boolean' ? activo : true;
+    const rawOrganizationId = getStringValue(formData, 'organization_id') || undefined;
+    const organizationId = rawOrganizationId && rawOrganizationId.length > 0 ? rawOrganizationId : undefined;
+
+    if (organizationId && !isUuid(organizationId)) {
+      return { success: false, error: 'Empresa inválida' };
+    }
+
+    const serverSupabase = (await createServerClient()) as any;
+    const { data: authData } = await serverSupabase.auth.getUser();
+    const callerId = authData?.user?.id ?? null;
+    if (!callerId) return { success: false, error: 'No autenticado' };
+
+    if (organizationId) {
+      const { data: org, error: orgErr } = await serverSupabase
+        .from('organizations')
+        .select('id, status')
+        .eq('id', organizationId)
+        .maybeSingle();
+      if (orgErr) return { success: false, error: orgErr.message ?? 'No se pudo validar la empresa' };
+      if (!org?.id || org.status !== 'active') {
+        return { success: false, error: 'La empresa seleccionada no existe o está inactiva' };
+      }
+
+      const { data: isSuper, error: superErr } = await serverSupabase.rpc('is_super_admin');
+      if (superErr) return { success: false, error: 'No se pudieron validar permisos' };
+
+      if (!isSuper) {
+        const { data: callerMembership, error: memErr } = await serverSupabase
+          .from('org_members')
+          .select('role')
+          .eq('organization_id', organizationId)
+          .eq('user_id', callerId)
+          .maybeSingle();
+        if (memErr) return { success: false, error: 'No se pudieron validar permisos' };
+        if (!callerMembership || callerMembership.role !== 'org_admin') {
+          return { success: false, error: 'Sin permisos para asignar a esta empresa' };
+        }
+      }
+    }
 
     const supabase = await createServiceClient();
 
@@ -248,11 +339,159 @@ export async function createManagedUser(formData: FormData): Promise<ManagedUser
       return { success: false, error: 'No se pudo guardar el perfil del usuario' };
     }
 
+    if (organizationId) {
+      try {
+        if (role === 'cliente') {
+          const { error: orgAssignErr } = await supabase
+            .from('profiles')
+            .update({ organization_id: organizationId } as any)
+            .eq('user_id', userId);
+          if (orgAssignErr) throw orgAssignErr;
+        } else {
+          const { error: transferErr } = await serverSupabase.rpc('transfer_lawyer_to_org', {
+            p_user_id: userId,
+            p_new_org_id: organizationId,
+            p_mode: 'B',
+          });
+          if (transferErr) throw transferErr;
+        }
+      } catch (orgAssignError) {
+        console.error('[createManagedUser] org assignment error', orgAssignError);
+        await supabase.auth.admin.deleteUser(userId).catch(() => undefined);
+        try {
+          await supabase.from('profiles').delete().eq('user_id', userId);
+        } catch {
+          // ignore rollback failure
+        }
+        return {
+          success: false,
+          error:
+            orgAssignError instanceof Error
+              ? orgAssignError.message
+              : 'No se pudo asignar la empresa al usuario',
+          users: (await fetchManagedUsers()).users ?? [],
+        };
+      }
+    }
+
     revalidatePath(ADMIN_USERS_PATH);
     return fetchManagedUsers();
   } catch (error) {
     console.error('[createManagedUser] unexpected', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error inesperado al crear el usuario' };
+  }
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export async function updateManagedUserOrganization(
+  userId: string,
+  organizationId: string | null,
+  mode: 'A' | 'B' = 'A',
+): Promise<ManagedUsersResult & { transfer?: unknown }> {
+  try {
+    await ensureAdminAccess();
+
+    const trimmedOrgId = organizationId?.trim() || null;
+    if (trimmedOrgId && !isUuid(trimmedOrgId)) {
+      return { success: false, error: 'Empresa inválida' };
+    }
+
+    const service = await createServiceClient();
+    const { data: targetProfile, error: targetErr } = await service
+      .from('profiles')
+      .select('id, user_id, role')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (targetErr) {
+      console.error('[updateManagedUserOrganization] target profile error', targetErr);
+      return { success: false, error: 'No se pudo leer el usuario' };
+    }
+    if (!targetProfile?.user_id) return { success: false, error: 'Usuario no encontrado' };
+
+    const targetRole = String((targetProfile as any).role ?? 'cliente') as ManagedUserRole;
+
+    if (trimmedOrgId) {
+      const { data: org, error: orgErr } = await service
+        .from('organizations' as any)
+        .select('id, status')
+        .eq('id', trimmedOrgId)
+        .maybeSingle();
+      if (orgErr) {
+        console.error('[updateManagedUserOrganization] org lookup error', orgErr);
+        return { success: false, error: 'No se pudo validar la empresa' };
+      }
+      const orgRow = org as any;
+      if (!orgRow?.id || orgRow.status !== 'active') {
+        return { success: false, error: 'La empresa destino no existe o está inactiva' };
+      }
+    }
+
+    if (targetRole === 'cliente') {
+      const serverSupabase = (await createServerClient()) as any;
+      const { data: authData } = await serverSupabase.auth.getUser();
+      const callerId = authData?.user?.id ?? null;
+      if (!callerId) return { success: false, error: 'No autenticado' };
+
+      const { data: isSuper, error: superErr } = await serverSupabase.rpc('is_super_admin');
+      if (superErr) return { success: false, error: 'No se pudieron validar permisos' };
+
+      if (!trimmedOrgId && !isSuper) {
+        return { success: false, error: 'Solo el super admin puede dejar un cliente sin empresa' };
+      }
+
+      if (!isSuper && trimmedOrgId) {
+        const { data: callerMembership, error: memErr } = await serverSupabase
+          .from('org_members')
+          .select('role')
+          .eq('organization_id', trimmedOrgId)
+          .eq('user_id', callerId)
+          .maybeSingle();
+        if (memErr) return { success: false, error: 'No se pudieron validar permisos' };
+        if (!callerMembership || callerMembership.role !== 'org_admin') {
+          return { success: false, error: 'Sin permisos para asignar a esta empresa' };
+        }
+      }
+
+      const { error: updateErr } = await service
+        .from('profiles')
+        .update({ organization_id: trimmedOrgId } as any)
+        .eq('user_id', userId);
+
+      if (updateErr) {
+        console.error('[updateManagedUserOrganization] client update error', updateErr);
+        return { success: false, error: 'No se pudo reasignar la empresa del cliente' };
+      }
+
+      revalidatePath(ADMIN_USERS_PATH);
+      return fetchManagedUsers();
+    }
+
+    if (!trimmedOrgId) {
+      return { success: false, error: 'Los usuarios internos deben pertenecer a una empresa' };
+    }
+
+    const serverSupabase = (await createServerClient()) as any;
+    const { data: transfer, error: rpcErr } = await serverSupabase.rpc('transfer_lawyer_to_org', {
+      p_user_id: userId,
+      p_new_org_id: trimmedOrgId,
+      p_mode: mode,
+    });
+
+    if (rpcErr) {
+      console.error('[updateManagedUserOrganization] transfer rpc error', rpcErr);
+      return { success: false, error: rpcErr.message ?? 'No se pudo transferir el usuario' };
+    }
+
+    revalidatePath(ADMIN_USERS_PATH);
+    const refreshed = await fetchManagedUsers();
+    return { ...refreshed, transfer };
+  } catch (error) {
+    console.error('[updateManagedUserOrganization] unexpected', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error inesperado' };
   }
 }
 

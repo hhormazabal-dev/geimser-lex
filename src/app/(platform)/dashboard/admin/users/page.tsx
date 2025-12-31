@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getCurrentProfile } from '@/lib/auth/roles';
 import { createServerClient } from '@/lib/supabase/server';
-import { fetchManagedUsers } from '@/lib/actions/admin-users';
+import { fetchManagedOrganizations, fetchManagedUsers } from '@/lib/actions/admin-users';
 import { AdminUserManager } from '@/components/AdminUserManager';
 import { Button } from '@/components/ui/button';
 
@@ -30,6 +30,7 @@ export default async function AdminUsersPage() {
   }
 
   const usersResult = await fetchManagedUsers();
+  const orgsResult = await fetchManagedOrganizations();
 
   if (!usersResult.success) {
     return (
@@ -52,7 +53,10 @@ export default async function AdminUsersPage() {
       <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(191,219,254,0.28),_transparent_45%),radial-gradient(circle_at_bottom,_rgba(148,163,184,0.25),_transparent_45%)]' />
       <div className='absolute inset-x-0 top-0 mx-auto h-40 w-full max-w-4xl rounded-full bg-white/45 blur-3xl opacity-70' />
       <div className='relative z-10 mx-auto max-w-6xl'>
-        <AdminUserManager initialUsers={usersResult.users ?? []} />
+        <AdminUserManager
+          initialUsers={usersResult.users ?? []}
+          organizations={orgsResult.success ? orgsResult.organizations ?? [] : []}
+        />
       </div>
     </div>
   );
