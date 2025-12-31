@@ -7,6 +7,7 @@ import {
   Trash2,
   Users,
   UserCheck,
+  Building2,
   ShieldCheck,
   Shield,
   Target,
@@ -152,6 +153,12 @@ export function AdminUserManager({ initialUsers, organizations }: AdminUserManag
 
     return { total, byRole, inactive };
   }, [users]);
+
+  const orgStats = useMemo(() => {
+    const total = (organizations ?? []).length;
+    const inactive = (organizations ?? []).filter((org) => org.status !== 'active').length;
+    return { total, inactive, active: total - inactive };
+  }, [organizations]);
 
   const resetState = () => {
     setPendingState({ type: null });
@@ -385,7 +392,13 @@ export function AdminUserManager({ initialUsers, organizations }: AdminUserManag
           </Button>
         </div>
 
-        <div className='mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5'>
+        <div className='mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-6'>
+          <HighlightStat
+            title='Empresas'
+            value={orgStats.total}
+            subtitle={`${orgStats.active} activas · ${orgStats.inactive} inactivas`}
+            icon={<Building2 className='h-4 w-4 text-amber-500' />}
+          />
           <HighlightStat
             title='Usuarios activos'
             value={stats.total - stats.inactive}
