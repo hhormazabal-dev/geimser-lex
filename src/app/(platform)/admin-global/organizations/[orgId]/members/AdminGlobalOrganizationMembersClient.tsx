@@ -3,7 +3,13 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-export function AdminGlobalOrganizationMembersClient(props: { orgId: string }) {
+type LawyerOption = {
+  user_id: string;
+  nombre: string | null;
+  email: string | null;
+};
+
+export function AdminGlobalOrganizationMembersClient(props: { orgId: string; lawyers: LawyerOption[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -14,7 +20,7 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string }) {
   const [newLawyerName, setNewLawyerName] = useState('');
   const [newLawyerPassword, setNewLawyerPassword] = useState('');
 
-  const [assignEmail, setAssignEmail] = useState('');
+  const [assignUserId, setAssignUserId] = useState('');
   const [assignMode, setAssignMode] = useState<'A' | 'B'>('A');
 
   async function createLawyer() {
@@ -53,22 +59,22 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string }) {
     setMessage(null);
     setCreatedPassword(null);
 
-    const email = assignEmail.trim().toLowerCase();
-    if (!email) return setMessage('Email requerido');
+    const userId = assignUserId.trim();
+    if (!userId) return setMessage('Debes seleccionar un abogado');
 
     const res = await fetch('/api/admin-global/assign-lawyer', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         organizationId: props.orgId,
-        email,
+        userId,
         mode: assignMode,
       }),
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) return setMessage(json?.error ?? 'Error asignando abogado');
 
-    setAssignEmail('');
+    setAssignUserId('');
     setMessage('Traslado ejecutado');
     startTransition(() => router.refresh());
   }
@@ -139,13 +145,19 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string }) {
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <div className="md:col-span-2">
-            <label className="text-xs font-medium text-muted-foreground">Email</label>
-            <input
+            <label className="text-xs font-medium text-muted-foreground">Abogado</label>
+            <select
               className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-              value={assignEmail}
-              onChange={(e) => setAssignEmail(e.target.value)}
-              placeholder="abogado@dominio.com"
-            />
+              value={assignUserId}
+              onChange={(e) => setAssignUserId(e.target.value)}
+            >
+              <option value="">Selecciona…</option>
+              {props.lawyers.map((l) => (
+                <option key={l.user_id} value={l.user_id}>
+                  {(l.nombre ?? 'Sin nombre') + (l.email ? ` — ${l.email}` : '')}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="md:col-span-1">
             <label className="text-xs font-medium text-muted-foreground">Modo</label>
@@ -172,4 +184,3 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string }) {
     </div>
   );
 }
-

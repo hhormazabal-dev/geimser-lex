@@ -37,6 +37,13 @@ export default async function AdminGlobalOrganizationMembersPage(props: { params
 
   const profileByUserId = new Map<string, any>((profiles ?? []).map((p: any) => [p.user_id, p]));
 
+  const { data: lawyers } = await supabase
+    .from('profiles')
+    .select('user_id, nombre, email')
+    .eq('role', 'abogado')
+    .eq('activo', true)
+    .order('nombre', { ascending: true });
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-white p-5">
@@ -54,7 +61,7 @@ export default async function AdminGlobalOrganizationMembersPage(props: { params
         </div>
       </div>
 
-      <AdminGlobalOrganizationMembersClient orgId={orgId} />
+      <AdminGlobalOrganizationMembersClient orgId={orgId} lawyers={(lawyers ?? []) as any} />
 
       <section className="rounded-xl border bg-white p-5">
         <div className="overflow-x-auto">
