@@ -58,10 +58,10 @@ export default async function AdminGlobalOrganizationsPage({ searchParams }: Adm
     .order('name', { ascending: true })
     .limit(5000);
 
-  const { data: lawyers } = await supabase
+  const { data: internalUsers } = await supabase
     .from('profiles')
-    .select('id, user_id, nombre, email')
-    .eq('role', 'abogado')
+    .select('id, user_id, nombre, email, role')
+    .in('role', ['admin_firma', 'abogado', 'analista'])
     .eq('activo', true)
     .order('nombre', { ascending: true });
 
@@ -84,7 +84,7 @@ export default async function AdminGlobalOrganizationsPage({ searchParams }: Adm
       <AdminGlobalClient
         organizations={(organizations ?? []) as any}
         organizationOptions={(orgOptions ?? []) as any}
-        lawyers={(lawyers ?? []) as any}
+        internalUsers={(internalUsers ?? []) as any}
         pagination={{
           q,
           status,

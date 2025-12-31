@@ -37,7 +37,10 @@ export async function POST(req: Request) {
 
     if (profileErr) return jsonError(profileErr.message ?? 'Error buscando usuario', 500);
     if (!profile?.user_id) return jsonError('Usuario no encontrado', 404);
-    if (profile.role !== 'abogado') return jsonError('El usuario seleccionado no es abogado', 400);
+    const allowedRoles = new Set(['admin_firma', 'abogado', 'analista']);
+    if (!allowedRoles.has(String(profile.role))) {
+      return jsonError('Solo se pueden trasladar usuarios internos (admin_firma/abogado/analista)', 400);
+    }
 
     const { data: result, error: rpcErr } = await supabase.rpc('transfer_lawyer_to_org', {
       p_user_id: profile.user_id,

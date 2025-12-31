@@ -7,9 +7,10 @@ type LawyerOption = {
   user_id: string;
   nombre: string | null;
   email: string | null;
+  role: 'admin_firma' | 'abogado' | 'analista';
 };
 
-export function AdminGlobalOrganizationMembersClient(props: { orgId: string; lawyers: LawyerOption[] }) {
+export function AdminGlobalOrganizationMembersClient(props: { orgId: string; internalUsers: LawyerOption[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -139,22 +140,22 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; law
       </section>
 
       <section className="rounded-xl border bg-white p-5">
-        <h2 className="text-base font-semibold">Agregar / mover abogado a esta empresa</h2>
+        <h2 className="text-base font-semibold">Agregar / mover usuario interno a esta empresa</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Si el abogado ya existe, usa este formulario para moverlo a esta empresa.
+          Si el usuario ya existe, usa este formulario para moverlo a esta empresa.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <div className="md:col-span-2">
-            <label className="text-xs font-medium text-muted-foreground">Abogado</label>
+            <label className="text-xs font-medium text-muted-foreground">Usuario</label>
             <select
               className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
               value={assignUserId}
               onChange={(e) => setAssignUserId(e.target.value)}
             >
               <option value="">Selecciona…</option>
-              {props.lawyers.map((l) => (
+              {props.internalUsers.map((l) => (
                 <option key={l.user_id} value={l.user_id}>
-                  {(l.nombre ?? 'Sin nombre') + (l.email ? ` — ${l.email}` : '')}
+                  {(l.nombre ?? 'Sin nombre') + (l.email ? ` — ${l.email}` : '') + ` (${l.role})`}
                 </option>
               ))}
             </select>

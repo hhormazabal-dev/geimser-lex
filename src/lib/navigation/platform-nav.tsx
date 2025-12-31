@@ -55,6 +55,14 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
           group: 'Super Admin',
           keywords: ['compliance', 'monitoreo', 'pjud', 'fuentes'],
         },
+        {
+          href: '/dashboard/admin/users',
+          label: 'Mantenedor de usuarios',
+          description: 'Cuentas, roles y accesos',
+          icon: <Users className="h-4 w-4" />,
+          group: 'Super Admin',
+          keywords: ['usuarios', 'roles', 'permisos', 'equipo'],
+        },
       ];
 
   // Super admin: solo navegación de negocio (evita menús operativos).

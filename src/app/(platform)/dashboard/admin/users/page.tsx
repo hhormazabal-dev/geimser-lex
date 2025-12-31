@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getCurrentProfile } from '@/lib/auth/roles';
+import { createServerClient } from '@/lib/supabase/server';
 import { fetchManagedUsers } from '@/lib/actions/admin-users';
 import { AdminUserManager } from '@/components/AdminUserManager';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,10 @@ export default async function AdminUsersPage() {
     redirect('/login');
   }
 
-  if (profile.role !== 'admin_firma') {
+  const supabase = (await createServerClient()) as any;
+  const { data: isSuperAdmin } = await supabase.rpc('is_super_admin');
+
+  if (profile.role !== 'admin_firma' && !isSuperAdmin) {
     redirect(profile.role === 'analista' ? '/dashboard/analista' : '/dashboard/abogado');
   }
 

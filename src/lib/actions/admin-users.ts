@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import type { Database, ProfileInsert, ProfileUpdate } from '@/lib/supabase/types';
 import { requireAuth } from '@/lib/auth/roles';
 import {
@@ -65,7 +65,11 @@ function mapRowToManagedUser(row: ProfileRow, authUser?: AuthUserLite | null): M
 
 async function ensureAdminAccess() {
   const profile = await requireAuth();
-  if (profile.role !== 'admin_firma') throw new Error('Sin permisos administrativos');
+  if (profile.role !== 'admin_firma') {
+    const supabase = (await createServerClient()) as any;
+    const { data: isSuperAdmin } = await supabase.rpc('is_super_admin');
+    if (!isSuperAdmin) throw new Error('Sin permisos administrativos');
+  }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('Falta configurar SUPABASE_SERVICE_ROLE_KEY');

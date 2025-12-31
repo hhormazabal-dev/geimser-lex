@@ -19,11 +19,12 @@ type OrganizationRow = {
 
 type OrganizationOption = Pick<OrganizationRow, 'id' | 'name' | 'status' | 'is_default'>;
 
-type LawyerRow = {
+type InternalUserRow = {
   id: string;
   user_id: string;
   nombre: string;
   email: string;
+  role: 'admin_firma' | 'abogado' | 'analista';
 };
 
 type PaginationState = {
@@ -37,7 +38,7 @@ type PaginationState = {
 export function AdminGlobalClient(props: {
   organizations: OrganizationRow[];
   organizationOptions: OrganizationOption[];
-  lawyers: LawyerRow[];
+  internalUsers: InternalUserRow[];
   pagination: PaginationState;
 }) {
   const router = useRouter();
@@ -65,7 +66,7 @@ export function AdminGlobalClient(props: {
     () => props.organizationOptions ?? [],
     [props.organizationOptions],
   );
-  const lawyers = useMemo(() => props.lawyers ?? [], [props.lawyers]);
+  const internalUsers = useMemo(() => props.internalUsers ?? [], [props.internalUsers]);
 
   const [qInput, setQInput] = useState(props.pagination.q);
   const [statusInput, setStatusInput] = useState<PaginationState['status']>(props.pagination.status);
@@ -413,23 +414,23 @@ export function AdminGlobalClient(props: {
       </section>
 
       <section className="rounded-xl border bg-white p-5">
-        <h2 className="text-base font-semibold">Asignar / mover abogado</h2>
+        <h2 className="text-base font-semibold">Asignar / mover usuario interno</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Mueve al abogado a la empresa destino y migra datos según el modo elegido.
+          Mueve al usuario (admin/abogado/analista) a la empresa destino y migra datos según el modo elegido.
         </p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <div className="md:col-span-1">
-            <label className="text-xs font-medium text-muted-foreground">Abogado activo</label>
+            <label className="text-xs font-medium text-muted-foreground">Usuario activo</label>
             <select
               className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
               value={assignUserId}
               onChange={(e) => setAssignUserId(e.target.value)}
             >
               <option value="">Selecciona…</option>
-              {lawyers.map((l) => (
+              {internalUsers.map((l) => (
                 <option key={l.user_id} value={l.user_id}>
-                  {l.nombre} — {l.email}
+                  {l.nombre} — {l.email} ({l.role})
                 </option>
               ))}
             </select>
