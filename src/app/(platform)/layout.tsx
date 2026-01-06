@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { PlatformChrome } from '@/components/layout/PlatformChrome';
 import { getCurrentProfile, type Role } from '@/lib/auth/roles';
+import { isTransitionEmail } from '@/lib/auth/transition';
 import { buildSidebarItems } from '@/lib/navigation/platform-nav';
 import { createServerClient } from '@/lib/supabase/server';
 
@@ -27,10 +28,11 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
   const supabase = (await createServerClient()) as any;
   const { data: isSuperAdmin } = await supabase.rpc('is_super_admin');
 
-  if (!isSuperAdmin && role !== 'cliente' && !activeOrgId) {
+  if (!isSuperAdmin && !canTransition && role !== 'cliente' && !activeOrgId) {
     redirect('/select-org');
   }
-  const sidebarItems = buildSidebarItems(role, { isSuperAdmin: Boolean(isSuperAdmin) });
+  const canTransition = isTransitionEmail((profile as any)?.email ?? null);
+  const sidebarItems = buildSidebarItems(role, { isSuperAdmin: Boolean(isSuperAdmin), canTransition });
 
   const footerHint = (
     <div className="space-y-2">

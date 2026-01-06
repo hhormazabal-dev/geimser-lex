@@ -5,6 +5,7 @@ import {
   Building2,
   ClipboardList,
   Crown,
+  ArrowLeftRight,
   FolderOpen,
   Gavel,
   Inbox,
@@ -18,8 +19,22 @@ import {
   Wallet,
 } from 'lucide-react';
 
-export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean }): SidebarItem[] {
+export function buildSidebarItems(
+  role: Role,
+  opts?: { isSuperAdmin?: boolean; canTransition?: boolean },
+): SidebarItem[] {
   const isSuperAdmin = Boolean(opts?.isSuperAdmin);
+  const canTransition = Boolean(opts?.canTransition);
+  const transitionItem: SidebarItem | null = canTransition
+    ? {
+        href: '/transicion',
+        label: 'Transicion',
+        description: 'Reasigna casos entre empresas',
+        icon: <ArrowLeftRight className="h-4 w-4" />,
+        group: isSuperAdmin ? 'Super Admin' : 'Administración',
+        keywords: ['transicion', 'reasignar', 'casos', 'empresas'],
+      }
+    : null;
   const superAdminItems: SidebarItem[] = !isSuperAdmin
     ? []
     : [
@@ -63,13 +78,14 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
           group: 'Super Admin',
           keywords: ['usuarios', 'roles', 'permisos', 'equipo'],
         },
+        ...(transitionItem ? [transitionItem] : []),
       ];
 
   // Super admin: solo navegación de negocio (evita menús operativos).
   if (isSuperAdmin) return superAdminItems;
 
   if (role === 'admin_firma') {
-    return [
+    const items: SidebarItem[] = [
       {
         href: '/dashboard/admin',
         label: 'Panel ejecutivo',
@@ -176,10 +192,13 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
         keywords: ['preferencias', 'plantillas'],
       },
     ];
+
+    if (transitionItem) items.push(transitionItem);
+    return items;
   }
 
   if (role === 'abogado') {
-    return [
+    const items: SidebarItem[] = [
       ...superAdminItems,
       {
         href: '/dashboard/abogado',
@@ -238,10 +257,13 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
         keywords: ['compliance', 'monitoreo', 'rut'],
       },
     ];
+
+    if (transitionItem) items.push(transitionItem);
+    return items;
   }
 
   if (role === 'analista') {
-    return [
+    const items: SidebarItem[] = [
       ...superAdminItems,
       {
         href: '/dashboard/analista',
@@ -308,6 +330,9 @@ export function buildSidebarItems(role: Role, opts?: { isSuperAdmin?: boolean })
         keywords: ['compliance', 'monitoreo'],
       },
     ];
+
+    if (transitionItem) items.push(transitionItem);
+    return items;
   }
 
   // cliente/usuario
