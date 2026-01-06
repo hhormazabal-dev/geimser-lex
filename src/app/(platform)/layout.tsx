@@ -27,11 +27,11 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
   // Staff interno requiere empresa activa para aplicar RLS multi-tenant.
   const supabase = (await createServerClient()) as any;
   const { data: isSuperAdmin } = await supabase.rpc('is_super_admin');
+  const canTransition = isTransitionEmail((profile as any)?.email ?? null);
 
   if (!isSuperAdmin && !canTransition && role !== 'cliente' && !activeOrgId) {
     redirect('/select-org');
   }
-  const canTransition = isTransitionEmail((profile as any)?.email ?? null);
   const sidebarItems = buildSidebarItems(role, { isSuperAdmin: Boolean(isSuperAdmin), canTransition });
 
   const footerHint = (
