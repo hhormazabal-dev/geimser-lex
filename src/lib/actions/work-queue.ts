@@ -31,12 +31,12 @@ type WorkQueueRequest = {
 export type WorkQueueData = {
   overdueStages: WorkQueueStage[];
   dueNext7Days: WorkQueueStage[];
-  paymentBlocks: WorkQueueStage[];
+  paymentBlocks: WorkQueueStage[]; // legacy: se mantiene por compatibilidad (deprecado)
   pendingRequests: WorkQueueRequest[];
   stats: {
     overdueStages: number;
     dueNext7Days: number;
-    paymentBlocks: number;
+    paymentBlocks: number; // legacy
     pendingRequests: number;
   };
 };
@@ -55,9 +55,22 @@ async function getVisibleCaseIds() {
   if (role === 'admin_firma') return null as string[] | null;
 
   if (role === 'abogado') {
-    const { data, error } = await supabase.from('cases').select('id').eq('abogado_responsable', profile.id);
-    if (error) throw error;
-    return (data ?? []).map((row) => row.id);
+    const [{ data: ownedCases, error: ownedError }, { data: collabCases, error: collabError }] = await Promise.all([
+      supabase.from('cases').select('id').eq('abogado_responsable', profile.id),
+      supabase.from('case_collaborators').select('case_id').eq('abogado_id', profile.id),
+    ]);
+
+    if (ownedError) throw ownedError;
+    if (collabError) throw collabError;
+
+    const ids = new Set<string>();
+    for (const row of ownedCases ?? []) {
+      if (row?.id) ids.add(String(row.id));
+    }
+    for (const row of (collabCases ?? []) as Array<{ case_id?: string | null }>) {
+      if (row?.case_id) ids.add(String(row.case_id));
+    }
+    return Array.from(ids);
   }
 
   if (role === 'analista') {
@@ -123,14 +136,6 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
       .lte('fecha_programada', next7)
       .order('fecha_programada', { ascending: true });
 
-    const paymentQuery = supabase
-      .from('case_stages')
-      .select(baseStageSelect)
-      .neq('estado', 'completado')
-      .eq('requiere_pago', true)
-      .neq('estado_pago', 'pagado')
-      .order('fecha_programada', { ascending: true });
-
     const requestsQuery = supabase
       .from('info_requests')
       .select('id, titulo, estado, tipo, prioridad, fecha_limite, case:cases(id, caratulado)')
@@ -140,20 +145,17 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
     if (visibleCaseIds) {
       overdueQuery.in('case_id', visibleCaseIds);
       dueQuery.in('case_id', visibleCaseIds);
-      paymentQuery.in('case_id', visibleCaseIds);
       requestsQuery.in('case_id', visibleCaseIds);
     }
 
-    const [overdueRes, dueRes, paymentRes, requestsRes] = await Promise.all([
+    const [overdueRes, dueRes, requestsRes] = await Promise.all([
       overdueQuery,
       dueQuery,
-      paymentQuery,
       requestsQuery,
     ]);
 
     if (overdueRes.error) throw overdueRes.error;
     if (dueRes.error) throw dueRes.error;
-    if (paymentRes.error) throw paymentRes.error;
     if (requestsRes.error) throw requestsRes.error;
 
     const mapStage = (row: any): WorkQueueStage => ({
@@ -183,7 +185,7 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
 
     const overdueStages = (overdueRes.data ?? []).map(mapStage);
     const dueNext7Days = (dueRes.data ?? []).map(mapStage);
-    const paymentBlocks = (paymentRes.data ?? []).map(mapStage);
+    const paymentBlocks: WorkQueueStage[] = [];
     const pendingRequests = (requestsRes.data ?? []).map(mapRequest);
 
     return {
@@ -196,7 +198,7 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
         stats: {
           overdueStages: overdueStages.length,
           dueNext7Days: dueNext7Days.length,
-          paymentBlocks: paymentBlocks.length,
+          paymentBlocks: 0,
           pendingRequests: pendingRequests.length,
         },
       },

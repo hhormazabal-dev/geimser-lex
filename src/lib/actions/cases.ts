@@ -305,6 +305,9 @@ export async function createCase(input: CreateCaseInput) {
 
     revalidatePath('/cases');
     revalidatePath('/dashboard');
+    revalidatePath('/dashboard/abogado');
+    revalidatePath('/dashboard/admin');
+    revalidatePath('/dashboard/analista');
     return { success: true, case: newCase };
   } catch (error) {
     console.error('Error in createCase:', error);
@@ -650,6 +653,9 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
     revalidatePath(`/cases/${caseId}`);
     revalidatePath('/cases');
     revalidatePath('/dashboard');
+    revalidatePath('/dashboard/abogado');
+    revalidatePath('/dashboard/admin');
+    revalidatePath('/dashboard/analista');
 
     return { success: true, case: updatedCase };
   } catch (error) {

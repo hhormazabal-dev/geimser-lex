@@ -173,11 +173,9 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
 
     const supabase = await createServerClient();
 
-    let caseQuery = supabase.from('cases').select('*');
-    if (role === 'abogado') {
-      // Mantiene consistencia con la vista "Mis casos" (asignados).
-      caseQuery = caseQuery.eq('abogado_responsable', profile.id);
-    }
+    const caseQuery = supabase.from('cases').select('*');
+    // Para abogado/admin/analista confiamos en RLS (has_case_access) para traer
+    // todos los casos accesibles en la empresa activa, incluyendo colaboraciones.
 
     const { data: caseRows, error: casesError } = await caseQuery;
     if (casesError) throw casesError;
@@ -327,11 +325,7 @@ export async function getCasesByStatus(): Promise<{ success: boolean; data?: Cas
 
     const supabase = await createServerClient();
 
-    let query = supabase.from('cases').select('estado');
-
-    if (role === 'abogado') {
-      query = query.eq('abogado_responsable', profile.id);
-    }
+    const query = supabase.from('cases').select('estado');
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -373,11 +367,7 @@ export async function getCasesByMateria(): Promise<{ success: boolean; data?: Ca
 
     const supabase = await createServerClient();
 
-    let query = supabase.from('cases').select('materia');
-
-    if (role === 'abogado') {
-      query = query.eq('abogado_responsable', profile.id);
-    }
+    const query = supabase.from('cases').select('materia');
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -419,11 +409,7 @@ export async function getCasesByPriority(): Promise<{ success: boolean; data?: C
 
     const supabase = await createServerClient();
 
-    let query = supabase.from('cases').select('prioridad');
-
-    if (role === 'abogado') {
-      query = query.eq('abogado_responsable', profile.id);
-    }
+    const query = supabase.from('cases').select('prioridad');
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -469,11 +455,7 @@ export async function getCasesByWorkflowState(): Promise<{
 
     const supabase = await createServerClient();
 
-    let query = supabase.from('cases').select('workflow_state');
-
-    if (role === 'abogado') {
-      query = query.eq('abogado_responsable', profile.id);
-    }
+    const query = supabase.from('cases').select('workflow_state');
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -531,21 +513,16 @@ export async function getMonthlyStats(): Promise<{ success: boolean; data?: Mont
     startDate.setMonth(startDate.getMonth() - 11);
     startDate.setDate(1);
 
-    let newCasesQuery = supabase
+    const newCasesQuery = supabase
       .from('cases')
       .select('fecha_inicio, valor_estimado')
       .gte('fecha_inicio', startDate.toISOString());
 
-    let completedCasesQuery = supabase
+    const completedCasesQuery = supabase
       .from('cases')
       .select('updated_at, valor_estimado')
       .in('estado', ['terminado', 'terminado_desistido_demandante'])
       .gte('updated_at', startDate.toISOString());
-
-    if (role === 'abogado') {
-      newCasesQuery = newCasesQuery.eq('abogado_responsable', profile.id);
-      completedCasesQuery = completedCasesQuery.eq('abogado_responsable', profile.id);
-    }
 
     const [newCasesResult, completedCasesResult] = await Promise.all([newCasesQuery, completedCasesQuery]);
 
@@ -825,7 +802,8 @@ export async function getUpcomingDeadlines(): Promise<{ success: boolean; data?:
     const today = new Date();
     const todayIso = today.toISOString().slice(0, 10);
     const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 30);
+    // 90 días para cubrir: este mes, próximo mes, +2 meses.
+    futureDate.setDate(futureDate.getDate() + 90);
     const futureIso = futureDate.toISOString().slice(0, 10);
 
     const query = supabase
@@ -844,17 +822,10 @@ export async function getUpcomingDeadlines(): Promise<{ success: boolean; data?:
     const { data: stages, error } = await query;
     if (error) throw error;
 
-    // Filtrar por acceso según rol
+    // Filtrar por acceso según rol:
+    // confiamos en RLS (has_case_access) para devolver solo casos accesibles.
     const stageRows = (stages as Array<Record<string, any>> | null) ?? [];
-    let filteredStages = stageRows;
-
-    if (role === 'abogado') {
-      filteredStages = filteredStages.filter(
-        (stage) => (stage.case?.abogado_responsable as string | null) === profile.id
-      );
-    }
-
-    return { success: true, data: filteredStages };
+    return { success: true, data: stageRows };
   } catch (error) {
     console.error('Error getting upcoming deadlines:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };

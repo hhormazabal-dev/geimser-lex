@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowUpRight, Calendar, ClipboardList, CreditCard, FilePlus2, Inbox, Search, Timer, UserPlus } from 'lucide-react';
+import { ArrowUpRight, Calendar, ClipboardList, FilePlus2, Inbox, Search, Timer, UserPlus } from 'lucide-react';
 
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -13,13 +13,13 @@ import { useToast } from '@/hooks/use-toast';
 import type { WorkQueueData } from '@/lib/actions/work-queue';
 import { cn, formatDate, formatRelativeTime } from '@/lib/utils';
 
-type ViewKey = 'all' | 'overdue' | 'due' | 'payment' | 'requests';
+type ViewKey = 'all' | 'overdue' | 'due' | 'requests';
 type SavedView = { id: string; name: string; view: ViewKey; q: string };
 
 type NormalizedItem =
   | {
       type: 'stage';
-      bucket: 'overdue' | 'due' | 'payment';
+      bucket: 'overdue' | 'due';
       id: string;
       key: string;
       case_id: string;
@@ -63,9 +63,8 @@ function compareIsoAsc(a: string | null, b: string | null) {
 
 function bucketPriority(bucket: NormalizedItem['bucket']): number {
   if (bucket === 'overdue') return 0;
-  if (bucket === 'payment') return 1;
-  if (bucket === 'requests') return 2;
-  return 3;
+  if (bucket === 'requests') return 1;
+  return 2;
 }
 
 function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
@@ -86,23 +85,6 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
         ...(s.materia ? [{ label: s.materia, variant: 'outline' as const }] : []),
       ],
       hint: { label: 'Atención inmediata', tone: 'danger' as const },
-      href: `/cases/${s.case_id}`,
-    })),
-    ...data.paymentBlocks.map((s) => ({
-      type: 'stage' as const,
-      bucket: 'payment' as const,
-      id: s.stage_id,
-      key: `payment:${s.stage_id}`,
-      case_id: s.case_id,
-      title: s.caratulado,
-      subtitle: s.etapa,
-      dateLabel: s.fecha_programada ? `Bloqueado · ${formatDate(s.fecha_programada)}` : 'Bloqueado por pago',
-      dateIso: safeISO(s.fecha_programada),
-      chips: [
-        { label: `Pago: ${s.estado_pago}`, variant: 'warning' as const },
-        ...(s.prioridad ? [{ label: s.prioridad, variant: 'outline' as const }] : []),
-      ],
-      hint: { label: s.enlace_pago ? 'Link de pago disponible' : 'Sin link de pago', tone: 'warning' as const },
       href: `/cases/${s.case_id}`,
     })),
     ...data.dueNext7Days.map((s) => ({
@@ -160,7 +142,6 @@ function viewLabel(view: ViewKey) {
   if (view === 'all') return 'Todo';
   if (view === 'overdue') return 'Vencidos';
   if (view === 'due') return 'Próximos 7 días';
-  if (view === 'payment') return 'Bloqueos por pago';
   return 'Solicitudes';
 }
 
@@ -211,7 +192,7 @@ export function InboxConsole({
   }, [pathname, router, search, searchParams]);
 
   const views = useMemo(() => {
-    const focus = data.stats.overdueStages + data.stats.paymentBlocks + data.stats.pendingRequests;
+    const focus = data.stats.overdueStages + data.stats.pendingRequests;
     return [
       {
         key: 'all' as const,
@@ -235,13 +216,6 @@ export function InboxConsole({
         icon: <Calendar className="h-4 w-4" />,
       },
       {
-        key: 'payment' as const,
-        label: 'Pagos',
-        description: 'Bloqueados por cobro',
-        count: data.stats.paymentBlocks,
-        icon: <CreditCard className="h-4 w-4" />,
-      },
-      {
         key: 'requests' as const,
         label: 'Solicitudes',
         description: 'Pendientes del cliente',
@@ -249,7 +223,7 @@ export function InboxConsole({
         icon: <ClipboardList className="h-4 w-4" />,
       },
     ];
-  }, [data.stats.dueNext7Days, data.stats.overdueStages, data.stats.paymentBlocks, data.stats.pendingRequests]);
+  }, [data.stats.dueNext7Days, data.stats.overdueStages, data.stats.pendingRequests]);
 
   const items = useMemo(() => normalizeWorkQueue(data), [data]);
   const itemByKey = useMemo(() => new Map(items.map((i) => [i.key, i])), [items]);
@@ -451,8 +425,7 @@ export function InboxConsole({
         '1': 'all',
         '2': 'overdue',
         '3': 'due',
-        '4': 'payment',
-        '5': 'requests',
+        '4': 'requests',
       };
       const next = map[e.key];
       if (next) {

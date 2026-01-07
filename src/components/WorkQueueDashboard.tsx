@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import type { WorkQueueData } from '@/lib/actions/work-queue';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { formatDate } from '@/lib/utils';
-import { AlertTriangle, Calendar, CreditCard, FileText } from 'lucide-react';
+import { AlertTriangle, Calendar, FileText } from 'lucide-react';
 
 function StageList({
   title,
@@ -135,11 +135,10 @@ export function WorkQueueDashboard({
     <div className="space-y-8">
       <PageHeader eyebrow="Bandeja de trabajo" title={title} description={description} />
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[
             { label: 'Etapas vencidas', value: data.stats.overdueStages, icon: <AlertTriangle className='h-4 w-4' /> },
             { label: 'Próximos 7 días', value: data.stats.dueNext7Days, icon: <Calendar className='h-4 w-4' /> },
-            { label: 'Bloqueos de pago', value: data.stats.paymentBlocks, icon: <CreditCard className='h-4 w-4' /> },
             { label: 'Solicitudes', value: data.stats.pendingRequests, icon: <FileText className='h-4 w-4' /> },
           ].map((item) => (
             <Card key={item.label}>
@@ -170,12 +169,6 @@ export function WorkQueueDashboard({
             icon={<Calendar className="h-5 w-5 text-sky-600" />}
             items={data.dueNext7Days}
             emptyText='No hay etapas programadas para los próximos 7 días.'
-          />
-          <StageList
-            title='Bloqueos por pago'
-            icon={<CreditCard className="h-5 w-5 text-amber-600" />}
-            items={data.paymentBlocks}
-            emptyText='No hay etapas bloqueadas por pago.'
           />
           <RequestList items={data.pendingRequests} />
       </section>

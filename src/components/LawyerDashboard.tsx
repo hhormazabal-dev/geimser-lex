@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowRight, Briefcase, Calendar, Clock, FileText, Target } from 'lucide-react';
 
 import { QuickLinksPanel } from '@/components/QuickLinksPanel';
@@ -53,7 +55,24 @@ const PRIORITY_CHIPS: Record<string, string> = {
 };
 
 export function LawyerDashboard({ profile, data, cases, quickLinks, templates }: LawyerDashboardProps) {
+  const router = useRouter();
   const stats = data.stats;
+
+  useEffect(() => {
+    // Evita que el dashboard quede "pegado" al volver atrás desde /cases/... (BFCache / client cache).
+    router.refresh();
+
+    const onFocus = () => router.refresh();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') router.refresh();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [router]);
 
   if (!stats) {
     return (
@@ -73,14 +92,43 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const recentCases = [...cases]
     .sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))
     .slice(0, 6);
-  const deadlines = (data.upcomingDeadlines || []).slice(0, 5);
+  const allDeadlines = (data.upcomingDeadlines || []) as any[];
+  const deadlines = allDeadlines.slice(0, 5);
   const totalStatus = data.casesByStatus.reduce((acc, item) => acc + item.count, 0);
   const nextDeadline = deadlines.length > 0 ? deadlines[0] : null;
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIso = today.toISOString().slice(0, 10);
+  const thisMonth = today.getMonth();
+  const thisYear = today.getFullYear();
+
+  const bucketCounts = allDeadlines.reduce(
+    (acc, deadline) => {
+      const raw = deadline?.fecha_programada as string | null | undefined;
+      if (!raw) return acc;
+      const date = new Date(`${raw}T00:00:00`);
+      if (Number.isNaN(date.getTime())) return acc;
+
+      if (raw === todayIso) {
+        acc.today += 1;
+        return acc;
+      }
+
+      const m = date.getMonth();
+      const y = date.getFullYear();
+      if (y === thisYear && m === thisMonth) acc.thisMonth += 1;
+      else if (y === thisYear && m === thisMonth + 1) acc.nextMonth += 1;
+      else if (y === thisYear && m === thisMonth + 2) acc.plusTwoMonths += 1;
+      return acc;
+    },
+    { today: 0, thisMonth: 0, nextMonth: 0, plusTwoMonths: 0 },
+  );
+
   const heroDescription =
-    activeCases.length > 0
-      ? `Gestiona ${activeCases.length} caso${activeCases.length === 1 ? '' : 's'} activo${
-          activeCases.length === 1 ? '' : 's'
+    stats.activeCases > 0
+      ? `Gestiona ${stats.activeCases} caso${stats.activeCases === 1 ? '' : 's'} activo${
+          stats.activeCases === 1 ? '' : 's'
         } y mantén tus próximos compromisos bajo control.`
       : 'Activa tus primeros casos y configura recordatorios para no perder hitos clave.';
 
@@ -99,9 +147,9 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     },
     {
       label: 'Próximas etapas',
-      value: deadlines.length,
+      value: allDeadlines.length,
       icon: Calendar,
-      caption: 'Dentro de los próximos 30 días',
+      caption: 'Dentro de los próximos 90 días',
     },
     {
       label: 'Notas y documentos',
@@ -199,6 +247,25 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   <p className='mt-2 text-xl font-semibold text-slate-900'>{stats.overdueStages}</p>
                 </div>
               </div>
+
+              <div className='grid grid-cols-2 gap-3 text-xs text-slate-500'>
+                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
+                  <p className='text-[11px] uppercase tracking-[0.18em]'>Hoy</p>
+                  <p className='mt-2 text-xl font-semibold text-slate-900'>{bucketCounts.today}</p>
+                </div>
+                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
+                  <p className='text-[11px] uppercase tracking-[0.18em]'>Este mes</p>
+                  <p className='mt-2 text-xl font-semibold text-slate-900'>{bucketCounts.thisMonth}</p>
+                </div>
+                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
+                  <p className='text-[11px] uppercase tracking-[0.18em]'>Próximo mes</p>
+                  <p className='mt-2 text-xl font-semibold text-slate-900'>{bucketCounts.nextMonth}</p>
+                </div>
+                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
+                  <p className='text-[11px] uppercase tracking-[0.18em]'>En 2 meses</p>
+                  <p className='mt-2 text-xl font-semibold text-slate-900'>{bucketCounts.plusTwoMonths}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </section>
@@ -224,6 +291,28 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
               <div>
                 <CardTitle className='text-lg font-semibold text-slate-900'>Casos bajo tu responsabilidad</CardTitle>
                 <p className='text-sm text-slate-500'>Mantenlos al día para asegurar continuidad con tus clientes.</p>
+                {data.casesByStatus.length > 0 && (
+                  <div className='mt-3 flex flex-wrap gap-2'>
+                    {[
+                      { key: 'activo', label: 'Activos' },
+                      { key: 'terminado', label: 'Terminados' },
+                      { key: 'suspendido', label: 'Suspendidos' },
+                      { key: 'archivado', label: 'Archivados' },
+                    ].map((item) => {
+                      const match = data.casesByStatus.find((row) => row.status === item.key);
+                      const count = match?.count ?? 0;
+                      return (
+                        <span
+                          key={item.key}
+                          className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700'
+                        >
+                          <span className='text-slate-500'>{item.label}</span>
+                          <span className='font-semibold text-slate-900'>{count}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <Link href='/cases' className='text-sm font-medium text-sky-600 hover:text-sky-700'>
                 Ver todos
@@ -384,7 +473,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
               </CardHeader>
               <CardContent className='space-y-3 px-6 pb-6 pt-0'>
                 {deadlines.length === 0 ? (
-                  <p className='text-sm text-slate-500'>No hay etapas agendadas en los próximos 30 días.</p>
+                  <p className='text-sm text-slate-500'>No hay etapas agendadas en los próximos 90 días.</p>
                 ) : (
                   deadlines.map((deadline: any) => (
                     <div key={deadline.id} className='rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm'>
