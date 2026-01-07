@@ -194,7 +194,8 @@ export function buildSidebarItems(
     ];
 
     if (transitionItem) items.push(transitionItem);
-    return items;
+    // Nota: el mantenedor global de usuarios es solo para super_admin.
+    return items.filter((i) => i.href !== '/dashboard/admin/users');
   }
 
   if (role === 'abogado') {

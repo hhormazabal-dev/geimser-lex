@@ -147,10 +147,34 @@ export async function getCurrentProfile(): Promise<(ProfileRow & { role: Role })
   // RBAC (multi-rol): si existe, el rol efectivo es el de mayor prioridad.
   try {
     const supabase = (await createServerClient()) as any;
-    const { data, error } = await supabase.rpc('effective_global_role');
-    const candidate = String(data ?? '').trim() as Role;
-    if (!error && (['admin_firma', 'abogado', 'analista', 'cliente'] as const).includes(candidate as any)) {
-      effectiveRole = candidate;
+    const [{ data: isSuperAdmin }, { data: roleFromRbac, error: rbacErr }] = await Promise.all([
+      supabase.rpc('is_super_admin'),
+      supabase.rpc('effective_global_role'),
+    ]);
+
+    const rbacCandidate = String(roleFromRbac ?? '').trim() as Role;
+    if (!rbacErr && (['admin_firma', 'abogado', 'analista', 'cliente'] as const).includes(rbacCandidate as any)) {
+      effectiveRole = rbacCandidate;
+    }
+
+    // Contexto por empresa activa: el rol real para UI/permisos depende del membership en esa empresa.
+    // - org_admin => admin_firma
+    // - lawyer => abogado
+    // - staff => analista
+    // Super admin mantiene rol global.
+    const activeOrgId = (profile as any)?.active_organization_id ?? null;
+    if (!isSuperAdmin && effectiveRole !== 'cliente' && activeOrgId) {
+      const { data: membership } = await supabase
+        .from('org_members')
+        .select('role')
+        .eq('organization_id', activeOrgId)
+        .eq('user_id', profile.user_id)
+        .maybeSingle();
+
+      const orgRole = String(membership?.role ?? '');
+      if (orgRole === 'org_admin') effectiveRole = 'admin_firma';
+      else if (orgRole === 'lawyer') effectiveRole = 'abogado';
+      else if (orgRole === 'staff') effectiveRole = 'analista';
     }
   } catch {
     // ignore: RBAC aún no migrado o RPC no disponible

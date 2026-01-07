@@ -143,11 +143,9 @@ async function syncUserRbacRoles(service: ServiceClient, userId: string, roles: 
 
 async function ensureAdminAccess() {
   const profile = await requireAuth();
-  if (profile.role !== 'admin_firma') {
-    const supabase = (await createServerClient()) as any;
-    const { data: isSuperAdmin } = await supabase.rpc('is_super_admin');
-    if (!isSuperAdmin) throw new Error('Sin permisos administrativos');
-  }
+  const supabase = (await createServerClient()) as any;
+  const { data: isSuperAdmin } = await supabase.rpc('is_super_admin');
+  if (!isSuperAdmin) throw new Error('Sin permisos administrativos');
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('Falta configurar SUPABASE_SERVICE_ROLE_KEY');

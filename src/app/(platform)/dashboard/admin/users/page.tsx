@@ -25,8 +25,9 @@ export default async function AdminUsersPage() {
   const supabase = (await createServerClient()) as any;
   const { data: isSuperAdmin } = await supabase.rpc('is_super_admin');
 
-  if (profile.role !== 'admin_firma' && !isSuperAdmin) {
-    redirect(profile.role === 'analista' ? '/dashboard/analista' : '/dashboard/abogado');
+  // Este mantenedor es GLOBAL (riesgo alto): solo super_admin.
+  if (!isSuperAdmin) {
+    redirect(profile.role === 'analista' ? '/dashboard/analista' : profile.role === 'admin_firma' ? '/dashboard/admin' : '/dashboard/abogado');
   }
 
   const usersResult = await fetchManagedUsers();
