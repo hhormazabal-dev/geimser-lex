@@ -189,6 +189,18 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
       return (row.estado as string | null) ?? null;
     };
 
+    const effectiveCaseBucket = (row: Record<string, any>): 'active' | 'in_progress' | 'closed' | 'other' => {
+      const estado = effectiveCaseStatus(row) ?? null;
+      const workflow = (row.workflow_state as string | null) ?? null;
+      if (estado === 'archivado') return 'other';
+      if (estado === 'suspendido') return 'other';
+      if (estado === 'terminado' || estado === 'terminado_desistido_demandante') return 'closed';
+      if (workflow === 'cerrado') return 'closed';
+      if (workflow === 'activo') return 'active';
+      if (workflow === 'preparacion' || workflow === 'en_revision') return 'in_progress';
+      return 'other';
+    };
+
     const today = new Date().toISOString().slice(0, 10);
 
     const clientsPromise = (async () => {
@@ -236,10 +248,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
     if ((requestsResult as any).error) throw (requestsResult as any).error;
     if ((stagesResult as any).error) throw (stagesResult as any).error;
 
-    const activeCases = cases.filter((c) => {
-      const status = effectiveCaseStatus(c) ?? null;
-      return status === 'activo' || status === 'terminado_apelacion';
-    }).length;
+    const activeCases = cases.filter((c) => effectiveCaseBucket(c) === 'active').length;
     const completedCases = cases.filter((c) => {
       const status = effectiveCaseStatus(c) ?? null;
       return status === 'terminado' || status === 'terminado_desistido_demandante';
