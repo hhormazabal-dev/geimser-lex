@@ -168,7 +168,20 @@ export async function requireAuth(roles?: Role | Role[]) {
   if (!roles) return { ...profile, role };
 
   const allow: Role[] = Array.isArray(roles) ? roles : [roles];
-  if (!allow.includes(role)) throw new Error('Sin permisos');
+  if (!allow.includes(role)) {
+    try {
+      const supabase = (await createServerClient()) as any;
+      const { data: isSuperAdmin, error } = await supabase.rpc('is_super_admin');
+      if (error) {
+        console.warn('[AUTH] No se pudo verificar is_super_admin():', error);
+      } else if (isSuperAdmin) {
+        return { ...profile, role };
+      }
+    } catch (error) {
+      console.warn('[AUTH] Error verificando is_super_admin():', error);
+    }
+    throw new Error('Sin permisos');
+  }
   return { ...profile, role };
 }
 

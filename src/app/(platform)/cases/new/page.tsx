@@ -14,12 +14,9 @@ export const metadata: Metadata = {
 };
 
 export default async function NewCasePage() {
-  // Verificar que el usuario sea abogado o admin
+  // Verificar permisos para crear casos (super_admin también pasa).
   try {
-    const profile = await requireAuth();
-    if (!['abogado', 'admin_firma', 'analista'].includes(profile.role)) {
-      redirect('/dashboard');
-    }
+    const profile = await requireAuth(['abogado', 'admin_firma', 'analista']);
 
     const [lawyers, clients] = await Promise.all([
       getAssignableLawyers(),
