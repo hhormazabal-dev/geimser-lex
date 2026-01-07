@@ -159,12 +159,12 @@ export function buildSidebarItems(
         keywords: ['compliance', 'monitoreo', 'stakeholders', 'rut'],
       },
       {
-        href: '/dashboard/admin/users',
-        label: 'Equipo y permisos',
-        description: 'Roles, accesos y estados',
+        href: '/empresa/usuarios',
+        label: 'Usuarios',
+        description: 'Equipo de tu empresa',
         icon: <Users className="h-4 w-4" />,
         group: 'Administración',
-        keywords: ['usuarios', 'roles', 'permisos'],
+        keywords: ['usuarios', 'equipo', 'permisos'],
       },
       {
         href: '/empresa',
@@ -194,8 +194,7 @@ export function buildSidebarItems(
     ];
 
     if (transitionItem) items.push(transitionItem);
-    // Nota: el mantenedor global de usuarios es solo para super_admin.
-    return items.filter((i) => i.href !== '/dashboard/admin/users');
+    return items;
   }
 
   if (role === 'abogado') {
