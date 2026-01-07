@@ -6,6 +6,14 @@ import { formatRoleLabel } from '@/lib/navigation/role-label';
 import { Menu, Search, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { IndicatorsPill } from '@/components/layout/IndicatorsPill';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState, useTransition } from 'react';
+
+type OrgOption = {
+  id: string;
+  name: string;
+  status: 'active' | 'inactive';
+};
 
 export function AppTopbar({
   title,
@@ -13,15 +21,35 @@ export function AppTopbar({
   onOpenSidebar,
   onOpenCommandPalette,
   canCreateCase,
+  organizations,
+  activeOrgId,
 }: {
   title: string;
   profile: { nombre: string; role: string };
   onOpenSidebar: () => void;
   onOpenCommandPalette: () => void;
   canCreateCase: boolean;
+  organizations: OrgOption[];
+  activeOrgId: string | null;
 }) {
   const initials = getInitials(profile.nombre);
   const avatarBg = stringToColor(profile.nombre);
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [selectedOrgId, setSelectedOrgId] = useState(activeOrgId ?? '');
+
+  const orgs = useMemo(() => organizations ?? [], [organizations]);
+  const showOrgSwitcher = orgs.length > 1;
+
+  async function setActiveOrg(nextOrgId: string) {
+    const res = await fetch('/api/set-active-org', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ organizationId: nextOrgId }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(json?.error ?? 'Error cambiando empresa');
+  }
 
   return (
     <div className="sticky top-0 z-50 border-b border-white/20 bg-white/70 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/60">
@@ -43,6 +71,47 @@ export function AppTopbar({
         </div>
 
         <div className="flex items-center gap-2">
+          {showOrgSwitcher ? (
+            <div className="hidden items-center gap-2 rounded-2xl border border-white/20 bg-white/50 px-2 py-1.5 sm:flex">
+              <span className="pl-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/45">Empresa</span>
+              <select
+                className="h-9 max-w-[260px] rounded-xl border border-white/20 bg-white/70 px-3 text-sm text-foreground shadow-sm outline-none"
+                value={selectedOrgId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setSelectedOrgId(next);
+                  startTransition(() => {
+                    void setActiveOrg(next)
+                      .then(() => router.refresh())
+                      .catch(() => {
+                        // si falla, forzamos UI a recalcular desde server en refresh manual
+                        router.refresh();
+                      });
+                  });
+                }}
+                disabled={isPending}
+                aria-label="Cambiar empresa activa"
+              >
+                <option value="" disabled>
+                  Selecciona…
+                </option>
+                {orgs.map((o) => (
+                  <option key={o.id} value={o.id} disabled={o.status !== 'active'}>
+                    {o.name} {o.status !== 'active' ? '(inactiva)' : ''}
+                  </option>
+                ))}
+              </select>
+              <Button
+                asChild
+                size="sm"
+                variant="ghost"
+                className="h-9 rounded-xl border border-white/20 bg-white/60 px-3 text-xs text-foreground/70 hover:bg-white hover:text-foreground"
+              >
+                <Link href="/select-org">Ver todas</Link>
+              </Button>
+            </div>
+          ) : null}
+
           <button
             type="button"
             onClick={onOpenCommandPalette}

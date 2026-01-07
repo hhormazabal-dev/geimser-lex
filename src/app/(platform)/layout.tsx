@@ -23,6 +23,7 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
 
   const role = profile.role as Role;
   const activeOrgId = (profile as any)?.active_organization_id ?? null;
+  const userId = (profile as any)?.user_id ?? (profile as any)?.id ?? null;
 
   // Staff interno requiere empresa activa para aplicar RLS multi-tenant.
   const supabase = (await createServerClient()) as any;
@@ -33,6 +34,27 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
     redirect('/select-org');
   }
   const sidebarItems = buildSidebarItems(role, { isSuperAdmin: Boolean(isSuperAdmin), canTransition });
+
+  // Org switcher: lista empresas disponibles para el usuario (para cambiar contexto sin salir).
+  let organizations: Array<{ id: string; name: string; status: 'active' | 'inactive' }> = [];
+  if (isSuperAdmin) {
+    const { data } = await supabase
+      .from('organizations')
+      .select('id, name, status')
+      .order('created_at', { ascending: false });
+    organizations = (data ?? []) as any;
+  } else if (userId) {
+    const { data: memberships } = await supabase.from('org_members').select('organization_id').eq('user_id', userId);
+    const orgIds = Array.from(new Set((memberships ?? []).map((m: any) => m.organization_id).filter(Boolean)));
+    if (orgIds.length) {
+      const { data } = await supabase
+        .from('organizations')
+        .select('id, name, status')
+        .in('id', orgIds)
+        .order('created_at', { ascending: false });
+      organizations = (data ?? []) as any;
+    }
+  }
 
   const footerHint = (
     <div className="space-y-2">
@@ -56,7 +78,13 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.14),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.12),_transparent_50%)]" />
       <div className="absolute inset-x-0 top-0 -z-10 mx-auto h-32 w-full max-w-[1600px] rounded-full bg-white/50 blur-3xl opacity-70" />
 
-      <PlatformChrome items={sidebarItems} profile={sidebarProfile} footer={footerHint}>
+      <PlatformChrome
+        items={sidebarItems}
+        profile={sidebarProfile}
+        footer={footerHint}
+        organizations={organizations}
+        activeOrgId={activeOrgId}
+      >
         {children}
       </PlatformChrome>
     </div>

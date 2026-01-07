@@ -21,6 +21,9 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; int
   const [newLawyerName, setNewLawyerName] = useState('');
   const [newLawyerPassword, setNewLawyerPassword] = useState('');
 
+  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [addMemberRole, setAddMemberRole] = useState<'lawyer' | 'staff' | 'org_admin'>('lawyer');
+
   const [assignUserId, setAssignUserId] = useState('');
   const [assignMode, setAssignMode] = useState<'A' | 'B'>('A');
 
@@ -53,6 +56,30 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; int
     setNewLawyerName('');
     setNewLawyerPassword('');
     setMessage('Abogado creado y agregado a la empresa');
+    startTransition(() => router.refresh());
+  }
+
+  async function addMember() {
+    setMessage(null);
+    setCreatedPassword(null);
+
+    const email = addMemberEmail.trim().toLowerCase();
+    if (!email) return setMessage('Email requerido');
+
+    const res = await fetch('/api/admin-global/add-member', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        organizationId: props.orgId,
+        email,
+        role: addMemberRole,
+      }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) return setMessage(json?.error ?? 'Error agregando miembro');
+
+    setAddMemberEmail('');
+    setMessage('Miembro agregado (sin mover casos)');
     startTransition(() => router.refresh());
   }
 
@@ -140,9 +167,48 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; int
       </section>
 
       <section className="rounded-xl border bg-white p-5">
-        <h2 className="text-base font-semibold">Agregar / mover usuario interno a esta empresa</h2>
+        <h2 className="text-base font-semibold">Sumar miembro (sin mover casos)</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Si el usuario ya existe, usa este formulario para moverlo a esta empresa.
+          Para que una persona esté en 2 empresas a la vez (por ejemplo, Camila colabora con Álvaro pero también tiene su propia empresa).
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="md:col-span-2">
+            <label className="text-xs font-medium text-muted-foreground">Email</label>
+            <input
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              value={addMemberEmail}
+              onChange={(e) => setAddMemberEmail(e.target.value)}
+              placeholder="usuario@dominio.com"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <label className="text-xs font-medium text-muted-foreground">Rol en empresa</label>
+            <select
+              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              value={addMemberRole}
+              onChange={(e) => setAddMemberRole(e.target.value as any)}
+            >
+              <option value="lawyer">Abogado</option>
+              <option value="staff">Staff</option>
+              <option value="org_admin">Admin empresa</option>
+            </select>
+          </div>
+        </div>
+        <div className="mt-4">
+          <button
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            onClick={() => void addMember()}
+            disabled={isPending}
+          >
+            Agregar miembro
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-xl border bg-white p-5">
+        <h2 className="text-base font-semibold">Mover usuario interno a esta empresa (transferencia)</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Esto lo saca de su empresa anterior y puede mover casos. No usar para “colaborar” entre empresas.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <div className="md:col-span-2">

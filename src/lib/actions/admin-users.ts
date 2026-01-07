@@ -41,6 +41,7 @@ export type ManagedUser = {
   email: string;
   nombre: string;
   role: ManagedUserRole;
+  globalRoles: ManagedUserRole[];
   rut: string | null;
   telefono: string | null;
   activo: boolean;
@@ -74,6 +75,7 @@ function mapRowToManagedUser(row: ProfileRowExtended, authUser?: AuthUserLite | 
     email,
     nombre: row.nombre,
     role,
+    globalRoles: [role],
     rut: row.rut ?? null,
     telefono: row.telefono ?? null,
     activo: row.activo ?? true,
@@ -82,6 +84,61 @@ function mapRowToManagedUser(row: ProfileRowExtended, authUser?: AuthUserLite | 
     activeOrganizationId: row.active_organization_id ?? null,
     organizationId: row.organization_id ?? null,
   };
+}
+
+function getHighestRole(roles: ManagedUserRole[]): ManagedUserRole {
+  const priority: Record<ManagedUserRole, number> = {
+    admin_firma: 300,
+    abogado: 200,
+    analista: 100,
+    cliente: 0,
+  };
+  const unique = Array.from(new Set((roles ?? []).filter(Boolean))) as ManagedUserRole[];
+  const sorted = unique.sort((a, b) => (priority[b] ?? 0) - (priority[a] ?? 0));
+  return sorted[0] ?? 'cliente';
+}
+
+function parseGlobalRolesFromFormData(formData: FormData, primaryRole: ManagedUserRole): ManagedUserRole[] {
+  const raw = formData.getAll('global_roles').map((v) => String(v).trim()) as string[];
+  const roleSet = new Set<ManagedUserRole>();
+  roleSet.add(primaryRole);
+  for (const r of raw) {
+    if ((['admin_firma', 'abogado', 'analista', 'cliente'] as const).includes(r as any)) {
+      roleSet.add(r as ManagedUserRole);
+    }
+  }
+  return Array.from(roleSet);
+}
+
+async function syncUserRbacRoles(service: ServiceClient, userId: string, roles: ManagedUserRole[]) {
+  const uniqueRoles = Array.from(new Set((roles ?? []).filter(Boolean)));
+
+  const { data: existingRows, error: selErr } = await service
+    .from('rbac_user_roles' as any)
+    .select('role_key')
+    .eq('user_id', userId);
+  if (selErr) throw selErr;
+
+  const existing = new Set<string>((existingRows ?? []).map((r: any) => String(r.role_key)));
+  const desired = new Set<string>(uniqueRoles);
+
+  const toInsert = Array.from(desired).filter((r) => !existing.has(r));
+  const toDelete = Array.from(existing).filter((r) => !desired.has(r));
+
+  if (toInsert.length) {
+    const payload = toInsert.map((role_key) => ({ user_id: userId, role_key }));
+    const { error: insErr } = await service.from('rbac_user_roles' as any).insert(payload);
+    if (insErr) throw insErr;
+  }
+
+  if (toDelete.length) {
+    const { error: delErr } = await service
+      .from('rbac_user_roles' as any)
+      .delete()
+      .eq('user_id', userId)
+      .in('role_key', toDelete);
+    if (delErr) throw delErr;
+  }
 }
 
 async function ensureAdminAccess() {
@@ -214,6 +271,38 @@ export async function fetchManagedUsers(): Promise<ManagedUsersResult> {
     const users = (data ?? [])
       .map((row) => mapRowToManagedUser(row, authUserMap.get(row.user_id)))
       .filter((u): u is ManagedUser => Boolean(u));
+
+    // Attach RBAC global roles (multi-role). Fallback to profiles.role if RBAC table not present yet.
+    try {
+      const userIds = Array.from(new Set(users.map((u) => u.userId).filter(Boolean)));
+      if (userIds.length) {
+        const { data: rolesRows } = await supabase
+          .from('rbac_user_roles' as any)
+          .select('user_id, role_key')
+          .in('user_id', userIds);
+
+        const rolesByUser = new Map<string, ManagedUserRole[]>();
+        for (const rr of rolesRows ?? []) {
+          const uid = String((rr as any).user_id ?? '');
+          const roleKey = String((rr as any).role_key ?? '') as ManagedUserRole;
+          if (!uid || !roleKey) continue;
+          const current = rolesByUser.get(uid) ?? [];
+          current.push(roleKey);
+          rolesByUser.set(uid, current);
+        }
+
+        for (const u of users) {
+          const roles = rolesByUser.get(u.userId);
+          if (roles && roles.length) {
+            u.globalRoles = Array.from(new Set(roles));
+          } else {
+            u.globalRoles = [u.role];
+          }
+        }
+      }
+    } catch {
+      // ignore (RBAC not migrated yet)
+    }
 
     return { success: true, users: sortUsers(users) };
   } catch (error) {
@@ -374,6 +463,13 @@ export async function createManagedUser(formData: FormData): Promise<ManagedUser
       }
     }
 
+    // RBAC roles: by default assign primary role only (editable later).
+    try {
+      await syncUserRbacRoles(supabase, userId, [role]);
+    } catch (rbacErr) {
+      console.warn('[createManagedUser] RBAC sync skipped/failed:', rbacErr);
+    }
+
     revalidatePath(ADMIN_USERS_PATH);
     return fetchManagedUsers();
   } catch (error) {
@@ -503,6 +599,8 @@ export async function updateManagedUser(userId: string, formData: FormData): Pro
     if (!updateData) return { success: false, error: parsed.error ?? 'Datos inválidos' };
 
     const { email, password, role, nombre, rut, telefono, activo } = updateData;
+    const globalRoles = parseGlobalRolesFromFormData(formData, role);
+    const primaryRole = getHighestRole(globalRoles);
     const rutValue = typeof rut === 'string' ? rut : null;
     const telefonoValue = typeof telefono === 'string' ? telefono : null;
     const activoValue = typeof activo === 'boolean' ? activo : true;
@@ -512,8 +610,8 @@ export async function updateManagedUser(userId: string, formData: FormData): Pro
     const userUpdatePayload: Record<string, unknown> = {
       email,
       email_confirm: true,
-      app_metadata: { role: role as ManagedUserRole },
-      user_metadata: { nombre, role: role as ManagedUserRole },
+      app_metadata: { role: primaryRole as ManagedUserRole },
+      user_metadata: { nombre, role: primaryRole as ManagedUserRole },
     };
     if (password) userUpdatePayload.password = password;
 
@@ -523,7 +621,7 @@ export async function updateManagedUser(userId: string, formData: FormData): Pro
     const profileUpdatePayload: ProfileUpdate = {
       nombre: nombre as string,
       email: email as string,
-      role: role as ManagedUserRole,
+      role: primaryRole as ManagedUserRole,
       rut: rutValue,
       telefono: telefonoValue,
       activo: activoValue,
@@ -536,6 +634,13 @@ export async function updateManagedUser(userId: string, formData: FormData): Pro
     if (profileError) {
       console.error('[updateManagedUser] profile error', profileError);
       return { success: false, error: 'No se pudo actualizar el perfil del usuario' };
+    }
+
+    // RBAC: update multi-role assignment
+    try {
+      await syncUserRbacRoles(supabase, userId, globalRoles);
+    } catch (rbacErr) {
+      console.warn('[updateManagedUser] RBAC sync skipped/failed:', rbacErr);
     }
 
     revalidatePath(ADMIN_USERS_PATH);

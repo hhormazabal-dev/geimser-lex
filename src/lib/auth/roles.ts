@@ -142,7 +142,19 @@ export async function getCurrentProfile(): Promise<(ProfileRow & { role: Role })
   const profile = await ensureProfile();
   if (!profile) return null;
 
-  const effectiveRole = ((profile.role ?? 'cliente') as Role) ?? 'cliente';
+  let effectiveRole = ((profile.role ?? 'cliente') as Role) ?? 'cliente';
+
+  // RBAC (multi-rol): si existe, el rol efectivo es el de mayor prioridad.
+  try {
+    const supabase = (await createServerClient()) as any;
+    const { data, error } = await supabase.rpc('effective_global_role');
+    const candidate = String(data ?? '').trim() as Role;
+    if (!error && (['admin_firma', 'abogado', 'analista', 'cliente'] as const).includes(candidate as any)) {
+      effectiveRole = candidate;
+    }
+  } catch {
+    // ignore: RBAC aún no migrado o RPC no disponible
+  }
 
   console.warn('[ROLE DEBUG] getCurrentProfile()', {
     auth_id: profile.id,

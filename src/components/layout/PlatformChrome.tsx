@@ -8,6 +8,12 @@ import { AppTopbar } from '@/components/layout/AppTopbar';
 import { CommandPalette } from '@/components/layout/CommandPalette';
 import { SupportFab } from '@/components/layout/SupportFab';
 
+type OrgOption = {
+  id: string;
+  name: string;
+  status: 'active' | 'inactive';
+};
+
 function resolveTitle(pathname: string, items: SidebarItem[]): string {
   const candidates = items
     .filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`))
@@ -20,11 +26,15 @@ export function PlatformChrome({
   items,
   profile,
   footer,
+  organizations,
+  activeOrgId,
 }: {
   children: ReactNode;
   items: SidebarItem[];
   profile: { nombre: string; role: string; email: string | null };
   footer?: ReactNode;
+  organizations: OrgOption[];
+  activeOrgId: string | null;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -71,6 +81,8 @@ export function PlatformChrome({
           onOpenSidebar={() => setMobileOpen(true)}
           onOpenCommandPalette={() => setPaletteOpen(true)}
           canCreateCase={canCreateCase}
+          organizations={organizations}
+          activeOrgId={activeOrgId}
         />
 
         <main className="pb-12 pt-6">

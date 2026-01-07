@@ -20,6 +20,33 @@ interface EmailTemplate {
   text: string;
 }
 
+function calendarHtmlBlock(data: any): string {
+  const c = data?.calendar;
+  if (!c || (!c.ics_url && !c.google_url && !c.outlook_url)) return '';
+  return `
+    <div style="margin: 18px 0; padding: 16px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
+      <p style="margin: 0 0 10px 0; font-weight: 700;">📅 Agregar al calendario</p>
+      <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px;">Un clic y queda en tu agenda (ICS / Google / Outlook).</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        ${c.ics_url ? `<a href="${c.ics_url}" style="display:inline-block; background:#111827; color:#fff; padding:10px 14px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">Descargar .ics</a>` : ''}
+        ${c.google_url ? `<a href="${c.google_url}" style="display:inline-block; background:#2563eb; color:#fff; padding:10px 14px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">Google Calendar</a>` : ''}
+        ${c.outlook_url ? `<a href="${c.outlook_url}" style="display:inline-block; background:#0f766e; color:#fff; padding:10px 14px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">Outlook</a>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function calendarTextBlock(data: any): string {
+  const c = data?.calendar;
+  if (!c || (!c.ics_url && !c.google_url && !c.outlook_url)) return '';
+  return `
+Agregar al calendario:
+${c.ics_url ? `- ICS: ${c.ics_url}` : ''}
+${c.google_url ? `- Google: ${c.google_url}` : ''}
+${c.outlook_url ? `- Outlook: ${c.outlook_url}` : ''}
+`.trim();
+}
+
 const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
   magic_link: (data) => ({
     subject: `Acceso a tu caso en Xel Chile - ${data.case_name}`,
@@ -141,7 +168,8 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
                 <p><strong>Fecha:</strong> ${new Date(data.date).toLocaleDateString('es-CL')}</p>
               </div>
               
-              <p>Puedes ver más detalles accediendo al portal cliente.</p>
+              ${data.case_url ? `<p><a href="${data.case_url}" style="color:#059669; font-weight:600;">Ver detalles en LEX</a></p>` : '<p>Puedes ver más detalles accediendo al portal.</p>'}
+              ${calendarHtmlBlock(data)}
               
               <p>Saludos,<br>Tu equipo legal en Xel Chile</p>
             </div>
@@ -164,7 +192,9 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
       ${data.stage_name ? `Etapa: ${data.stage_name}` : ''}
       Fecha: ${new Date(data.date).toLocaleDateString('es-CL')}
       
-      Puedes ver más detalles en el portal cliente.
+      ${data.case_url ? `Ver detalles: ${data.case_url}` : 'Puedes ver más detalles en el portal.'}
+      
+      ${calendarTextBlock(data)}
       
       Saludos,
       Tu equipo legal en Xel Chile
@@ -208,6 +238,8 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
                 ${data.description ? `<p><strong>Descripción:</strong> ${data.description}</p>` : ''}
               </div>
               
+              ${data.case_url ? `<p><a href="${data.case_url}" style="color:#dc2626; font-weight:600;">Ver caso en LEX</a></p>` : ''}
+              ${calendarHtmlBlock(data)}
               <p>Es importante que estés al tanto de este vencimiento. Si tienes alguna pregunta, contacta a tu abogado.</p>
               
               <p>Saludos,<br>Tu equipo legal en Xel Chile</p>
@@ -231,6 +263,9 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
       Fecha límite: ${new Date(data.deadline).toLocaleDateString('es-CL')}
       Días restantes: ${data.days_remaining}
       ${data.description ? `Descripción: ${data.description}` : ''}
+      ${data.case_url ? `Ver caso: ${data.case_url}` : ''}
+      
+      ${calendarTextBlock(data)}
       
       Contacta a tu abogado si tienes alguna pregunta.
       
@@ -309,6 +344,59 @@ const EMAIL_TEMPLATES: Record<string, (data: any) => EmailTemplate> = {
       Tu equipo legal en Xel Chile
     `
   })
+  ,
+  overdue_stages_alert: (data) => ({
+    subject: `Alerta: ${data.overdue_count ?? 0} etapa(s) vencida(s)`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Etapas Vencidas</title>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #0f172a; color: white; padding: 20px; text-align: center; }
+            .content { padding: 30px 20px; background: #f9fafb; }
+            .item { background: white; padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 10px; margin: 10px 0; }
+            .footer { padding: 20px; text-align: center; color: #666; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⚖️ Xel Chile</h1>
+              <p>Etapas vencidas</p>
+            </div>
+            <div class="content">
+              <h2>🚨 Tienes etapas vencidas</h2>
+              <p>Resumen diario de etapas pendientes con fecha pasada.</p>
+              ${(Array.isArray(data.stages) ? data.stages : []).map((s: any) => `
+                <div class="item">
+                  <p style="margin:0; font-weight:700;">${s.case_name ?? 'Caso'}</p>
+                  <p style="margin:6px 0 0 0;"><strong>Etapa:</strong> ${s.stage_name ?? '-'}</p>
+                  <p style="margin:6px 0 0 0;"><strong>Fecha:</strong> ${s.deadline ? new Date(s.deadline).toLocaleDateString('es-CL') : '-'}</p>
+                </div>
+              `).join('')}
+              ${data.dashboard_url ? `<p style="margin-top:16px;"><a href="${data.dashboard_url}" style="color:#0f172a; font-weight:700;">Abrir bandeja</a></p>` : ''}
+              <p>Saludos,<br>LEX</p>
+            </div>
+            <div class="footer">
+              <p>Xel Chile - Sistema de Gestión Legal</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `
+Alerta de etapas vencidas
+
+Tienes ${data.overdue_count ?? 0} etapa(s) vencida(s).
+${Array.isArray(data.stages) ? data.stages.map((s: any) => `- ${s.case_name ?? 'Caso'} · ${s.stage_name ?? '-'} · ${s.deadline ? new Date(s.deadline).toLocaleDateString('es-CL') : '-'}`).join('\n') : ''}
+${data.dashboard_url ? `\nAbrir bandeja: ${data.dashboard_url}` : ''}
+    `.trim(),
+  }),
 };
 
 serve(async (req) => {

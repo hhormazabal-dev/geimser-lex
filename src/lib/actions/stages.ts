@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { getCurrentProfile, requireAuth, canAccessCase } from '@/lib/auth/roles';
 import { logAuditAction } from '@/lib/audit/log';
 import {
@@ -70,6 +70,189 @@ type CompleteStageDB = Partial<Pick<CaseStage, 'estado' | 'fecha_cumplida' | 'de
 
 async function getSB() {
   return createServerClient();
+}
+
+type CaseChangeSettings = {
+  case_change_emails_enabled: boolean;
+  calendar_links_enabled: boolean;
+  case_change_send_to_lawyer: boolean;
+  case_change_send_to_staff: boolean;
+  case_change_send_to_clients: boolean;
+};
+
+function defaultCaseChangeSettings(): CaseChangeSettings {
+  return {
+    case_change_emails_enabled: true,
+    calendar_links_enabled: true,
+    case_change_send_to_lawyer: true,
+    case_change_send_to_staff: false,
+    case_change_send_to_clients: true,
+  };
+}
+
+function buildCalendarLinks(args: {
+  token: string;
+  appUrl: string;
+  dateOnly: string;
+  title: string;
+  details: string;
+}) {
+  const start = args.dateOnly.split('-').join('');
+  const endDate = new Date(`${args.dateOnly}T00:00:00.000Z`);
+  endDate.setUTCDate(endDate.getUTCDate() + 1);
+  const end = `${endDate.getUTCFullYear()}${String(endDate.getUTCMonth() + 1).padStart(2, '0')}${String(endDate.getUTCDate()).padStart(2, '0')}`;
+
+  const google = new URL('https://calendar.google.com/calendar/render');
+  google.searchParams.set('action', 'TEMPLATE');
+  google.searchParams.set('text', args.title);
+  google.searchParams.set('dates', `${start}/${end}`);
+  google.searchParams.set('details', args.details);
+
+  const outlook = new URL('https://outlook.live.com/calendar/0/deeplink/compose');
+  outlook.searchParams.set('subject', args.title);
+  outlook.searchParams.set('startdt', `${args.dateOnly}T00:00:00Z`);
+  outlook.searchParams.set('enddt', `${args.dateOnly}T23:59:59Z`);
+  outlook.searchParams.set('body', args.details);
+
+  return {
+    ics_url: `${args.appUrl}/api/calendar/ics?token=${encodeURIComponent(args.token)}`,
+    google_url: google.toString(),
+    outlook_url: outlook.toString(),
+  };
+}
+
+async function sendNotificationEmail(to: string, template: string, data: Record<string, any>) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return;
+  try {
+    await fetch(`${url}/functions/v1/send-notification`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${anon}`,
+      },
+      body: JSON.stringify({ type: 'email', to, template, data }),
+    });
+  } catch (e) {
+    console.warn('[notifications] send failed', e);
+  }
+}
+
+async function notifyCaseChange(args: {
+  actorEmail?: string | null;
+  caseId: string;
+  stage: { id: string; etapa?: string | null; descripcion?: string | null; fecha_programada?: string | null; es_publica?: boolean | null };
+  updateType: string;
+  description: string;
+}) {
+  const svc = createServiceClient() as any;
+
+  const { data: caseRow } = await svc
+    .from('cases')
+    .select(
+      `
+        id,
+        caratulado,
+        organization_id,
+        abogado_responsable:profiles(email)
+      `
+    )
+    .eq('id', args.caseId)
+    .maybeSingle();
+
+  const orgId = String(caseRow?.organization_id ?? '');
+  if (!orgId) return;
+
+  const { data: settingsRow } = await svc
+    .from('organization_notification_settings')
+    .select('case_change_emails_enabled, calendar_links_enabled, case_change_send_to_lawyer, case_change_send_to_staff, case_change_send_to_clients')
+    .eq('organization_id', orgId)
+    .maybeSingle();
+
+  const settings: CaseChangeSettings = {
+    ...defaultCaseChangeSettings(),
+    ...(settingsRow ?? {}),
+  };
+  if (!settings.case_change_emails_enabled) return;
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://geimser-lex.vercel.app';
+  const caseUrl = `${appUrl}/cases/${args.caseId}`;
+  const actor = (args.actorEmail ?? '').trim().toLowerCase();
+
+  const recipients = new Set<string>();
+
+  if (settings.case_change_send_to_lawyer) {
+    const lawyerEmail = String(caseRow?.abogado_responsable?.email ?? '').trim().toLowerCase();
+    if (lawyerEmail) recipients.add(lawyerEmail);
+  }
+
+  if (settings.case_change_send_to_staff) {
+    const { data: members } = await svc
+      .from('org_members')
+      .select('user_id, role')
+      .eq('organization_id', orgId)
+      .in('role', ['org_admin', 'staff']);
+    const ids = Array.from(new Set((members ?? []).map((m: any) => m.user_id).filter(Boolean)));
+    if (ids.length) {
+      const { data: staffProfiles } = await svc.from('profiles').select('email, user_id').in('user_id', ids);
+      for (const p of staffProfiles ?? []) {
+        const email = String(p.email ?? '').trim().toLowerCase();
+        if (email) recipients.add(email);
+      }
+    }
+  }
+
+  const canNotifyClients = Boolean(args.stage.es_publica ?? true);
+  if (settings.case_change_send_to_clients && canNotifyClients) {
+    const { data: clients } = await svc
+      .from('case_clients')
+      .select('client_profile:profiles(email)')
+      .eq('case_id', args.caseId);
+    for (const row of clients ?? []) {
+      const email = String(row?.client_profile?.email ?? '').trim().toLowerCase();
+      if (email) recipients.add(email);
+    }
+  }
+
+  if (actor) recipients.delete(actor);
+  if (recipients.size === 0) return;
+
+  const stageName = args.stage.etapa ?? null;
+
+  let calendar: any = null;
+  const dateOnly = String(args.stage.fecha_programada ?? '').trim();
+  if (settings.calendar_links_enabled && dateOnly) {
+    const token = crypto.randomUUID();
+    const { error: tokErr } = await svc.from('calendar_event_tokens').insert({
+      token,
+      organization_id: orgId,
+      stage_id: args.stage.id,
+      recipient_email: null,
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90).toISOString(),
+    });
+    if (!tokErr) {
+      calendar = buildCalendarLinks({
+        token,
+        appUrl,
+        dateOnly,
+        title: `${caseRow?.caratulado ?? 'Caso'} · ${stageName ?? 'Hito'}`,
+        details: `${args.description}\n\nVer caso: ${caseUrl}`,
+      });
+    }
+  }
+
+  const data = {
+    case_name: caseRow?.caratulado ?? 'Caso',
+    update_type: args.updateType,
+    description: args.description,
+    stage_name: stageName,
+    date: new Date().toISOString(),
+    case_url: caseUrl,
+    calendar,
+  };
+
+  await Promise.all(Array.from(recipients).map((to) => sendNotificationEmail(to, 'case_update', data)));
 }
 
 function normalizeDateOnlyInput(value?: string | null) {
@@ -149,6 +332,20 @@ export async function createStage(input: CreateStageInput) {
       diff_json: { created: stageData },
     });
 
+    await notifyCaseChange({
+      actorEmail: (profile as any)?.email ?? null,
+      caseId: vi.case_id,
+      stage: {
+        id: newStage.id,
+        etapa: newStage.etapa ?? null,
+        descripcion: newStage.descripcion ?? null,
+        fecha_programada: newStage.fecha_programada ?? null,
+        es_publica: newStage.es_publica ?? true,
+      },
+      updateType: 'Nueva etapa',
+      description: `Se creó la etapa "${newStage.etapa}"${newStage.fecha_programada ? ` (fecha: ${newStage.fecha_programada})` : ''}.`,
+    });
+
     revalidatePath(`/cases/${vi.case_id}`);
     return { success: true, stage: newStage };
   } catch (error) {
@@ -224,6 +421,29 @@ export async function updateStage(stageId: string, input: UpdateStageInput) {
       diff_json: { from: existingStage, to: updatedStage },
     });
 
+    const changes: string[] = [];
+    if (existingStage.etapa !== updatedStage.etapa) changes.push(`etapa: "${existingStage.etapa}" → "${updatedStage.etapa}"`);
+    if (existingStage.estado !== updatedStage.estado) changes.push(`estado: ${existingStage.estado} → ${updatedStage.estado}`);
+    if (existingStage.fecha_programada !== updatedStage.fecha_programada) {
+      changes.push(`fecha: ${existingStage.fecha_programada ?? '—'} → ${updatedStage.fecha_programada ?? '—'}`);
+    }
+    if (existingStage.responsable_id !== updatedStage.responsable_id) changes.push('responsable actualizado');
+    if (existingStage.es_publica !== updatedStage.es_publica) changes.push(`visibilidad: ${existingStage.es_publica ? 'pública' : 'privada'} → ${updatedStage.es_publica ? 'pública' : 'privada'}`);
+
+    await notifyCaseChange({
+      actorEmail: (profile as any)?.email ?? null,
+      caseId: existingStage.case_id,
+      stage: {
+        id: updatedStage.id,
+        etapa: updatedStage.etapa ?? null,
+        descripcion: updatedStage.descripcion ?? null,
+        fecha_programada: updatedStage.fecha_programada ?? null,
+        es_publica: updatedStage.es_publica ?? true,
+      },
+      updateType: 'Etapa actualizada',
+      description: changes.length ? `Cambios: ${changes.join(' · ')}` : `Se actualizó la etapa "${updatedStage.etapa}".`,
+    });
+
     revalidatePath(`/cases/${existingStage.case_id}`);
     return { success: true, stage: updatedStage };
   } catch (error) {
@@ -294,6 +514,20 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
       entity_type: 'case_stage',
       entity_id: stageId,
       diff_json: { completed: updatePayload },
+    });
+
+    await notifyCaseChange({
+      actorEmail: (profile as any)?.email ?? null,
+      caseId: existingStage.case_id,
+      stage: {
+        id: updatedStage.id,
+        etapa: updatedStage.etapa ?? null,
+        descripcion: updatedStage.descripcion ?? null,
+        fecha_programada: updatedStage.fecha_programada ?? null,
+        es_publica: updatedStage.es_publica ?? true,
+      },
+      updateType: 'Etapa completada',
+      description: `Se completó la etapa "${updatedStage.etapa}" (cumplida: ${updatedStage.fecha_cumplida ?? 'hoy'}).`,
     });
 
     revalidatePath(`/cases/${existingStage.case_id}`);

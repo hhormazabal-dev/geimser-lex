@@ -650,7 +650,9 @@ export function AdminUserManager({ initialUsers, organizations }: AdminUserManag
                                       {user.activo ? 'Activo' : 'Inactivo'}
                                     </span>
                                     <span className='rounded-full bg-gray-100 px-2 py-0.5 text-xs uppercase tracking-wide text-gray-600'>
-                                      {formatRoleLabel(user.role)}
+                                      {Array.from(new Set([user.role, ...(user.globalRoles ?? [])]))
+                                        .map((r) => formatRoleLabel(r))
+                                        .join(' · ')}
                                     </span>
                                   </div>
                                   <div className='grid gap-1 text-muted-foreground md:grid-cols-2'>
@@ -834,6 +836,34 @@ export function AdminUserManager({ initialUsers, organizations }: AdminUserManag
                                 </option>
                               ))}
                             </select>
+                          </div>
+                          <div className='space-y-1 md:col-span-2 lg:col-span-3'>
+                            <Label>Roles globales (RBAC)</Label>
+                            <p className='text-xs text-muted-foreground'>
+                              Selecciona múltiples roles. El de mayor nivel queda como principal (compatibilidad).
+                            </p>
+                            <div className='mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4'>
+                              {managedUserRoles.map((role) => {
+                                const current = Array.from(new Set([user.role, ...(user.globalRoles ?? [])]));
+                                const checked = current.includes(role);
+                                return (
+                                  <label
+                                    key={role}
+                                    className='flex items-center gap-2 rounded-lg border border-white/30 bg-white px-3 py-2 text-sm'
+                                  >
+                                    <input
+                                      type='checkbox'
+                                      name='global_roles'
+                                      value={role}
+                                      defaultChecked={checked}
+                                      disabled={isPending}
+                                      className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+                                    />
+                                    <span>{formatRoleLabel(role)}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
                           </div>
                           <div className='space-y-1'>
                             <Label htmlFor={`edit-rut-${user.userId}`}>RUT</Label>
