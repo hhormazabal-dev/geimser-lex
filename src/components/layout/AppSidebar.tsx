@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  Star,
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -33,6 +34,8 @@ interface AppSidebarProps {
     role: string;
     email: string | null;
   };
+  organizations: Array<{ id: string; name: string; status: 'active' | 'inactive' }>;
+  activeOrgId: string | null;
   footer?: ReactNode;
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -40,20 +43,38 @@ interface AppSidebarProps {
   onMobileOpenChange: (open: boolean) => void;
 }
 
+function normalizeSectionName(group?: string | null) {
+  const g = String(group ?? '').trim();
+  if (!g) return 'General';
+  if (g === 'Principal') return 'Hoy';
+  if (['Operación', 'CRM', 'Finanzas', 'Comunicación', 'Herramientas'].includes(g)) return 'Trabajo';
+  return g;
+}
+
 function groupItems(items: SidebarItem[]) {
   const groups = new Map<string, SidebarItem[]>();
   for (const item of items) {
-    const key = item.group ?? 'General';
+    const key = normalizeSectionName(item.group);
     const current = groups.get(key) ?? [];
     current.push(item);
     groups.set(key, current);
   }
-  return Array.from(groups.entries());
+  const order = ['Favoritos', 'Hoy', 'Trabajo', 'Administración', 'Super Admin', 'General'];
+  return Array.from(groups.entries()).sort((a, b) => {
+    const ia = order.indexOf(a[0]);
+    const ib = order.indexOf(b[0]);
+    if (ia === -1 && ib === -1) return a[0].localeCompare(b[0], 'es');
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 }
 
 export function AppSidebar({
   items,
   profile,
+  organizations,
+  activeOrgId,
   footer,
   collapsed,
   onToggleCollapsed,
@@ -62,6 +83,15 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const [query, setQuery] = useState('');
+  const [pinned, setPinned] = useState<string[]>(() => {
+    try {
+      const raw = window.localStorage.getItem('xel.sidebarPinned');
+      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -78,55 +108,88 @@ export function AppSidebar({
             .toLowerCase();
           return haystack.includes(q);
         });
-    return groupItems(filtered);
-  }, [items, query]);
+    const pinnedSet = new Set(pinned);
+    const pinnedItems = q ? [] : filtered.filter((i) => pinnedSet.has(i.href));
+    const rest = q ? filtered : filtered.filter((i) => !pinnedSet.has(i.href));
+    const grouped = groupItems(rest);
+    return pinnedItems.length ? [['Favoritos', pinnedItems] as const, ...grouped] : grouped;
+  }, [items, query, pinned]);
+
+  const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
+  const savePinned = (next: string[]) => {
+    setPinned(next);
+    try {
+      window.localStorage.setItem('xel.sidebarPinned', JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
+  const togglePin = (href: string) => {
+    const next = pinnedSet.has(href) ? pinned.filter((h) => h !== href) : [href, ...pinned].slice(0, 6);
+    savePinned(next);
+  };
 
   const initials = getInitials(profile.nombre);
   const avatarBg = stringToColor(profile.nombre);
+  const activeOrg = useMemo(
+    () => (activeOrgId ? organizations.find((o) => o.id === activeOrgId) ?? null : null),
+    [organizations, activeOrgId]
+  );
 
   const renderLink = (item: SidebarItem) => {
     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    const isPinned = pinnedSet.has(item.href);
     return (
-      <Link
-        key={item.href}
-        href={item.href}
-        onClick={() => onMobileOpenChange(false)}
-        title={collapsed ? item.label : undefined}
-        aria-current={isActive ? 'page' : undefined}
-        className={cn(
-          'group relative flex items-start gap-3 rounded-2xl border border-white/10 bg-white/20 px-3 py-2.5 transition-all hover:border-primary/30 hover:bg-primary/10',
-          isActive && 'border-primary/40 bg-primary/15 shadow-sm',
-          collapsed && 'justify-center px-2',
-        )}
-      >
-        <span
+      <div key={item.href} className={cn('group flex items-stretch gap-2', collapsed && 'justify-center')}>
+        <Link
+          href={item.href}
+          onClick={() => onMobileOpenChange(false)}
+          title={collapsed ? item.label : undefined}
+          aria-current={isActive ? 'page' : undefined}
           className={cn(
-            'mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/50 text-foreground/70 transition-colors group-hover:text-foreground',
-            isActive && 'bg-primary/10 text-primary',
+            'relative flex flex-1 items-start gap-3 rounded-2xl border border-white/10 bg-white/20 px-3 py-2.5 transition-all hover:border-primary/30 hover:bg-primary/10',
+            isActive && 'border-primary/40 bg-primary/15 shadow-sm',
+            collapsed && 'flex-none justify-center px-2',
           )}
         >
-          {item.icon}
-        </span>
-        {!collapsed && (
-          <span className="min-w-0 flex-1 text-sm leading-snug">
-            <span className="flex items-center gap-2">
-              <span className={cn('truncate font-medium', isActive && 'text-primary')}>
-                {item.label}
-              </span>
-              {item.badge && (
-                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                  {item.badge}
-                </span>
-              )}
-            </span>
-            {item.description && (
-              <span className="mt-0.5 block truncate text-xs text-foreground/60">
-                {item.description}
-              </span>
+          <span
+            className={cn(
+              'mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/50 text-foreground/70 transition-colors group-hover:text-foreground',
+              isActive && 'bg-primary/10 text-primary',
             )}
+          >
+            {item.icon}
           </span>
-        )}
-      </Link>
+          {!collapsed && (
+            <span className="min-w-0 flex-1 text-sm leading-snug">
+              <span className="flex items-center gap-2">
+                <span className={cn('truncate font-medium', isActive && 'text-primary')}>{item.label}</span>
+                {item.badge && (
+                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                    {item.badge}
+                  </span>
+                )}
+              </span>
+              {item.description && <span className="mt-0.5 block truncate text-xs text-foreground/60">{item.description}</span>}
+            </span>
+          )}
+        </Link>
+
+        {!collapsed ? (
+          <button
+            type="button"
+            onClick={() => togglePin(item.href)}
+            className={cn(
+              'hidden w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/20 text-foreground/55 transition hover:bg-white/50 hover:text-foreground group-hover:inline-flex',
+              isPinned && 'inline-flex text-primary'
+            )}
+            aria-label={isPinned ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+            title={isPinned ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+          >
+            <Star className={cn('h-4 w-4', isPinned && 'fill-primary')} />
+          </button>
+        ) : null}
+      </div>
     );
   };
 
@@ -160,6 +223,26 @@ export function AppSidebar({
 
       {!collapsed && (
         <div className="pb-4">
+          <div className="mb-4 rounded-2xl border border-white/20 bg-white/45 px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-foreground/45">Contexto</p>
+            <div className="mt-2 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {activeOrg?.name ?? 'Sin empresa activa'}
+                </p>
+                <p className="text-xs text-foreground/55">
+                  {formatRoleLabel(profile.role)}
+                  {activeOrg?.status === 'inactive' ? ' · inactiva' : ''}
+                </p>
+              </div>
+              <Link
+                href="/select-org"
+                className="rounded-xl border border-white/20 bg-white/60 px-3 py-2 text-xs font-semibold text-foreground/70 shadow-sm transition hover:bg-white hover:text-foreground"
+              >
+                Cambiar
+              </Link>
+            </div>
+          </div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/45" />
             <input
@@ -177,9 +260,7 @@ export function AppSidebar({
           {filteredGroups.map(([group, groupItems]) => (
             <section key={group} className="space-y-2">
               {!collapsed && (
-                <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-foreground/45">
-                  {group}
-                </p>
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-foreground/45">{group}</p>
               )}
               <div className="space-y-2">{groupItems.map(renderLink)}</div>
             </section>

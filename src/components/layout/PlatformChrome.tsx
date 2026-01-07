@@ -67,6 +67,8 @@ export function PlatformChrome({
       <AppSidebar
         items={items}
         profile={profile}
+        organizations={organizations}
+        activeOrgId={activeOrgId}
         footer={footer}
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
