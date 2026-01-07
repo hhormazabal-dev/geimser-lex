@@ -996,7 +996,12 @@ export function CaseForm({
             : 'preparacion',
       };
 
-      const shouldCreateThenAttachTermino = !existingCase && payload.estado === 'terminado' && Boolean(terminoFile);
+      const terminoFileFromAttachments =
+        !terminoFile && payload.estado === 'terminado' && selectedFiles.length > 0 ? selectedFiles[0] : null;
+      const effectiveTerminoFile = terminoFile ?? terminoFileFromAttachments;
+      const attachmentsToUpload = terminoFileFromAttachments ? selectedFiles.slice(1) : selectedFiles;
+      const shouldCreateThenAttachTermino =
+        !existingCase && payload.estado === 'terminado' && Boolean(effectiveTerminoFile);
 
       // Regla de negocio: si el caso se marca como "Terminado", debe existir un documento de término asociado.
       // Para edición, subimos el archivo y guardamos su ID en `termino_documento_id` antes de llamar al server action.
@@ -1004,7 +1009,7 @@ export function CaseForm({
         const legacyNoDoc = Boolean((existingCase as any)?.termino_sin_documento);
         if (!legacyNoDoc) {
           if (!existingCase) {
-            if (!terminoFile) {
+            if (!effectiveTerminoFile) {
               toast({
                 title: 'Documento requerido',
                 description: 'Debes adjuntar un documento de término para guardar el estado “Terminado”.',
@@ -1013,6 +1018,14 @@ export function CaseForm({
               setIsLoading(false);
               return;
             }
+          } else if (!payload.termino_documento_id && !effectiveTerminoFile && !terminoDocumentoId) {
+            toast({
+              title: 'Documento requerido',
+              description: 'Debes adjuntar un documento de término para guardar el estado “Terminado”.',
+              variant: 'destructive',
+            });
+            setIsLoading(false);
+            return;
           }
 
           let terminoId = (payload.termino_documento_id as string | null | undefined) ?? null;
@@ -1020,11 +1033,11 @@ export function CaseForm({
             terminoId = terminoDocumentoId;
           }
 
-          if (terminoFile && existingCase) {
+          if (effectiveTerminoFile && existingCase) {
             const formData = new FormData();
             formData.append('case_id', existingCase.id);
-            formData.append('file', terminoFile);
-            formData.append('nombre', terminoFile.name);
+            formData.append('file', effectiveTerminoFile);
+            formData.append('nombre', effectiveTerminoFile.name);
             formData.append('visibilidad', 'privado');
 
             const uploadResult = await uploadDocument(formData);
@@ -1042,7 +1055,7 @@ export function CaseForm({
             setValue('termino_documento_id', terminoId as any, { shouldDirty: true, shouldValidate: false });
           }
 
-          if (!terminoId) {
+          if (!terminoId && existingCase) {
             toast({
               title: 'Documento requerido',
               description: 'Debes adjuntar un documento de término para guardar el estado “Terminado”.',
@@ -1052,7 +1065,9 @@ export function CaseForm({
             return;
           }
 
-          payload.termino_documento_id = terminoId as any;
+          if (terminoId) {
+            payload.termino_documento_id = terminoId as any;
+          }
         }
       }
 
@@ -1082,11 +1097,11 @@ export function CaseForm({
 
         const createdCaseId = (result as { case?: { id: string } }).case?.id;
 
-        if (!existingCase && shouldCreateThenAttachTermino && createdCaseId && terminoFile) {
+        if (!existingCase && shouldCreateThenAttachTermino && createdCaseId && effectiveTerminoFile) {
           const formData = new FormData();
           formData.append('case_id', createdCaseId);
-          formData.append('file', terminoFile);
-          formData.append('nombre', terminoFile.name);
+          formData.append('file', effectiveTerminoFile);
+          formData.append('nombre', effectiveTerminoFile.name);
           formData.append('visibilidad', 'privado');
 
           const uploadResult = await uploadDocument(formData);
@@ -1114,12 +1129,12 @@ export function CaseForm({
           resetTerminoFileSelection();
         }
 
-        if (!existingCase && selectedFiles.length > 0) {
+        if (!existingCase && attachmentsToUpload.length > 0) {
           if (createdCaseId) {
             let successfulUploads = 0;
             const failedUploads: Array<{ fileName: string; message?: string }> = [];
 
-            for (const file of selectedFiles) {
+            for (const file of attachmentsToUpload) {
               const formData = new FormData();
               formData.append('case_id', createdCaseId);
               formData.append('file', file);
