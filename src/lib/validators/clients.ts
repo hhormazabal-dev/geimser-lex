@@ -16,6 +16,7 @@ export const createClientSchema = z.object({
     .string()
     .max(50, 'El teléfono no puede exceder 50 caracteres')
     .optional(),
+  require_biometric: z.boolean().optional(),
 });
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;

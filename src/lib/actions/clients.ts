@@ -90,6 +90,18 @@ export async function createClientProfile(input: CreateClientInput): Promise<Cre
       throw new Error(profileError?.message ?? 'No se pudo guardar el perfil del cliente');
     }
 
+    await (supabase as any)
+      .from('didit_profile_settings')
+      .upsert(
+        {
+          profile_id: userId,
+          organization_id: activeOrgId,
+          require_biometric: Boolean((payload as any).require_biometric),
+        },
+        { onConflict: 'profile_id' },
+      )
+      .throwOnError();
+
     revalidatePath('/cases/new');
     revalidatePath('/dashboard/analista');
     revalidatePath('/clients');

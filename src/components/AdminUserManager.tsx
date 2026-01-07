@@ -14,6 +14,7 @@ import {
   Search,
   XCircle,
   Plus,
+  Loader2,
 } from 'lucide-react';
 import {
   createManagedUser,
@@ -24,6 +25,7 @@ import {
   type ManagedOrganization,
   type ManagedUser,
 } from '@/lib/actions/admin-users';
+import { startDiditVerification } from '@/lib/actions/didit-verification';
 import { managedUserRoles } from '@/lib/validators/admin-users';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -68,6 +70,7 @@ export function AdminUserManager({ initialUsers, organizations }: AdminUserManag
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [pendingState, setPendingState] = useState<PendingState>({ type: null });
+  const [verifyingUserId, setVerifyingUserId] = useState<string | null>(null);
   const [orgDraftByUserId, setOrgDraftByUserId] = useState<Record<string, string>>({});
   const [transferModeByUserId, setTransferModeByUserId] = useState<Record<string, 'A' | 'B'>>({});
 
@@ -162,6 +165,38 @@ export function AdminUserManager({ initialUsers, organizations }: AdminUserManag
 
   const resetState = () => {
     setPendingState({ type: null });
+  };
+
+  const handleStartIdentityVerification = async (user: ManagedUser) => {
+    setVerifyingUserId(user.userId);
+    try {
+      const result = await startDiditVerification(user.userId);
+      if (!result.success) {
+        toast({ title: 'No se pudo iniciar la validación', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(result.url);
+      } catch {
+        // ignore
+      }
+
+      window.open(result.url, '_blank', 'noopener,noreferrer');
+      toast({
+        title: 'Validación iniciada',
+        description: 'Se abrió el enlace de Didit (y quedó copiado al portapapeles si el navegador lo permite).',
+      });
+    } catch (error) {
+      console.error('Error starting identity verification', error);
+      toast({
+        title: 'Error inesperado',
+        description: 'No fue posible iniciar la validación de identidad.',
+        variant: 'destructive',
+      });
+    } finally {
+      setVerifyingUserId(null);
+    }
   };
 
   const handleTransferOrg = (user: ManagedUser) => {
@@ -646,6 +681,22 @@ export function AdminUserManager({ initialUsers, organizations }: AdminUserManag
 
                                 <div className='flex flex-col gap-3 md:items-end'>
                                   <div className='flex flex-wrap items-center gap-2'>
+                                    <Button
+                                      variant='outline'
+                                      size='sm'
+                                      onClick={() => handleStartIdentityVerification(user)}
+                                      disabled={isPending || verifyingUserId !== null}
+                                      className='flex items-center gap-2'
+                                    >
+                                      {verifyingUserId === user.userId ? (
+                                        <>
+                                          <Loader2 className='h-4 w-4 animate-spin' />
+                                          Validando…
+                                        </>
+                                      ) : (
+                                        'Validar identidad'
+                                      )}
+                                    </Button>
                                     <Button
                                       variant='outline'
                                       size='sm'

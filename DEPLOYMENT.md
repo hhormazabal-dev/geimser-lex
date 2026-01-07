@@ -45,6 +45,17 @@ La opción más sencilla y escalable para producción.
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   NEXT_PUBLIC_APP_URL=https://your-app-domain.com
+
+   # Didit (ID Verification)
+   DIDIT_API_KEY=your-didit-api-key
+   DIDIT_WORKFLOW_ID=your-didit-workflow-id
+   # Opcional (si quieres flujos distintos cuando se marca biometría al crear cliente)
+   DIDIT_WORKFLOW_ID_BIOMETRIC=your-didit-workflow-id-with-biometrics
+   # Webhook (Didit -> tu app)
+   DIDIT_WEBHOOK_SECRET=your-didit-webhook-secret
+   # Opcional: nombre del header de firma si cambia
+   DIDIT_WEBHOOK_SIGNATURE_HEADER=x-didit-signature
    ```
 
 3. **Desplegar**:
@@ -157,8 +168,17 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # Next.js
-NEXTAUTH_URL=https://your-domain.com
-NEXTAUTH_SECRET=your-secret-key
+NEXT_PUBLIC_APP_URL=https://your-domain.com
+
+# Didit (ID Verification)
+DIDIT_API_KEY=your-didit-api-key
+DIDIT_WORKFLOW_ID=your-didit-workflow-id
+# Opcional (si quieres flujos distintos cuando se marca biometría al crear cliente)
+DIDIT_WORKFLOW_ID_BIOMETRIC=your-didit-workflow-id-with-biometrics
+# Webhook (Didit -> tu app)
+DIDIT_WEBHOOK_SECRET=your-didit-webhook-secret
+# Opcional: nombre del header de firma si cambia
+DIDIT_WEBHOOK_SIGNATURE_HEADER=x-didit-signature
 
 # Email (opcional, para notificaciones)
 SMTP_HOST=smtp.gmail.com

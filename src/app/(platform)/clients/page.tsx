@@ -10,6 +10,7 @@ import {
   assignClientToCase,
   type ClientCaseSummary,
 } from '@/lib/actions/clients';
+import { startDiditVerification } from '@/lib/actions/didit-verification';
 import { getCases } from '@/lib/actions/cases';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ interface ClientFormState {
   email: string;
   rut: string;
   telefono: string;
+  require_biometric: boolean;
 }
 
 type ClientRecord = {
@@ -67,6 +69,7 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [verifyingClientId, setVerifyingClientId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [clientCaseMap, setClientCaseMap] = useState<Record<string, ClientCaseState>>({});
@@ -76,6 +79,7 @@ export default function ClientsPage() {
     email: '',
     rut: '',
     telefono: '',
+    require_biometric: false,
   });
   const { toast } = useToast();
 
@@ -160,10 +164,14 @@ export default function ClientsPage() {
   );
 
   const resetForm = () => {
-    setForm({ nombre: '', email: '', rut: '', telefono: '' });
+    setForm({ nombre: '', email: '', rut: '', telefono: '', require_biometric: false });
   };
 
   const handleChange = (field: keyof ClientFormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (field === 'require_biometric') {
+      setForm((prev) => ({ ...prev, require_biometric: event.target.checked }));
+      return;
+    }
     const value = field === 'rut' ? formatRUT(event.target.value) : event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -177,6 +185,7 @@ export default function ClientsPage() {
         email: form.email.trim(),
         rut: form.rut.trim() || undefined,
         telefono: form.telefono.trim() || undefined,
+        require_biometric: form.require_biometric,
       };
 
       const result = await createClientProfile(payload);
@@ -211,6 +220,38 @@ export default function ClientsPage() {
       });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleStartIdentityVerification = async (clientId: string) => {
+    setVerifyingClientId(clientId);
+    try {
+      const result = await startDiditVerification(clientId);
+      if (!result.success) {
+        toast({ title: 'No se pudo iniciar la validación', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(result.url);
+      } catch {
+        // ignore (clipboard permissions)
+      }
+
+      window.open(result.url, '_blank', 'noopener,noreferrer');
+      toast({
+        title: 'Validación iniciada',
+        description: 'Se abrió el enlace de Didit (y quedó copiado al portapapeles si el navegador lo permite).',
+      });
+    } catch (error) {
+      console.error('Error starting identity verification', error);
+      toast({
+        title: 'Error inesperado',
+        description: 'No fue posible iniciar la validación de identidad.',
+        variant: 'destructive',
+      });
+    } finally {
+      setVerifyingClientId(null);
     }
   };
 
@@ -407,6 +448,17 @@ export default function ClientsPage() {
                 </div>
               </div>
 
+              <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-700">
+                <input
+                  id="require_biometric"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  checked={form.require_biometric}
+                  onChange={handleChange('require_biometric')}
+                />
+                Requerir validación biométrica (Didit)
+              </label>
+
               <Button type="submit" className="flex items-center gap-2" disabled={isCreating}>
                 {isCreating ? (
                   <>
@@ -471,6 +523,21 @@ export default function ClientsPage() {
                           </div>
                         </button>
                         <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={verifyingClientId !== null}
+                            onClick={() => handleStartIdentityVerification(client.id)}
+                          >
+                            {verifyingClientId === client.id ? (
+                              <span className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Validando…
+                              </span>
+                            ) : (
+                              'Validar identidad'
+                            )}
+                          </Button>
                           <Button variant="outline" size="sm" onClick={() => handleToggleClient(client.id)}>
                             {isExpanded ? 'Ocultar casos' : `Ver casos (${caseCount})`}
                           </Button>
