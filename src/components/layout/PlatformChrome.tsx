@@ -87,7 +87,7 @@ export function PlatformChrome({
 
         <main className="pb-12 pt-6">
           <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8">
-            {children}
+            <div key={activeOrgId ?? 'no-org'}>{children}</div>
           </div>
         </main>
       </div>
