@@ -59,7 +59,11 @@ const baseCaseSchema = z.object({
     ])
     .default('activo'),
   // UUID del documento asociado al término (obligatorio a nivel DB cuando estado = 'terminado').
-  termino_documento_id: z.string().uuid('ID de documento inválido').nullable().optional(),
+  // En formularios HTML el "null" suele llegar como string vacío; lo normalizamos a null para no bloquear el submit.
+  termino_documento_id: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z.string().uuid('ID de documento inválido').nullable(),
+  ).optional(),
   fecha_inicio: z.string().optional(),
   sentencia_estado: z
     .enum(['no_registra', 'pendiente', 'programada', 'dictada'])

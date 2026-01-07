@@ -19,7 +19,7 @@ type LawyerRow = {
   nombre: string | null;
   email: string | null;
   activo: boolean | null;
-  active_organization_id: string | null;
+  organization_id: string;
 };
 
 type CaseRow = {
@@ -40,6 +40,15 @@ interface TransitionClientProps {
   cases: CaseRow[];
 }
 
+function encodeSelection(lawyerId: string, organizationId: string) {
+  return `${lawyerId}|${organizationId}`;
+}
+
+function decodeSelection(value: string) {
+  const [lawyerId, organizationId] = value.split('|');
+  return { lawyerId: lawyerId ?? '', organizationId: organizationId ?? '' };
+}
+
 export function TransitionClient({ organizations, lawyers, cases }: TransitionClientProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -54,7 +63,7 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
   const lawyersByOrg = useMemo(() => {
     const map = new Map<string, LawyerRow[]>();
     for (const lawyer of lawyers) {
-      const orgId = lawyer.active_organization_id ?? 'no-org';
+      const orgId = lawyer.organization_id;
       if (!map.has(orgId)) {
         map.set(orgId, []);
       }
@@ -71,7 +80,10 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
     return map;
   }, [lawyers]);
 
-  const lawyerMap = useMemo(() => new Map(lawyers.map((lawyer) => [lawyer.id, lawyer])), [lawyers]);
+  const lawyerSelectionMap = useMemo(
+    () => new Map(lawyers.map((lawyer) => [encodeSelection(lawyer.id, lawyer.organization_id), lawyer])),
+    [lawyers],
+  );
 
   const filteredCases = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -99,8 +111,8 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
     }
 
     for (const lawyer of lawyers) {
-      if (lawyer.active_organization_id && stats.has(lawyer.active_organization_id)) {
-        stats.get(lawyer.active_organization_id)!.lawyers += 1;
+      if (lawyer.organization_id && stats.has(lawyer.organization_id)) {
+        stats.get(lawyer.organization_id)!.lawyers += 1;
       }
     }
 
@@ -114,7 +126,7 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
   }, [organizations, lawyers, cases]);
 
   const handleReassign = (caseRow: CaseRow, selectedId: string) => {
-    const targetLawyerId = selectedId;
+    const { lawyerId: targetLawyerId, organizationId: targetOrgId } = decodeSelection(selectedId);
     if (!targetLawyerId) {
       toast({
         title: 'Selecciona un abogado',
@@ -138,13 +150,11 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
         const result = await reassignCaseAcrossOrganizations({
           case_id: caseRow.id,
           abogado_id: targetLawyerId,
+          target_org_id: targetOrgId,
         });
 
         if (result.success) {
-          const targetLawyer = lawyerMap.get(targetLawyerId);
-          const targetOrg = targetLawyer?.active_organization_id
-            ? orgMap.get(targetLawyer.active_organization_id)?.name
-            : null;
+          const targetOrg = targetOrgId ? orgMap.get(targetOrgId)?.name : null;
           toast({
             title: 'Caso reasignado',
             description: result.moved
@@ -203,7 +213,7 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
                     <p className="text-xs text-foreground/50">Sin abogados asignados.</p>
                   ) : (
                     orgLawyers.map((lawyer) => (
-                      <p key={lawyer.id} className="text-xs text-foreground/70">
+                      <p key={encodeSelection(lawyer.id, org.id)} className="text-xs text-foreground/70">
                         {lawyer.nombre ?? 'Sin nombre'}
                         {lawyer.email ? ` - ${lawyer.email}` : ''}
                         {lawyer.activo === false ? ' - Inactivo' : ''}
@@ -214,21 +224,6 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
               </div>
             );
           })}
-
-          {lawyersByOrg.has('no-org') ? (
-            <div className="rounded-lg border border-dashed p-3">
-              <p className="text-sm font-semibold text-foreground">Sin empresa activa</p>
-              <div className="mt-2 space-y-1">
-                {(lawyersByOrg.get('no-org') ?? []).map((lawyer) => (
-                  <p key={lawyer.id} className="text-xs text-foreground/70">
-                    {lawyer.nombre ?? 'Sin nombre'}
-                    {lawyer.email ? ` - ${lawyer.email}` : ''}
-                    {lawyer.activo === false ? ' - Inactivo' : ''}
-                  </p>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </div>
       </aside>
 
@@ -274,15 +269,14 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
             <tbody>
               {filteredCases.map((row) => {
                 const currentLawyerId = row.abogado?.id ?? '';
-                const hasCurrentOption = currentLawyerId && lawyerMap.has(currentLawyerId);
-                const selectedId = selectionByCase[row.id] ?? (hasCurrentOption ? currentLawyerId : '');
-                const targetLawyer = selectedId ? lawyerMap.get(selectedId) : null;
-                const targetOrgName = targetLawyer?.active_organization_id
-                  ? orgMap.get(targetLawyer.active_organization_id)?.name
-                  : null;
+                const currentSelection =
+                  currentLawyerId && row.organization_id ? encodeSelection(currentLawyerId, row.organization_id) : '';
+                const hasCurrentOption = currentSelection && lawyerSelectionMap.has(currentSelection);
+                const selectedId = selectionByCase[row.id] ?? (hasCurrentOption ? currentSelection : '');
+                const decoded = selectedId ? decodeSelection(selectedId) : null;
+                const targetOrgName = decoded?.organizationId ? orgMap.get(decoded.organizationId)?.name : null;
                 const currentOrgName = row.org?.name ?? row.organization_id ?? 'Sin empresa';
-                const willMove =
-                  targetLawyer?.active_organization_id && row.organization_id !== targetLawyer.active_organization_id;
+                const willMove = decoded?.organizationId && row.organization_id !== decoded.organizationId;
 
                 return (
                   <tr key={row.id} className="border-b last:border-b-0">
@@ -318,9 +312,9 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
                             <optgroup key={org.id} label={org.name}>
                               {orgLawyers.map((lawyer) => (
                                 <option
-                                  key={lawyer.id}
-                                  value={lawyer.id}
-                                  disabled={lawyer.activo === false || !lawyer.active_organization_id}
+                                  key={encodeSelection(lawyer.id, org.id)}
+                                  value={encodeSelection(lawyer.id, org.id)}
+                                  disabled={lawyer.activo === false}
                                 >
                                   {lawyer.nombre ?? 'Sin nombre'}
                                   {lawyer.email ? ` - ${lawyer.email}` : ''}
@@ -330,21 +324,6 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
                             </optgroup>
                           );
                         })}
-                        {lawyersByOrg.get('no-org')?.length ? (
-                          <optgroup label="Sin empresa activa">
-                            {lawyersByOrg.get('no-org')?.map((lawyer) => (
-                              <option
-                                key={lawyer.id}
-                                value={lawyer.id}
-                                disabled={lawyer.activo === false || !lawyer.active_organization_id}
-                              >
-                                {lawyer.nombre ?? 'Sin nombre'}
-                                {lawyer.email ? ` - ${lawyer.email}` : ''}
-                                {lawyer.activo === false ? ' - Inactivo' : ' - Sin empresa'}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ) : null}
                       </select>
                       {willMove ? (
                         <p className="mt-1 text-xs text-amber-600">
@@ -361,7 +340,7 @@ export function TransitionClient({ organizations, lawyers, cases }: TransitionCl
                           isPending ||
                           pendingCaseId === row.id ||
                           !selectedId ||
-                          selectedId === currentLawyerId
+                          selectedId === currentSelection
                         }
                       >
                         {pendingCaseId === row.id ? (

@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { assignLawyerSchema, type AssignLawyerInput } from '@/lib/validators/case';
+import { reassignAcrossOrganizationsSchema, type ReassignAcrossOrganizationsInput } from '@/lib/validators/transicion';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireTransitionAccess } from '@/lib/auth/transition';
 import { logAuditAction } from '@/lib/audit/log';
@@ -165,10 +165,12 @@ async function reconcileBillingAccounts(supabase: any, caseId: string, targetOrg
   }
 }
 
-export async function reassignCaseAcrossOrganizations(input: AssignLawyerInput): Promise<TransitionResult> {
+export async function reassignCaseAcrossOrganizations(
+  input: ReassignAcrossOrganizationsInput,
+): Promise<TransitionResult> {
   try {
     await requireTransitionAccess();
-    const validated = assignLawyerSchema.parse(input);
+    const validated = reassignAcrossOrganizationsSchema.parse(input);
     const supabase = createServiceClient() as any;
 
     const { data: caseRow, error: caseError } = await supabase
@@ -187,7 +189,7 @@ export async function reassignCaseAcrossOrganizations(input: AssignLawyerInput):
 
     const { data: lawyerRow, error: lawyerError } = await supabase
       .from('profiles')
-      .select('id, user_id, nombre, email, role, active_organization_id')
+      .select('id, user_id, nombre, email, role')
       .eq('id', validated.abogado_id)
       .maybeSingle();
 
@@ -200,10 +202,7 @@ export async function reassignCaseAcrossOrganizations(input: AssignLawyerInput):
       return { success: false, error: 'El usuario destino no es un usuario interno asignable (abogado/admin).' };
     }
 
-    const targetOrgId = lawyerRow.active_organization_id ? String(lawyerRow.active_organization_id) : null;
-    if (!targetOrgId) {
-      return { success: false, error: 'El abogado destino no tiene empresa activa asignada.' };
-    }
+    const targetOrgId = String(validated.target_org_id);
 
     if (lawyerRow.user_id) {
       const { data: membership, error: membershipError } = await supabase

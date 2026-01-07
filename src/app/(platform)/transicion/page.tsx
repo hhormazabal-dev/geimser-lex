@@ -20,13 +20,12 @@ export default async function TransitionPage() {
 
   const supabase = createServiceClient() as any;
 
-  const [{ data: organizations }, { data: lawyers }, { data: cases }] = await Promise.all([
+  const [{ data: organizations }, { data: orgMembers }, { data: cases }] = await Promise.all([
     supabase.from('organizations').select('id, name, status').order('name', { ascending: true }),
     supabase
-      .from('profiles')
-      .select('id, nombre, email, role, activo, active_organization_id')
-      .in('role', ['abogado', 'admin_firma'])
-      .order('nombre', { ascending: true }),
+      .from('org_members')
+      .select('organization_id, user_id, role')
+      .in('role', ['lawyer', 'org_admin']),
     supabase
       .from('cases')
       .select(
@@ -47,6 +46,37 @@ export default async function TransitionPage() {
       .order('created_at', { ascending: false })
       .limit(5000),
   ]);
+
+  const memberUserIds = Array.from(
+    new Set((orgMembers ?? []).map((row: any) => row?.user_id).filter(Boolean)),
+  ) as string[];
+
+  const { data: memberProfiles } = memberUserIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id, user_id, nombre, email, role, activo')
+        .in('user_id', memberUserIds)
+    : { data: [] };
+
+  const profileByUserId = new Map<string, any>(
+    (memberProfiles ?? []).map((profile: any) => [String(profile.user_id), profile]),
+  );
+
+  const lawyers = (orgMembers ?? [])
+    .map((membership: any) => {
+      const profile = profileByUserId.get(String(membership.user_id));
+      if (!profile) return null;
+      if (!['abogado', 'admin_firma'].includes(String(profile.role))) return null;
+      return {
+        id: String(profile.id),
+        nombre: profile.nombre ?? null,
+        email: profile.email ?? null,
+        activo: profile.activo ?? null,
+        organization_id: String(membership.organization_id),
+      };
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => String(a.nombre ?? '').localeCompare(String(b.nombre ?? ''), 'es'));
 
   return (
     <div className="space-y-6">
