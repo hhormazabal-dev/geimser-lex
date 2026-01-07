@@ -996,20 +996,23 @@ export function CaseForm({
             : 'preparacion',
       };
 
+      const shouldCreateThenAttachTermino = !existingCase && payload.estado === 'terminado' && Boolean(terminoFile);
+
       // Regla de negocio: si el caso se marca como "Terminado", debe existir un documento de término asociado.
       // Para edición, subimos el archivo y guardamos su ID en `termino_documento_id` antes de llamar al server action.
       if (payload.estado === 'terminado') {
         const legacyNoDoc = Boolean((existingCase as any)?.termino_sin_documento);
         if (!legacyNoDoc) {
           if (!existingCase) {
-            toast({
-              title: 'Documento requerido',
-              description:
-                'Para marcar un expediente como “Terminado” primero crea el caso y luego adjunta el documento de término en la edición.',
-              variant: 'destructive',
-            });
-            setIsLoading(false);
-            return;
+            if (!terminoFile) {
+              toast({
+                title: 'Documento requerido',
+                description: 'Debes adjuntar un documento de término para guardar el estado “Terminado”.',
+                variant: 'destructive',
+              });
+              setIsLoading(false);
+              return;
+            }
           }
 
           let terminoId = (payload.termino_documento_id as string | null | undefined) ?? null;
@@ -1017,7 +1020,7 @@ export function CaseForm({
             terminoId = terminoDocumentoId;
           }
 
-          if (terminoFile) {
+          if (terminoFile && existingCase) {
             const formData = new FormData();
             formData.append('case_id', existingCase.id);
             formData.append('file', terminoFile);
@@ -1058,7 +1061,15 @@ export function CaseForm({
       if (existingCase) {
         result = await updateCase(existingCase.id, payload);
       } else {
-        result = await createCase(payload);
+        result = await createCase(
+          shouldCreateThenAttachTermino
+            ? ({
+                ...payload,
+                estado: 'activo',
+                termino_documento_id: null,
+              } as any)
+            : payload,
+        );
       }
 
       if (result.success) {
@@ -1070,6 +1081,38 @@ export function CaseForm({
         });
 
         const createdCaseId = (result as { case?: { id: string } }).case?.id;
+
+        if (!existingCase && shouldCreateThenAttachTermino && createdCaseId && terminoFile) {
+          const formData = new FormData();
+          formData.append('case_id', createdCaseId);
+          formData.append('file', terminoFile);
+          formData.append('nombre', terminoFile.name);
+          formData.append('visibilidad', 'privado');
+
+          const uploadResult = await uploadDocument(formData);
+          if (!uploadResult.success || !uploadResult.document?.id) {
+            toast({
+              title: 'Caso creado, pero falta el documento de término',
+              description: uploadResult.error ?? 'No se pudo cargar el documento de término.',
+              variant: 'destructive',
+            });
+          } else {
+            const finalizeResult = await updateCase(createdCaseId, {
+              estado: 'terminado',
+              termino_documento_id: uploadResult.document.id,
+            } as any);
+
+            if (!finalizeResult.success) {
+              toast({
+                title: 'Caso creado, pero no se pudo marcar como Terminado',
+                description: finalizeResult.error ?? 'Intenta nuevamente en unos minutos.',
+                variant: 'destructive',
+              });
+            }
+          }
+
+          resetTerminoFileSelection();
+        }
 
         if (!existingCase && selectedFiles.length > 0) {
           if (createdCaseId) {
