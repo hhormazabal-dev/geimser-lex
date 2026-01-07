@@ -183,6 +183,12 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
     const cases = (caseRows as Array<Record<string, any>> | null) ?? [];
     const caseIds = cases.map((c) => c.id as string).filter(Boolean);
 
+    const effectiveCaseStatus = (row: Record<string, any>): string | null => {
+      const sentenciaEstado = (row.sentencia_estado as string | null) ?? null;
+      if (sentenciaEstado === 'dictada') return 'terminado';
+      return (row.estado as string | null) ?? null;
+    };
+
     const today = new Date().toISOString().slice(0, 10);
 
     const clientsPromise = (async () => {
@@ -231,11 +237,11 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
     if ((stagesResult as any).error) throw (stagesResult as any).error;
 
     const activeCases = cases.filter((c) => {
-      const status = (c.estado as string | null) ?? null;
+      const status = effectiveCaseStatus(c) ?? null;
       return status === 'activo' || status === 'terminado_apelacion';
     }).length;
     const completedCases = cases.filter((c) => {
-      const status = (c.estado as string | null) ?? null;
+      const status = effectiveCaseStatus(c) ?? null;
       return status === 'terminado' || status === 'terminado_desistido_demandante';
     }).length;
 
@@ -325,7 +331,7 @@ export async function getCasesByStatus(): Promise<{ success: boolean; data?: Cas
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('estado');
+    const query = supabase.from('cases').select('estado, sentencia_estado');
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -333,7 +339,9 @@ export async function getCasesByStatus(): Promise<{ success: boolean; data?: Cas
     const caseRows = (casesData as Array<Record<string, any>> | null) ?? [];
 
     const statusCounts = caseRows.reduce((acc, case_) => {
-      const status = (case_.estado as string | null) || 'sin_estado';
+      const sentenciaEstado = (case_.sentencia_estado as string | null) ?? null;
+      const base = sentenciaEstado === 'dictada' ? 'terminado' : (case_.estado as string | null);
+      const status = base || 'sin_estado';
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);

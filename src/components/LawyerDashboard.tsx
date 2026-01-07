@@ -88,7 +88,16 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     );
   }
 
-  const activeCases = cases.filter((c) => c.estado === 'activo' || c.estado === 'terminado_apelacion');
+  const effectiveCaseStatus = (caseRow: any) => {
+    const sentenciaEstado = (caseRow?.sentencia_estado as string | null | undefined) ?? null;
+    if (sentenciaEstado === 'dictada') return 'terminado';
+    return (caseRow?.estado as string | null | undefined) ?? null;
+  };
+
+  const activeCases = cases.filter((c) => {
+    const status = effectiveCaseStatus(c);
+    return status === 'activo' || status === 'terminado_apelacion';
+  });
   const recentCases = [...cases]
     .sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))
     .slice(0, 6);
@@ -338,6 +347,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                     </thead>
                     <tbody className='divide-y divide-slate-100 text-slate-700'>
                       {recentCases.map((caseItem) => {
+                        const effectiveStatus = effectiveCaseStatus(caseItem) ?? caseItem.estado ?? '';
                         const nextStage = caseItem.case_stages?.find((stage) => (stage.estado ?? '') === 'pendiente');
 
                         return (
@@ -367,10 +377,10 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                               <div className='space-y-2'>
                                 <span
                                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
-                                    STATUS_CHIPS[caseItem.estado || ''] ?? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                    STATUS_CHIPS[effectiveStatus] ?? 'bg-slate-100 text-slate-600 border border-slate-200'
                                   }`}
                                 >
-                                  {STATUS_LABELS[caseItem.estado || ''] ?? (caseItem.estado || 'Sin estado')}
+                                  {STATUS_LABELS[effectiveStatus] ?? (effectiveStatus || 'Sin estado')}
                                 </span>
                                 <span
                                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
