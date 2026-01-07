@@ -434,7 +434,19 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
     if (fetchError || !existingCase) throw new Error('Caso no encontrado');
 
     const isAdmin = profile.role === 'admin_firma';
-    const isLawyerOwner = profile.role === 'abogado' && existingCase.abogado_responsable === profile.id;
+    let isLawyerOwner = false;
+    if (profile.role === 'abogado') {
+      isLawyerOwner = existingCase.abogado_responsable === profile.id;
+      if (!isLawyerOwner) {
+        const { data: collaborator } = await supabase
+          .from('case_collaborators')
+          .select('id')
+          .eq('case_id', caseId)
+          .eq('abogado_id', profile.id)
+          .maybeSingle();
+        isLawyerOwner = Boolean(collaborator);
+      }
+    }
     const isAnalystOwner = profile.role === 'analista' && existingCase.analista_id === profile.id;
     if (!isAdmin && !isLawyerOwner && !isAnalystOwner) throw new Error('Sin permisos para editar este caso');
     if (isAnalystOwner && existingCase.workflow_state === 'cerrado') throw new Error('El caso ya fue cerrado');
@@ -965,7 +977,21 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
     );
 
     if (profile.role === 'abogado') {
-      query = query.eq('abogado_responsable', profile.id);
+      const { data: collaboratorRows } = await supabase
+        .from('case_collaborators')
+        .select('case_id')
+        .eq('abogado_id', profile.id)
+        .limit(10000);
+
+      const collaboratorCaseIds = (collaboratorRows ?? [])
+        .map((row: { case_id?: string | null }) => row.case_id)
+        .filter((id): id is string => Boolean(id));
+
+      if (collaboratorCaseIds.length > 0) {
+        query = query.or(`abogado_responsable.eq.${profile.id},id.in.(${collaboratorCaseIds.join(',')})`);
+      } else {
+        query = query.eq('abogado_responsable', profile.id);
+      }
     } else if (profile.role === 'cliente') {
       const { data: clientCases } = await supabase
         .from('case_clients')
@@ -1037,7 +1063,13 @@ export async function getCaseById(caseId: string) {
       if (!clientCase) throw new Error('Sin permisos para ver este caso');
     }
     if (profile.role === 'abogado' && caseRow.abogado_responsable && caseRow.abogado_responsable !== profile.id) {
-      throw new Error('Sin permisos para ver este caso');
+      const { data: collaborator } = await supabase
+        .from('case_collaborators')
+        .select('id')
+        .eq('case_id', caseId)
+        .eq('abogado_id', profile.id)
+        .maybeSingle();
+      if (!collaborator) throw new Error('Sin permisos para ver este caso');
     }
     const [lawyerProfile, stagesRes, notesRes, docsRes, reqsRes, counterpartiesRes, clientsRes] = await Promise.all([
       (async () => {
