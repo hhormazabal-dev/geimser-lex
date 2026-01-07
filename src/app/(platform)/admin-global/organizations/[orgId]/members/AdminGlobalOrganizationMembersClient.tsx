@@ -21,7 +21,7 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; int
   const [newLawyerName, setNewLawyerName] = useState('');
   const [newLawyerPassword, setNewLawyerPassword] = useState('');
 
-  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [addMemberUserId, setAddMemberUserId] = useState('');
   const [addMemberRole, setAddMemberRole] = useState<'lawyer' | 'staff' | 'org_admin'>('lawyer');
 
   const [assignUserId, setAssignUserId] = useState('');
@@ -63,8 +63,11 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; int
     setMessage(null);
     setCreatedPassword(null);
 
-    const email = addMemberEmail.trim().toLowerCase();
-    if (!email) return setMessage('Email requerido');
+    const userId = addMemberUserId.trim();
+    if (!userId) return setMessage('Debes seleccionar un usuario');
+    const selected = props.internalUsers.find((u) => u.user_id === userId) ?? null;
+    const email = (selected?.email ?? '').trim().toLowerCase();
+    if (!email) return setMessage('El usuario seleccionado no tiene email');
 
     const res = await fetch('/api/admin-global/add-member', {
       method: 'POST',
@@ -78,7 +81,7 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; int
     const json = await res.json().catch(() => null);
     if (!res.ok) return setMessage(json?.error ?? 'Error agregando miembro');
 
-    setAddMemberEmail('');
+    setAddMemberUserId('');
     setMessage('Miembro agregado (sin mover casos)');
     startTransition(() => router.refresh());
   }
@@ -173,13 +176,22 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; int
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <div className="md:col-span-2">
-            <label className="text-xs font-medium text-muted-foreground">Email</label>
-            <input
+            <label className="text-xs font-medium text-muted-foreground">Usuario</label>
+            <select
               className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-              value={addMemberEmail}
-              onChange={(e) => setAddMemberEmail(e.target.value)}
-              placeholder="usuario@dominio.com"
-            />
+              value={addMemberUserId}
+              onChange={(e) => setAddMemberUserId(e.target.value)}
+              disabled={isPending}
+            >
+              <option value="">Selecciona…</option>
+              {props.internalUsers
+                .filter((u) => Boolean(u.email))
+                .map((u) => (
+                  <option key={u.user_id} value={u.user_id}>
+                    {(u.nombre ?? 'Sin nombre') + (u.email ? ` — ${u.email}` : '') + ` (${u.role})`}
+                  </option>
+                ))}
+            </select>
           </div>
           <div className="md:col-span-1">
             <label className="text-xs font-medium text-muted-foreground">Rol en empresa</label>
@@ -187,6 +199,7 @@ export function AdminGlobalOrganizationMembersClient(props: { orgId: string; int
               className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
               value={addMemberRole}
               onChange={(e) => setAddMemberRole(e.target.value as any)}
+              disabled={isPending}
             >
               <option value="lawyer">Abogado</option>
               <option value="staff">Staff</option>
