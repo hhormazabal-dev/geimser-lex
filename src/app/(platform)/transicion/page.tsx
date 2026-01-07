@@ -25,7 +25,7 @@ export default async function TransitionPage() {
     supabase
       .from('profiles')
       .select('id, nombre, email, role, activo, active_organization_id')
-      .eq('role', 'abogado')
+      .in('role', ['abogado', 'admin_firma'])
       .order('nombre', { ascending: true }),
     supabase
       .from('cases')

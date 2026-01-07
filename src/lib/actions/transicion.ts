@@ -195,8 +195,9 @@ export async function reassignCaseAcrossOrganizations(input: AssignLawyerInput):
       return { success: false, error: lawyerError?.message ?? 'Abogado no encontrado.' };
     }
 
-    if (String(lawyerRow.role) !== 'abogado') {
-      return { success: false, error: 'El usuario destino no es abogado.' };
+    // Elegibles: abogado o admin_firma (org_admin) con empresa activa.
+    if (!['abogado', 'admin_firma'].includes(String(lawyerRow.role))) {
+      return { success: false, error: 'El usuario destino no es un usuario interno asignable (abogado/admin).' };
     }
 
     const targetOrgId = lawyerRow.active_organization_id ? String(lawyerRow.active_organization_id) : null;
