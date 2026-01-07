@@ -45,70 +45,10 @@ function isoDateOnly(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
-async function getVisibleCaseIds() {
-  const profile = await getCurrentProfile();
-  if (!profile) throw new Error('No autenticado');
-
-  const supabase = await createServerClient();
-  const role = (profile as any)._role_override ?? profile.role;
-
-  if (role === 'admin_firma') return null as string[] | null;
-
-  if (role === 'abogado') {
-    const [{ data: ownedCases, error: ownedError }, { data: collabCases, error: collabError }] = await Promise.all([
-      supabase.from('cases').select('id').eq('abogado_responsable', profile.id),
-      supabase.from('case_collaborators').select('case_id').eq('abogado_id', profile.id),
-    ]);
-
-    if (ownedError) throw ownedError;
-    if (collabError) throw collabError;
-
-    const ids = new Set<string>();
-    for (const row of ownedCases ?? []) {
-      if (row?.id) ids.add(String(row.id));
-    }
-    for (const row of (collabCases ?? []) as Array<{ case_id?: string | null }>) {
-      if (row?.case_id) ids.add(String(row.case_id));
-    }
-    return Array.from(ids);
-  }
-
-  if (role === 'analista') {
-    const { data, error } = await supabase
-      .from('cases')
-      .select('id')
-      .in('workflow_state', ['preparacion', 'en_revision']);
-    if (error) throw error;
-    return (data ?? []).map((row) => row.id);
-  }
-
-  // cliente u otros roles: por relación case_clients
-  const { data, error } = await supabase
-    .from('case_clients')
-    .select('case_id')
-    .eq('client_profile_id', profile.id);
-  if (error) throw error;
-  return (data ?? []).map((row) => row.case_id);
-}
-
 export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQueueData; error?: string }> {
   try {
     await requireAuth();
     const supabase = await createServerClient();
-
-    const visibleCaseIds = await getVisibleCaseIds();
-    if (visibleCaseIds && visibleCaseIds.length === 0) {
-      return {
-        success: true,
-        data: {
-          overdueStages: [],
-          dueNext7Days: [],
-          paymentBlocks: [],
-          pendingRequests: [],
-          stats: { overdueStages: 0, dueNext7Days: 0, paymentBlocks: 0, pendingRequests: 0 },
-        },
-      };
-    }
 
     const today = isoDateOnly(new Date());
     const next7 = isoDateOnly(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
@@ -141,12 +81,6 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
       .select('id, titulo, estado, tipo, prioridad, fecha_limite, case:cases(id, caratulado)')
       .in('estado', ['pendiente', 'en_revision'])
       .order('fecha_limite', { ascending: true, nullsFirst: false });
-
-    if (visibleCaseIds) {
-      overdueQuery.in('case_id', visibleCaseIds);
-      dueQuery.in('case_id', visibleCaseIds);
-      requestsQuery.in('case_id', visibleCaseIds);
-    }
 
     const [overdueRes, dueRes, requestsRes] = await Promise.all([
       overdueQuery,
