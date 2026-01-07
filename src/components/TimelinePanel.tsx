@@ -128,6 +128,11 @@ export function TimelinePanel({
   }, [caseId]);
 
   useEffect(() => {
+    if (isLoading) return;
+    onStagesLoaded?.(stages);
+  }, [isLoading, onStagesLoaded, stages]);
+
+  useEffect(() => {
     setHasInitializedSection(false);
     setActiveSection('proceso');
   }, [caseId]);

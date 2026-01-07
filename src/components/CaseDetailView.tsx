@@ -269,6 +269,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         .replace(/[\u0300-\u036f]/g, '');
 
     const todayIso = new Date().toISOString().split('T')[0]!;
+    const todayTime = parseDateOnly(todayIso)?.getTime() ?? null;
     const sorted = [...stageCatalog].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
     const currentStage = sorted.find((stage) => stage.estado !== 'completado') ?? null;
 
@@ -281,12 +282,24 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         .filter((row): row is { item: T; time: number } => typeof row.time === 'number')
         .sort((a, b) => a.time - b.time);
 
+    const pickNextUpcoming = <T extends CaseStage>(
+      items: T[],
+      selector: (item: T) => string | null,
+    ) => {
+      const rows = stagesWithDate(items, selector);
+      if (rows.length === 0) return null;
+      if (typeof todayTime === 'number') {
+        const upcoming = rows.find((row) => row.time >= todayTime);
+        if (upcoming) return upcoming.item;
+      }
+      return rows[0]!.item;
+    };
+
     const nextScheduled = (() => {
-      const upcoming = stagesWithDate(
+      return pickNextUpcoming(
         sorted.filter((s) => s.estado !== 'completado' && Boolean(s.fecha_programada)),
         (s) => s.fecha_programada ?? null,
       );
-      return upcoming[0]?.item ?? null;
     })();
 
     const lastCompleted = (() => {
@@ -315,11 +328,10 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       return false;
     });
     const nextAudience = (() => {
-      const candidates = stagesWithDate(
+      return pickNextUpcoming(
         audienceStages.filter((s) => s.estado !== 'completado' && Boolean(s.fecha_programada)),
         (s) => s.fecha_programada ?? null,
       );
-      return candidates[0]?.item ?? null;
     })();
     const lastAudience = (() => {
       const candidates = stagesWithDate(
