@@ -59,9 +59,8 @@ export function AnalystDashboard({
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: 'Etapas vencidas', value: workQueue.stats.overdueStages, icon: Timer, tone: 'text-red-600', href: '/inbox' },
+            { label: 'Vencimientos vencidos', value: workQueue.stats.overdueStages, icon: Timer, tone: 'text-red-600', href: '/inbox' },
             { label: 'Próximos 7 días', value: workQueue.stats.dueNext7Days, icon: Calendar, tone: 'text-sky-600', href: '/inbox' },
-            { label: 'Bloqueos de pago', value: workQueue.stats.paymentBlocks, icon: CreditCard, tone: 'text-amber-700', href: '/inbox' },
             { label: 'Solicitudes', value: workQueue.stats.pendingRequests, icon: ClipboardList, tone: 'text-violet-600', href: '/inbox' },
           ].map((item) => {
             const Icon = item.icon;
@@ -195,4 +194,3 @@ export function AnalystDashboard({
     </div>
   );
 }
-

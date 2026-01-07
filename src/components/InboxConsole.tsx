@@ -18,7 +18,7 @@ type SavedView = { id: string; name: string; view: ViewKey; q: string };
 
 type NormalizedItem =
   | {
-      type: 'stage';
+      type: 'deadline';
       bucket: 'overdue' | 'due';
       id: string;
       key: string;
@@ -68,9 +68,9 @@ function bucketPriority(bucket: NormalizedItem['bucket']): number {
 }
 
 function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
-  const stages: NormalizedItem[] = [
+  const deadlines: NormalizedItem[] = [
     ...data.overdueStages.map((s) => ({
-      type: 'stage' as const,
+      type: 'deadline' as const,
       bucket: 'overdue' as const,
       id: s.stage_id,
       key: `overdue:${s.stage_id}`,
@@ -88,7 +88,7 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
       href: `/cases/${s.case_id}`,
     })),
     ...data.dueNext7Days.map((s) => ({
-      type: 'stage' as const,
+      type: 'deadline' as const,
       bucket: 'due' as const,
       id: s.stage_id,
       key: `due:${s.stage_id}`,
@@ -129,7 +129,7 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
     };
   });
 
-  const all = [...stages, ...requests];
+  const all = [...deadlines, ...requests];
   all.sort((a, b) => {
     const p = bucketPriority(a.bucket) - bucketPriority(b.bucket);
     if (p !== 0) return p;
@@ -166,9 +166,8 @@ export function InboxConsole({
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
   const [bulkMode, setBulkMode] = useState<
-    'completeStages' | 'rescheduleStages' | 'closeRequests' | 'setCasePriority' | 'setCaseWorkflow' | 'none'
+    'closeRequests' | 'setCasePriority' | 'setCaseWorkflow' | 'none'
   >('none');
-  const [bulkDate, setBulkDate] = useState<string>('');
   const [bulkPriority, setBulkPriority] = useState<'baja' | 'media' | 'alta' | 'urgente'>('media');
   const [bulkWorkflow, setBulkWorkflow] = useState<'preparacion' | 'en_revision' | 'activo' | 'cerrado'>('en_revision');
   const [bulkPending, setBulkPending] = useState(false);
@@ -204,14 +203,14 @@ export function InboxConsole({
       {
         key: 'overdue' as const,
         label: 'Vencidos',
-        description: 'Etapas atrasadas',
+        description: 'Vencimientos vencidos',
         count: data.stats.overdueStages,
         icon: <Timer className="h-4 w-4" />,
       },
       {
         key: 'due' as const,
         label: 'Próximos 7 días',
-        description: 'Para agendar hoy',
+        description: 'Vencimientos próximos',
         count: data.stats.dueNext7Days,
         icon: <Calendar className="h-4 w-4" />,
       },
@@ -300,7 +299,7 @@ export function InboxConsole({
   }, [itemByKey, selectedKeys]);
 
   const selectedStageIds = useMemo(
-    () => selectedItems.filter((i) => i.type === 'stage').map((i) => i.id),
+    () => [],
     [selectedItems],
   );
   const selectedRequestIds = useMemo(
@@ -328,30 +327,18 @@ export function InboxConsole({
     if (bulkMode === 'none') return;
 
     const payload =
-      bulkMode === 'completeStages'
-        ? { action: 'completeStages' as const, stageIds: selectedStageIds }
-        : bulkMode === 'rescheduleStages'
-          ? { action: 'rescheduleStages' as const, stageIds: selectedStageIds, date: bulkDate }
-          : bulkMode === 'closeRequests'
-            ? { action: 'closeRequests' as const, requestIds: selectedRequestIds }
-            : bulkMode === 'setCasePriority'
-              ? { action: 'setCasePriority' as const, caseIds: selectedCaseIds, priority: bulkPriority }
-              : { action: 'setCaseWorkflow' as const, caseIds: selectedCaseIds, workflow_state: bulkWorkflow };
+      bulkMode === 'closeRequests'
+        ? { action: 'closeRequests' as const, requestIds: selectedRequestIds }
+        : bulkMode === 'setCasePriority'
+          ? { action: 'setCasePriority' as const, caseIds: selectedCaseIds, priority: bulkPriority }
+          : { action: 'setCaseWorkflow' as const, caseIds: selectedCaseIds, workflow_state: bulkWorkflow };
 
-    if ((payload as any).stageIds && (payload as any).stageIds.length === 0) {
-      toast({ title: 'Selecciona etapas', description: 'Esta acción aplica solo a etapas.', variant: 'destructive' });
-      return;
-    }
     if ((payload as any).requestIds && (payload as any).requestIds.length === 0) {
       toast({ title: 'Selecciona solicitudes', description: 'Esta acción aplica solo a solicitudes.', variant: 'destructive' });
       return;
     }
     if ((payload as any).caseIds && (payload as any).caseIds.length === 0) {
       toast({ title: 'Selecciona casos', description: 'No hay casos asociados a la selección.', variant: 'destructive' });
-      return;
-    }
-    if (bulkMode === 'rescheduleStages' && !bulkDate) {
-      toast({ title: 'Falta fecha', description: 'Selecciona una nueva fecha para reprogramar.', variant: 'destructive' });
       return;
     }
 
@@ -562,7 +549,7 @@ export function InboxConsole({
               <p>Atajos: <span className="font-semibold text-foreground">/</span> buscar · <span className="font-semibold text-foreground">1–5</span> vistas · <span className="font-semibold text-foreground">Esc</span> limpiar.</p>
               <p>
                 Empieza por <span className="font-semibold text-foreground">Vencidos</span> y{' '}
-                <span className="font-semibold text-foreground">Pagos</span> para destrabar el flujo.
+                <span className="font-semibold text-foreground">Solicitudes</span> para destrabar el flujo.
               </p>
             </CardContent>
           </Card>
@@ -577,7 +564,7 @@ export function InboxConsole({
                     {selectedKeys.size} seleccionado(s)
                   </Badge>
                   <span className="text-sm text-foreground/60">
-                    {selectedStageIds.length} etapas · {selectedRequestIds.length} solicitudes · {selectedCaseIds.length} casos
+                    {selectedRequestIds.length} solicitudes · {selectedCaseIds.length} casos
                   </span>
                 </div>
 
@@ -589,22 +576,10 @@ export function InboxConsole({
                     disabled={bulkPending}
                   >
                     <option value="none">Acción…</option>
-                    <option value="completeStages">Completar etapas</option>
-                    <option value="rescheduleStages">Reprogramar etapas</option>
                     <option value="closeRequests">Cerrar solicitudes</option>
                     <option value="setCasePriority">Cambiar prioridad del caso</option>
                     <option value="setCaseWorkflow">Cambiar workflow del caso</option>
                   </select>
-
-                  {bulkMode === 'rescheduleStages' && (
-                    <input
-                      type="date"
-                      value={bulkDate}
-                      onChange={(e) => setBulkDate(e.target.value)}
-                      className="h-10 rounded-2xl border border-white/20 bg-white/60 px-3 text-sm text-foreground shadow-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
-                      disabled={bulkPending}
-                    />
-                  )}
 
                   {bulkMode === 'setCasePriority' && (
                     <select
