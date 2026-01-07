@@ -180,6 +180,12 @@ export async function createCase(input: CreateCaseInput) {
       throw new Error('Debes seleccionar un cliente principal antes de crear el caso.');
     }
 
+    // En la práctica, si el creador no es abogado (y por tanto no "se autoasigna"),
+    // exigimos abogado responsable para que no existan causas huérfanas.
+    if ((profile.role === 'admin_firma' || profile.role === 'analista') && !caseInput.abogado_responsable) {
+      throw new Error('Debes asignar un abogado responsable antes de crear el caso.');
+    }
+
     const supabase = await getSB();
     const nowIso = new Date().toISOString();
     const numeroCausaClean = caseInput.numero_causa?.trim() ?? null;
