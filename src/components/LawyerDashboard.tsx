@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowRight, Briefcase, Calendar, Clock, FileText, Target } from 'lucide-react';
 
@@ -54,20 +54,6 @@ const PRIORITY_CHIPS: Record<string, string> = {
   urgente: 'bg-red-50 text-red-600 border border-red-100',
 };
 
-const WORKFLOW_CHIPS: Record<string, string> = {
-  preparacion: 'bg-slate-100 text-slate-700 border border-slate-200',
-  en_revision: 'bg-amber-50 text-amber-700 border border-amber-100',
-  activo: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
-  cerrado: 'bg-violet-50 text-violet-700 border border-violet-100',
-};
-
-const WORKFLOW_LABELS: Record<string, string> = {
-  preparacion: 'Preparación',
-  en_revision: 'En revisión',
-  activo: 'Activo',
-  cerrado: 'Cerrado',
-};
-
 export function LawyerDashboard({ profile, data, cases, quickLinks, templates }: LawyerDashboardProps) {
   const router = useRouter();
   const stats = data.stats;
@@ -77,25 +63,6 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     if (sentenciaEstado === 'dictada') return 'terminado';
     return (caseRow?.estado as string | null | undefined) ?? null;
   };
-
-  const bucketCountsByWorkflow = useMemo(() => {
-    const counts: { preparacion: number; en_revision: number; activo: number; cerrado: number } = {
-      preparacion: 0,
-      en_revision: 0,
-      activo: 0,
-      cerrado: 0,
-    };
-    for (const row of cases as any[]) {
-      const status = effectiveCaseStatus(row);
-      if (status === 'terminado' || status === 'terminado_desistido_demandante') {
-        counts.cerrado += 1;
-        continue;
-      }
-      const wf = String(row?.workflow_state ?? '').trim() as keyof typeof counts;
-      if (wf in counts) counts[wf] += 1;
-    }
-    return counts;
-  }, [cases]);
 
   useEffect(() => {
     // Evita que el dashboard quede "pegado" al volver atrás desde /cases/... (BFCache / client cache).
@@ -129,9 +96,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
 
   const activeCases = cases.filter((c: any) => {
     const status = effectiveCaseStatus(c);
-    if (status === 'terminado' || status === 'terminado_desistido_demandante') return false;
-    if (status === 'archivado' || status === 'suspendido') return false;
-    return (c as any)?.workflow_state === 'activo';
+    return status === 'activo' || status === 'terminado_apelacion';
   });
   const recentCases = [...cases]
     .sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))
@@ -335,24 +300,29 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
               <div>
                 <CardTitle className='text-lg font-semibold text-slate-900'>Casos bajo tu responsabilidad</CardTitle>
                 <p className='text-sm text-slate-500'>Mantenlos al día para asegurar continuidad con tus clientes.</p>
-                <div className='mt-3 flex flex-wrap gap-2'>
-                  {(
-                    [
-                      { key: 'activo' as const, label: 'Activos' },
-                      { key: 'en_revision' as const, label: 'En revisión' },
-                      { key: 'preparacion' as const, label: 'Preparación' },
-                      { key: 'cerrado' as const, label: 'Cerrados' },
-                    ] as const
-                  ).map((item) => (
-                    <span
-                      key={item.key}
-                      className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700'
-                    >
-                      <span className='text-slate-500'>{item.label}</span>
-                      <span className='font-semibold text-slate-900'>{bucketCountsByWorkflow[item.key]}</span>
-                    </span>
-                  ))}
-                </div>
+                {data.casesByStatus.length > 0 && (
+                  <div className='mt-3 flex flex-wrap gap-2'>
+                    {[
+                      { key: 'activo', label: 'Activos' },
+                      { key: 'terminado', label: 'Terminados' },
+                      { key: 'terminado_apelacion', label: 'Terminado apelación' },
+                      { key: 'suspendido', label: 'Suspendidos' },
+                      { key: 'archivado', label: 'Archivados' },
+                    ].map((item) => {
+                      const match = data.casesByStatus.find((row) => row.status === item.key);
+                      const count = match?.count ?? 0;
+                      return (
+                        <span
+                          key={item.key}
+                          className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700'
+                        >
+                          <span className='text-slate-500'>{item.label}</span>
+                          <span className='font-semibold text-slate-900'>{count}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <Link href='/cases' className='text-sm font-medium text-sky-600 hover:text-sky-700'>
                 Ver todos
@@ -379,9 +349,6 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                     <tbody className='divide-y divide-slate-100 text-slate-700'>
                       {recentCases.map((caseItem) => {
                         const effectiveStatus = effectiveCaseStatus(caseItem) ?? caseItem.estado ?? '';
-                        const workflowState = String((caseItem as any).workflow_state ?? '').trim();
-                        const showWorkflow = workflowState && workflowState !== 'activo' && effectiveStatus === 'activo';
-                        const primaryChip = showWorkflow ? workflowState : effectiveStatus;
                         const nextStage = caseItem.case_stages?.find((stage) => (stage.estado ?? '') === 'pendiente');
 
                         return (
@@ -411,13 +378,10 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                               <div className='space-y-2'>
                                 <span
                                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
-                                    (showWorkflow ? WORKFLOW_CHIPS[primaryChip] : STATUS_CHIPS[primaryChip]) ??
-                                    'bg-slate-100 text-slate-600 border border-slate-200'
+                                    STATUS_CHIPS[effectiveStatus] ?? 'bg-slate-100 text-slate-600 border border-slate-200'
                                   }`}
                                 >
-                                  {showWorkflow
-                                    ? WORKFLOW_LABELS[primaryChip] ?? primaryChip.replace('_', ' ')
-                                    : STATUS_LABELS[primaryChip] ?? (primaryChip || 'Sin estado')}
+                                  {STATUS_LABELS[effectiveStatus] ?? (effectiveStatus || 'Sin estado')}
                                 </span>
                                 <span
                                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${

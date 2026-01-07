@@ -1058,6 +1058,8 @@ export async function getCaseById(caseId: string) {
       .single();
     if (caseError || !caseRow) throw new Error('Caso no encontrado');
 
+    let isCollaborator = false;
+
     // autorización básica por rol
     if (profile.role === 'cliente') {
       const { data: clientCase } = await supabase
@@ -1076,13 +1078,14 @@ export async function getCaseById(caseId: string) {
         .eq('abogado_id', profile.id)
         .maybeSingle();
       if (!collaborator) throw new Error('Sin permisos para ver este caso');
+      isCollaborator = true;
     }
     const [lawyerProfile, stagesRes, notesRes, docsRes, reqsRes, counterpartiesRes, clientsRes] = await Promise.all([
       (async () => {
         if (!caseRow.abogado_responsable) return null;
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, nombre, telefono, rut')
+          .select('id, nombre, telefono, rut, email')
           .eq('id', caseRow.abogado_responsable)
           .maybeSingle();
         if (error) {
@@ -1125,6 +1128,7 @@ export async function getCaseById(caseId: string) {
 
     const enrichedCase: any = {
       ...caseRow,
+      is_collaborator: isCollaborator,
       abogado_responsable_id: caseRow.abogado_responsable,
       abogado_responsable: lawyerProfile
         ? {
@@ -1132,6 +1136,7 @@ export async function getCaseById(caseId: string) {
             nombre: lawyerProfile.nombre,
             telefono: lawyerProfile.telefono,
             rut: lawyerProfile.rut,
+            email: (lawyerProfile as any).email ?? null,
           }
         : null,
       case_stages: stagesRes?.data ?? [],
@@ -1147,6 +1152,18 @@ export async function getCaseById(caseId: string) {
           .filter((client): client is { id: string; nombre: string; email: string; telefono: string | null; rut?: string | null; is_primary: boolean } => Boolean(client)) ??
         [],
     };
+
+    // Fallback: si no hay case_clients, intenta al menos mostrar el cliente principal.
+    if ((enrichedCase.clients?.length ?? 0) === 0 && (caseRow as any).cliente_principal_id) {
+      const { data: primaryClient } = await supabase
+        .from('profiles')
+        .select('id, nombre, email, telefono, rut')
+        .eq('id', (caseRow as any).cliente_principal_id)
+        .maybeSingle();
+      if (primaryClient?.id) {
+        enrichedCase.clients = [{ ...primaryClient, is_primary: true }];
+      }
+    }
 
     return { success: true, case: enrichedCase };
   } catch (error) {

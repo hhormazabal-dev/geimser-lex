@@ -110,6 +110,7 @@ function parsePartyLines(raw?: string | null): Array<{ nombre: string; rut?: str
 interface CaseDetailViewProps {
   case: Omit<Case, 'abogado_responsable'> & {
     fecha_termino?: string | null;
+    is_collaborator?: boolean;
     abogado_responsable?: {
       id: string;
       nombre: string;
@@ -462,7 +463,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   const canEdit =
     profile.role === 'admin_firma' ||
     profile.role === 'analista' ||
-    (profile.role === 'abogado' && caseData.abogado_responsable?.id === profile.id);
+    (profile.role === 'abogado' &&
+      (caseData.abogado_responsable?.id === profile.id || caseData.is_collaborator === true));
   const canReassign = profile.role === 'admin_firma' || profile.role === 'analista';
 
   const canManageStages = canEdit;
