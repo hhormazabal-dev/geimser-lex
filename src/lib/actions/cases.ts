@@ -39,6 +39,12 @@ const sOrNull = (v: string | undefined | null): string | null => (v ?? null);
 const nOrNull = (v: number | undefined | null): number | null => (v ?? null);
 const CASE_META_REGEX = /<!--case-form-meta:[\s\S]*?-->/g;
 
+function trimTextOrNull(value?: string | null): string | null {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function sanitizeObservaciones(value?: string | null): string | null {
   if (value === undefined || value === null) return null;
   const cleaned = value.replace(CASE_META_REGEX, '').trim();
@@ -188,21 +194,25 @@ export async function createCase(input: CreateCaseInput) {
 
     const supabase = await getSB();
     const nowIso = new Date().toISOString();
-    const numeroCausaClean = caseInput.numero_causa?.trim() ?? null;
+    const numeroCausaClean = trimTextOrNull(caseInput.numero_causa);
+    const tribunalClean = trimTextOrNull(caseInput.tribunal);
 
     if (numeroCausaClean) {
-      const { data: existing, error: numeroError } = await supabase
-        .from('cases')
-        .select('id')
-        .eq('numero_causa', numeroCausaClean)
-        .limit(1)
-        .maybeSingle();
+      let query = supabase.from('cases').select('id');
+      query = query.eq('numero_causa', numeroCausaClean);
+      query = tribunalClean ? query.eq('tribunal', tribunalClean) : query.is('tribunal', null);
+
+      // Evita falsos positivos cross-org (especialmente para super admins).
+      const orgId = (profile as any)?.active_organization_id ?? null;
+      if (orgId) query = query.eq('organization_id', orgId);
+
+      const { data: existing, error: numeroError } = await query.limit(1).maybeSingle();
 
       if (numeroError && numeroError.code !== 'PGRST116') throw numeroError;
       if (existing) {
         return {
           success: false,
-          error: 'Ya existe un expediente registrado con ese número de causa.',
+          error: 'Ya existe un expediente registrado con ese número de causa para ese tribunal.',
         };
       }
     }
@@ -213,7 +223,7 @@ export async function createCase(input: CreateCaseInput) {
 
       numero_causa: numeroCausaClean,
       materia: sOrNull(caseInput.materia),
-      tribunal: sOrNull(caseInput.tribunal),
+      tribunal: tribunalClean,
       region: sOrNull(caseInput.region),
       comuna: sOrNull(caseInput.comuna),
       rut_cliente: sOrNull(caseInput.rut_cliente),
@@ -483,11 +493,9 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       ...(rest.fecha_inicio !== undefined && { fecha_inicio: rest.fecha_inicio }),
       ...(rest.numero_causa !== undefined && {
         numero_causa:
-          typeof rest.numero_causa === 'string' && rest.numero_causa.trim().length > 0
-            ? rest.numero_causa.trim()
-            : null,
+          trimTextOrNull(typeof rest.numero_causa === 'string' ? rest.numero_causa : null),
       }),
-      ...(rest.tribunal !== undefined && { tribunal: rest.tribunal }),
+      ...(rest.tribunal !== undefined && { tribunal: trimTextOrNull(rest.tribunal) }),
       ...(rest.region !== undefined && { region: rest.region }),
       ...(rest.comuna !== undefined && { comuna: rest.comuna }),
       ...(rest.contraparte !== undefined && { contraparte: rest.contraparte }),
@@ -560,24 +568,35 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
     if (rest.prioridad !== undefined) updatePayload.prioridad = rest.prioridad;
     if (rest.workflow_state !== undefined) updatePayload.workflow_state = parseWorkflow(rest.workflow_state);
 
-    if (rest.numero_causa !== undefined) {
-      const trimmedNumero = typeof rest.numero_causa === 'string' ? rest.numero_causa.trim() : null;
-      if (trimmedNumero && trimmedNumero !== (existingCase.numero_causa ?? null)) {
-        const { data: existingNumero, error: numeroError } = await supabase
-          .from('cases')
-          .select('id')
-          .eq('numero_causa', trimmedNumero)
-          .neq('id', caseId)
-          .limit(1)
-          .maybeSingle();
+    // Evita duplicados dentro del mismo tribunal (mismo número puede existir en distintos tribunales).
+    const nextNumero = rest.numero_causa !== undefined ? trimTextOrNull(rest.numero_causa) : trimTextOrNull(existingCase.numero_causa);
+    const nextTribunal =
+      rest.tribunal !== undefined ? trimTextOrNull(rest.tribunal) : trimTextOrNull((existingCase as any).tribunal);
+    const numeroOrTribunalChanged =
+      (rest.numero_causa !== undefined && nextNumero !== trimTextOrNull(existingCase.numero_causa)) ||
+      (rest.tribunal !== undefined && nextTribunal !== trimTextOrNull((existingCase as any).tribunal));
 
-        if (numeroError && numeroError.code !== 'PGRST116') throw numeroError;
-        if (existingNumero) {
-          return {
-            success: false,
-            error: 'Ya existe otro expediente con ese número de causa.',
-          };
-        }
+    if (numeroOrTribunalChanged && nextNumero) {
+      let query = supabase
+        .from('cases')
+        .select('id')
+        .eq('numero_causa', nextNumero)
+        .neq('id', caseId);
+
+      query = nextTribunal ? query.eq('tribunal', nextTribunal) : query.is('tribunal', null);
+
+      if ((existingCase as any).organization_id) {
+        query = query.eq('organization_id', (existingCase as any).organization_id);
+      }
+
+      const { data: existingNumero, error: numeroError } = await query.limit(1).maybeSingle();
+
+      if (numeroError && numeroError.code !== 'PGRST116') throw numeroError;
+      if (existingNumero) {
+        return {
+          success: false,
+          error: 'Ya existe otro expediente con ese número de causa para ese tribunal.',
+        };
       }
     }
 
