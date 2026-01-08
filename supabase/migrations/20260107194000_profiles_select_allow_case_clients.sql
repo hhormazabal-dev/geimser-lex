@@ -10,6 +10,89 @@ BEGIN;
 -- responsible for OR where they are collaborators, within the active org.
 -- ---------------------------------------------------------------------------
 
+-- Helper to avoid RLS recursion between profiles <-> cases.
+-- Note: we bypass row security here on purpose; access checks are implemented
+-- explicitly using current org + org_members + case ownership/collaboration.
+CREATE OR REPLACE FUNCTION public.can_access_case_for_profile_select(p_case_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth
+SET row_security = off
+AS $$
+  WITH ctx AS (
+    SELECT
+      auth.uid() AS user_id,
+      (
+        SELECT p.active_organization_id
+        FROM public.profiles p
+        WHERE p.user_id = auth.uid()
+        LIMIT 1
+      ) AS org_id,
+      (
+        SELECT p.id
+        FROM public.profiles p
+        WHERE p.user_id = auth.uid()
+        LIMIT 1
+      ) AS profile_id
+  ),
+  c AS (
+    SELECT c.id, c.organization_id, c.abogado_responsable
+    FROM public.cases c
+    WHERE c.id = p_case_id
+  ),
+  roles AS (
+    SELECT
+      EXISTS (
+        SELECT 1
+        FROM public.org_members m
+        WHERE m.organization_id = (SELECT org_id FROM ctx)
+          AND m.user_id = (SELECT user_id FROM ctx)
+          AND m.role = 'org_admin'::public.org_member_role
+      ) AS is_org_admin,
+      EXISTS (
+        SELECT 1
+        FROM public.org_members m
+        WHERE m.organization_id = (SELECT org_id FROM ctx)
+          AND m.user_id = (SELECT user_id FROM ctx)
+          AND m.role = 'staff'::public.org_member_role
+      ) AS is_staff,
+      EXISTS (
+        SELECT 1
+        FROM public.org_members m
+        WHERE m.organization_id = (SELECT org_id FROM ctx)
+          AND m.user_id = (SELECT user_id FROM ctx)
+          AND m.role = 'lawyer'::public.org_member_role
+      ) AS is_lawyer
+  )
+  SELECT
+    public.is_super_admin()
+    OR (
+      (SELECT org_id FROM ctx) IS NOT NULL
+      AND (SELECT organization_id FROM c) = (SELECT org_id FROM ctx)
+      AND (
+        (SELECT is_org_admin FROM roles)
+        OR (SELECT is_staff FROM roles)
+        OR (
+          (SELECT is_lawyer FROM roles)
+          AND (
+            (SELECT abogado_responsable FROM c) = (SELECT profile_id FROM ctx)
+            OR EXISTS (
+              SELECT 1
+              FROM public.case_collaborators col
+              WHERE col.case_id = (SELECT id FROM c)
+                AND col.abogado_id = (SELECT profile_id FROM ctx)
+            )
+          )
+        )
+      )
+    );
+$$;
+
+REVOKE ALL ON FUNCTION public.can_access_case_for_profile_select(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.can_access_case_for_profile_select(UUID) TO authenticated;
+
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "profiles_select_scoped" ON public.profiles;
@@ -33,31 +116,11 @@ CREATE POLICY "profiles_select_scoped" ON public.profiles
         OR EXISTS (
           SELECT 1
           FROM public.case_clients cc
-          JOIN public.cases c ON c.id = cc.case_id
           WHERE cc.client_profile_id = profiles.id
-            AND c.organization_id = public.current_org_id()
-            AND (
-              -- org_admin / staff ven los clientes de los casos del org
-              public.has_org_role(public.current_org_id(), 'org_admin'::public.org_member_role)
-              OR public.has_org_role(public.current_org_id(), 'staff'::public.org_member_role)
-              OR (
-                -- lawyers: solo los casos propios o donde colaboran
-                public.has_org_role(public.current_org_id(), 'lawyer'::public.org_member_role)
-                AND (
-                  c.abogado_responsable = auth.uid()
-                  OR EXISTS (
-                    SELECT 1
-                    FROM public.case_collaborators col
-                    WHERE col.case_id = c.id
-                      AND col.abogado_id = auth.uid()
-                  )
-                )
-              )
-            )
+            AND public.can_access_case_for_profile_select(cc.case_id)
         )
       )
     )
   );
 
 COMMIT;
-

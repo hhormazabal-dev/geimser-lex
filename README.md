@@ -1,4 +1,3 @@
-'''
 # Xel Chile - Plataforma Corporativa para Estudios Jurídicos
 
 ![Xel Chile Logo](./public/logo.svg)
@@ -43,7 +42,8 @@ El sistema está diseñado como una aplicación de página única (SPA) altament
 | Característica | Descripción |
 | :--- | :--- |
 | **Gestión de Casos** | Creación, edición y seguimiento de casos jurídicos con campos específicos para Chile (RIT, RUC, materia, etc.). |
-| **Sistema de Roles** | Roles predefinidos (`admin_firma`, `abogado`, `cliente`) con un sistema de permisos granular basado en RLS de Supabase. |
+| **Multi-tenant (Organizaciones)** | Aislamiento por empresa vía `organizations`, `org_members` y contexto de empresa activa (`profiles.active_organization_id`) reforzado con RLS. |
+| **Sistema de Roles (Multi-rol)** | Roles (`admin_firma`, `abogado`, `analista`, `cliente`) + RBAC global (multi-rol) y `super_admin` global. La autorización se aplica con RLS + RPCs (`is_super_admin`, `effective_global_role`, `has_case_access`). |
 | **Portal Cliente** | Acceso seguro para clientes a través de *magic links*, permitiéndoles ver el estado de sus casos, documentos y timeline. |
 | **Timeline Procesal** | Visualización cronológica de las etapas procesales de cada caso, con plantillas predefinidas por materia legal. |
 | **Gestión Documental** | Carga, descarga y organización de documentos con control de versiones, visibilidad configurable y almacenamiento seguro en Supabase Storage. |
@@ -119,7 +119,7 @@ Sigue estos pasos para configurar y ejecutar el proyecto en tu entorno local.
 ### Requisitos
 
 - [Node.js](https://nodejs.org/) >= 18.0.0
-- [npm](https://www.npmjs.com/) >= 8.0.0
+- [pnpm](https://pnpm.io/) (recomendado) o [npm](https://www.npmjs.com/)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 - [Docker](https://www.docker.com/) (para Supabase local)
 
@@ -133,7 +133,8 @@ Sigue estos pasos para configurar y ejecutar el proyecto en tu entorno local.
 
 2.  **Instala las dependencias:**
     ```bash
-    npm install
+    pnpm install
+    # o: npm install
     ```
 
 ### Configuración de Supabase
@@ -153,24 +154,30 @@ Sigue estos pasos para configurar y ejecutar el proyecto en tu entorno local.
 
 4.  **Aplica las migraciones:**
     ```bash
-    supabase db reset
+    pnpm db:reset
     ```
     El comando limpia la base de datos local y aplica todas las migraciones en orden. El archivo `seed.sql` queda disponible si necesitas agregar inserciones simples adicionales.
 
 5.  **Carga los datos de prueba y usuarios demo:**
     ```bash
-    pnpm run seed:demo
+    pnpm seed:demo
     # o, si prefieres no usar los scripts de package.json:
     npx tsx scripts/seed-auth-users.ts
     ```
     Este script utiliza la `SUPABASE_SERVICE_ROLE_KEY` configurada en tu `.env.local` para crear los usuarios de ejemplo en `auth.users` y poblar las tablas relacionadas (`profiles`, `cases`, etc.).
+
+6.  **(Opcional) Generar un SQL único para bootstrap** (útil si vas a levantar esto en otro proyecto Supabase sin CLI/CI):
+    ```bash
+    ./scripts/generate-supabase-full-sql.sh > supabase/full_init.sql
+    ```
+    Este archivo es un artefacto generado (recomendado no commitearlo).
 
 ### Ejecutar la Aplicación
 
 Una vez completada la instalación y configuración, puedes iniciar el servidor de desarrollo:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 La aplicación estará disponible en [http://localhost:3000](http://localhost:3000).
@@ -183,14 +190,14 @@ La aplicación estará disponible en [http://localhost:3000](http://localhost:30
 
 ## Scripts Disponibles
 
-- `npm run dev`: Inicia el servidor de desarrollo.
-- `npm run build`: Compila la aplicación para producción.
-- `npm run start`: Inicia un servidor de producción.
-- `npm run lint`: Ejecuta ESLint para analizar el código.
-- `npm run test`: Ejecuta la suite completa de tests (unitarios y e2e).
-- `npm run test:unit`: Ejecuta solo los tests unitarios.
-- `npm run test:e2e`: Ejecuta solo los tests e2e.
-- `pnpm run seed:demo`: Crea usuarios demo con la Service Role Key y vuelve a cargar los datos de ejemplo (puedes usar `npx tsx scripts/seed-auth-users.ts`).
+- `pnpm dev`: Inicia el servidor de desarrollo.
+- `pnpm build`: Compila la aplicación para producción.
+- `pnpm start`: Inicia un servidor de producción.
+- `pnpm lint`: Ejecuta ESLint para analizar el código.
+- `pnpm test`: Ejecuta la suite completa de tests (unitarios y e2e).
+- `pnpm test:unit`: Ejecuta solo los tests unitarios.
+- `pnpm test:e2e`: Ejecuta solo los tests e2e.
+- `pnpm seed:demo`: Crea usuarios demo con la Service Role Key y vuelve a cargar los datos de ejemplo (puedes usar `npx tsx scripts/seed-auth-users.ts`).
 
 Para una lista completa, consulta la sección `scripts` en `package.json`.
 
@@ -198,9 +205,9 @@ Para una lista completa, consulta la sección `scripts` en `package.json`.
 
 El proyecto tiene una cobertura de testing exhaustiva para garantizar la calidad y la estabilidad.
 
-- **Unit Tests**: Se utilizan para probar funciones individuales, Server Actions y validadores de forma aislada. Se ejecutan con `npm run test:unit`.
-- **E2E Tests**: Simulan flujos de usuario completos en un entorno de navegador real. Se ejecutan con `npm run test:e2e`.
-- **Coverage**: Para generar un reporte de cobertura de código, ejecuta `npm run test:coverage`.
+- **Unit Tests**: Se utilizan para probar funciones individuales, Server Actions y validadores de forma aislada. Se ejecutan con `pnpm test:unit`.
+- **E2E Tests**: Simulan flujos de usuario completos en un entorno de navegador real. Se ejecutan con `pnpm test:e2e`.
+- **Coverage**: Para generar un reporte de cobertura de código, ejecuta `pnpm test:coverage`.
 
 ## Seguridad
 
@@ -212,6 +219,12 @@ La seguridad es un pilar fundamental de Xel Chile. Se han implementado múltiple
 - **Headers de Seguridad**: Se utilizan headers HTTP estándar de la industria para proteger la aplicación contra ataques de clickjacking, XSS, etc.
 - **Gestión de Sesiones Segura**: Control de sesiones activas, detección de anomalías y protección contra secuestro de sesiones.
 
+### Multi-tenant y Roles (RBAC)
+
+- **Organizaciones**: el aislamiento se basa en `organizations`, `org_members` y la empresa activa (`profiles.active_organization_id`).
+- **RBAC global (multi-rol)**: se soportan múltiples roles por usuario (`rbac_user_roles`); el rol “efectivo” se resuelve con `effective_global_role()` (prioridad) y se ajusta por membership del org activo.
+- **Super admin**: el acceso global se otorga vía `public.super_admins` y se valida con `is_super_admin()`. Al clonar/desplegar, actualiza los emails seed de super admins en las migraciones.
+
 ## Contribuciones
 
 Las contribuciones son bienvenidas. Por favor, lee el archivo `CONTRIBUTING.md` para conocer las guías de estilo de código y el proceso para enviar pull requests.
@@ -219,4 +232,3 @@ Las contribuciones son bienvenidas. Por favor, lee el archivo `CONTRIBUTING.md` 
 ## Licencia
 
 Este proyecto está bajo la Licencia MIT. Consulta el archivo `LICENSE` para más detalles.
-'''
