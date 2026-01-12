@@ -23,7 +23,7 @@ async function fetchProfilesByOrgRoles(orgRoles: OrgMemberRole[]): Promise<Direc
     return [];
   }
 
-  const { data: members, error: membersError } = await supabase
+  const { data: members, error: membersError } = await (supabase as any)
     .from('org_members')
     .select('user_id, role')
     .eq('organization_id', orgId)
