@@ -85,6 +85,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const [selectedDeadline, setSelectedDeadline] = useState<any | null>(null);
   const [casePage, setCasePage] = useState(1);
   const [casesPerPage, setCasesPerPage] = useState(5);
+  const [moreColumn, setMoreColumn] = useState<CalendarKey | null>(null);
   const allDeadlines = (data.upcomingDeadlines || []) as any[];
   const caseById = useMemo(() => new Map(cases.map((caseItem) => [caseItem.id, caseItem])), [cases]);
   const calendarBuckets = useMemo<Record<CalendarKey, any[]>>(() => {
@@ -317,27 +318,23 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                                 onClick={() => setSelectedDeadline(deadline)}
                                 className='group w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
                               >
-                                <div className='flex items-start justify-between gap-2'>
-                                  <div className='min-w-0 space-y-1'>
-                                    <p className='max-h-9 overflow-hidden text-[12px] font-semibold leading-snug text-slate-900'>
-                                      {deadline.etapa || 'Actuación pendiente'}
-                                    </p>
-                                    <p className='max-h-8 overflow-hidden text-[11px] leading-snug text-slate-600'>
-                                      {resolveCaseTitle(deadline)}
-                                    </p>
-                                    <p className='truncate text-[10px] text-slate-500'>{resolveCaseClient(deadline)}</p>
-                                  </div>
-                                  <div className='shrink-0 text-right'>
-                                    <span className='inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-medium text-slate-500'>
+                                <div className='min-w-0 space-y-1'>
+                                  <div className='flex items-center justify-between gap-2 text-[9px] text-slate-500'>
+                                    <span className='truncate'>
                                       {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
                                     </span>
                                     {deadline.fecha_programada && (
-                                      <span className='mt-1 inline-flex items-center gap-1 text-[9px] text-sky-600'>
+                                      <span className='inline-flex items-center gap-1 text-sky-600'>
                                         <Clock className='h-2.5 w-2.5' />
-                                        {formatRelativeTime(deadline.fecha_programada)}
+                                        <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
                                       </span>
                                     )}
                                   </div>
+                                  <p className='truncate text-[12px] font-semibold text-slate-900'>
+                                    {deadline.etapa || 'Actuación pendiente'}
+                                  </p>
+                                  <p className='truncate text-[11px] text-slate-600'>{resolveCaseTitle(deadline)}</p>
+                                  <p className='truncate text-[10px] text-slate-500'>{resolveCaseClient(deadline)}</p>
                                 </div>
                               </button>
                             ))
@@ -345,7 +342,13 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                         </div>
 
                         {items.length > previewItems.length && (
-                          <p className='mt-2 text-[10px] text-slate-500'>+{items.length - previewItems.length} más</p>
+                          <button
+                            type='button'
+                            onClick={() => setMoreColumn(column.key)}
+                            className='mt-2 text-[10px] font-medium text-sky-600 hover:text-sky-700'
+                          >
+                            +{items.length - previewItems.length} más
+                          </button>
                         )}
                       </div>
                     );
@@ -811,6 +814,62 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   <Link href={`/cases/${selectedDeadline.case.id}`}>Ver caso completo</Link>
                 </Button>
               )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={Boolean(moreColumn)}
+          onOpenChange={(open) => {
+            if (!open) setMoreColumn(null);
+          }}
+        >
+          <DialogContent className='max-w-lg'>
+            <DialogHeader className='space-y-2'>
+              <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Agenda completa</p>
+              <DialogTitle className='text-lg'>
+                {moreColumn ? CALENDAR_COLUMNS.find((col) => col.key === moreColumn)?.label : 'Actuaciones'}
+              </DialogTitle>
+              <DialogDescription className='text-[12px]'>
+                {moreColumn ? (calendarBuckets[moreColumn]?.length ?? 0) : 0} actuaciones registradas.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className='max-h-[320px] space-y-2 overflow-y-auto pr-1'>
+              {(moreColumn ? calendarBuckets[moreColumn] ?? [] : []).map((deadline) => (
+                <button
+                  key={deadline.id}
+                  type='button'
+                  onClick={() => {
+                    setMoreColumn(null);
+                    setSelectedDeadline(deadline);
+                  }}
+                  className='w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-[12px] transition hover:border-slate-300 hover:bg-slate-50'
+                >
+                  <div className='flex items-center justify-between gap-2 text-[10px] text-slate-500'>
+                    <span className='truncate'>
+                      {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
+                    </span>
+                    {deadline.fecha_programada && (
+                      <span className='inline-flex items-center gap-1 text-sky-600'>
+                        <Clock className='h-3 w-3' />
+                        <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className='mt-1 truncate font-semibold text-slate-900'>
+                    {deadline.etapa || 'Actuación pendiente'}
+                  </p>
+                  <p className='truncate text-[11px] text-slate-600'>{resolveCaseTitle(deadline)}</p>
+                  <p className='truncate text-[10px] text-slate-500'>{resolveCaseClient(deadline)}</p>
+                </button>
+              ))}
+            </div>
+
+            <DialogFooter className='gap-2'>
+              <DialogClose asChild>
+                <Button variant='outline' size='sm'>Cerrar</Button>
+              </DialogClose>
             </DialogFooter>
           </DialogContent>
         </Dialog>
