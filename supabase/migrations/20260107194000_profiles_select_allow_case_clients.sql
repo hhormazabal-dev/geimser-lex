@@ -1,12 +1,12 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- Fix: allow staff to read client profiles linked to cases they can access.
+-- Fix: allow staff to read client + lawyer profiles linked to cases they can access.
 -- Symptom: in Case detail, "Clientes principales" may show as "Sin registrar"
 -- even when `case_clients` exists, because the joined `profiles` row is hidden
 -- by RLS if the client profile has missing/mismatched organization_id.
 --
--- This keeps tenant isolation: lawyers only see clients for cases they are
+-- This keeps tenant isolation: lawyers only see profiles for cases they are
 -- responsible for OR where they are collaborators, within the active org.
 -- ---------------------------------------------------------------------------
 
@@ -118,6 +118,20 @@ CREATE POLICY "profiles_select_scoped" ON public.profiles
           FROM public.case_clients cc
           WHERE cc.client_profile_id = profiles.id
             AND public.can_access_case_for_profile_select(cc.case_id)
+        )
+        -- abogados responsables vinculados a casos accesibles (fallback ante datos legacy)
+        OR EXISTS (
+          SELECT 1
+          FROM public.cases c
+          WHERE c.abogado_responsable = profiles.id
+            AND public.can_access_case_for_profile_select(c.id)
+        )
+        -- abogados colaboradores vinculados a casos accesibles (fallback ante datos legacy)
+        OR EXISTS (
+          SELECT 1
+          FROM public.case_collaborators col
+          WHERE col.abogado_id = profiles.id
+            AND public.can_access_case_for_profile_select(col.case_id)
         )
       )
     )

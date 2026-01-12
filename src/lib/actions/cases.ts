@@ -871,13 +871,37 @@ type LawyerSummary = {
 
 export async function listAvailableLawyers() {
   try {
-    await requireAuth(['admin_firma', 'analista']);
+    const profile = await requireAuth(['admin_firma', 'analista']);
+    const orgId = (profile as { active_organization_id?: string | null }).active_organization_id ?? null;
+    if (!orgId) {
+      return {
+        success: false as const,
+        lawyers: [] as LawyerSummary[],
+        error: 'Debes seleccionar una empresa activa primero.',
+      };
+    }
     const supabase = await getSB();
+
+    const { data: members, error: membersError } = await supabase
+      .from('org_members')
+      .select('user_id, role')
+      .eq('organization_id', orgId)
+      .in('role', ['lawyer', 'org_admin']);
+    if (membersError) throw membersError;
+
+    const userIds = Array.from(
+      new Set((members ?? []).map((member: { user_id?: string | null }) => member.user_id).filter(Boolean) as string[]),
+    );
+
+    if (userIds.length === 0) {
+      return { success: true as const, lawyers: [] as LawyerSummary[] };
+    }
 
     const { data, error } = await supabase
       .from('profiles')
       .select('id, nombre, email, telefono, activo')
-      .eq('role', 'abogado')
+      .in('user_id', userIds)
+      .eq('activo', true)
       .order('nombre', { ascending: true });
     if (error) throw error;
 
