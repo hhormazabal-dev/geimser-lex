@@ -278,13 +278,13 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   </span>
                 </div>
 
-                <div className='mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
+                <div className='mt-3 grid gap-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
                   {CALENDAR_COLUMNS.map((column) => {
                     const items = calendarBuckets[column.key] ?? [];
-                    const previewItems = items.slice(0, 3);
+                    const previewItems = items.slice(0, 2);
 
                     return (
-                      <div key={column.key} className='rounded-xl border border-slate-200 bg-white/90 p-2.5 shadow-sm'>
+                      <div key={column.key} className='rounded-lg border border-slate-200 bg-white/90 p-2 shadow-sm'>
                         <div className='flex items-start justify-between gap-2'>
                           <div>
                             <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>{column.label}</p>
@@ -293,7 +293,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                           <span className='text-[11px] font-semibold text-slate-700'>{items.length}</span>
                         </div>
 
-                        <div className='mt-2.5 space-y-2'>
+                        <div className='mt-2 space-y-1.5'>
                           {previewItems.length === 0 ? (
                             <div className='rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-2.5 py-3 text-[11px] text-slate-400'>
                               Sin actuaciones registradas
@@ -304,27 +304,18 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                                 key={deadline.id}
                                 type='button'
                                 onClick={() => setSelectedDeadline(deadline)}
-                                className='group w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
+                                className='group w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
                               >
-                                <div className='flex items-start justify-between gap-3'>
-                                  <div className='space-y-1'>
-                                    <p className='text-[12px] font-semibold text-slate-900'>
+                                <div className='flex items-start justify-between gap-2'>
+                                  <div className='min-w-0 space-y-0.5'>
+                                    <p className='truncate text-[11px] font-semibold text-slate-900'>
                                       {deadline.etapa || 'Actuación pendiente'}
                                     </p>
-                                    <p className='text-[11px] text-slate-500'>{resolveCaseTitle(deadline)}</p>
+                                    <p className='truncate text-[10px] text-slate-500'>{resolveCaseTitle(deadline)}</p>
                                   </div>
-                                  <span className='rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-500'>
+                                  <span className='shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-medium text-slate-500'>
                                     {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
                                   </span>
-                                </div>
-                                <div className='mt-1 flex items-center justify-between text-[10px] text-slate-500'>
-                                  <span>{resolveCaseClient(deadline)}</span>
-                                  {deadline.fecha_programada && (
-                                    <span className='inline-flex items-center gap-1 text-sky-600'>
-                                      <Clock className='h-2.5 w-2.5' />
-                                      {formatRelativeTime(deadline.fecha_programada)}
-                                    </span>
-                                  )}
                                 </div>
                               </button>
                             ))
@@ -382,38 +373,19 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
 
               <div className='grid grid-cols-2 gap-2.5 text-[11px] text-slate-500'>
                 <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
-                  <p className='text-[10px] uppercase tracking-[0.18em]'>Solicitudes pendientes</p>
+                  <p className='text-[10px] uppercase tracking-[0.18em]'>Pendientes</p>
                   <p className='mt-2 text-lg font-semibold text-slate-900'>{stats.pendingRequests}</p>
                 </div>
                 <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
-                  <p className='text-[10px] uppercase tracking-[0.18em]'>Casos cerrados</p>
-                  <p className='mt-2 text-lg font-semibold text-slate-900'>{stats.completedCases}</p>
-                </div>
-              </div>
-
-              <div className='grid grid-cols-2 gap-2.5 text-[11px] text-slate-500'>
-                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
                   <p className='text-[10px] uppercase tracking-[0.18em]'>Hoy</p>
                   <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.today}</p>
-                </div>
-                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
-                  <p className='text-[10px] uppercase tracking-[0.18em]'>Este mes</p>
-                  <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.thisMonth}</p>
-                </div>
-                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
-                  <p className='text-[10px] uppercase tracking-[0.18em]'>Próximo mes</p>
-                  <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.nextMonth}</p>
-                </div>
-                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
-                  <p className='text-[10px] uppercase tracking-[0.18em]'>En 2 meses</p>
-                  <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.plusTwoMonths}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </section>
 
-        <section className='grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
+        <section className='grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4'>
           {metricCards.map((item) => (
             <Card key={item.label} className='rounded-xl border border-slate-200 bg-white shadow-sm'>
               <CardContent className='space-y-2.5 p-4'>
@@ -421,7 +393,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>{item.label}</p>
                   <item.icon className='h-3.5 w-3.5 text-slate-400' />
                 </div>
-                <p className='text-2xl font-semibold text-slate-900'>{item.value}</p>
+                <p className='text-xl font-semibold text-slate-900'>{item.value}</p>
                 <p className='text-[11px] text-slate-500'>{item.caption}</p>
               </CardContent>
             </Card>
