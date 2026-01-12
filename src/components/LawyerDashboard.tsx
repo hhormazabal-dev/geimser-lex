@@ -592,21 +592,42 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                 {deadlines.length === 0 ? (
                   <p className='text-[12px] text-slate-500'>No hay etapas agendadas en los próximos 90 días.</p>
                 ) : (
-                  deadlines.map((deadline: any) => (
-                    <div key={deadline.id} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[12px]'>
-                      <p className='font-medium text-slate-900'>{deadline.case?.caratulado || 'Caso sin título'}</p>
-                      <p className='text-[11px] text-slate-500'>Etapa: {deadline.etapa}</p>
-                      <div className='mt-2 flex items-center justify-between text-[11px] text-slate-500'>
-                        <span>{deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}</span>
-                        {deadline.fecha_programada && (
-                          <span className='inline-flex items-center gap-1 text-sky-600'>
-                            <Clock className='h-3 w-3' />
-                            {formatRelativeTime(deadline.fecha_programada)}
-                          </span>
-                        )}
+                  deadlines.map((deadline: any) => {
+                    const caseId = deadline.case?.id;
+                    const content = (
+                      <>
+                        <p className='font-medium text-slate-900'>{deadline.case?.caratulado || 'Caso sin título'}</p>
+                        <p className='text-[11px] text-slate-500'>Etapa: {deadline.etapa}</p>
+                        <div className='mt-2 flex items-center justify-between text-[11px] text-slate-500'>
+                          <span>{deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}</span>
+                          {deadline.fecha_programada && (
+                            <span className='inline-flex items-center gap-1 text-sky-600'>
+                              <Clock className='h-3 w-3' />
+                              {formatRelativeTime(deadline.fecha_programada)}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    );
+
+                    if (caseId) {
+                      return (
+                        <Link
+                          key={deadline.id}
+                          href={`/cases/${caseId}`}
+                          className='block rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[12px] transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm'
+                        >
+                          {content}
+                        </Link>
+                      );
+                    }
+
+                    return (
+                      <div key={deadline.id} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[12px]'>
+                        {content}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </CardContent>
             </Card>
