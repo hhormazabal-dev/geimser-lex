@@ -83,6 +83,25 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const router = useRouter();
   const stats = data.stats;
   const [selectedDeadline, setSelectedDeadline] = useState<any | null>(null);
+  const allDeadlines = (data.upcomingDeadlines || []) as any[];
+  const caseById = useMemo(() => new Map(cases.map((caseItem) => [caseItem.id, caseItem])), [cases]);
+  const calendarBuckets = useMemo<Record<CalendarKey, any[]>>(() => {
+    const buckets = CALENDAR_COLUMNS.reduce((acc, column) => {
+      acc[column.key] = [];
+      return acc;
+    }, {} as Record<CalendarKey, any[]>);
+
+    allDeadlines.forEach((deadline) => {
+      const key = classifyStage(deadline?.etapa);
+      buckets[key].push(deadline);
+    });
+
+    Object.values(buckets).forEach((items) => {
+      items.sort((a, b) => String(a?.fecha_programada ?? '').localeCompare(String(b?.fecha_programada ?? '')));
+    });
+
+    return buckets;
+  }, [allDeadlines]);
 
   const effectiveCaseStatus = (caseRow: any) => {
     const sentenciaEstado = (caseRow?.sentencia_estado as string | null | undefined) ?? null;
@@ -106,20 +125,6 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     };
   }, [router]);
 
-  if (!stats) {
-    return (
-      <Card className="border-red-200/60 bg-white/80">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600">
-            <AlertTriangle className="h-5 w-5" />
-            No se pudieron cargar los datos
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-foreground/60">Intenta nuevamente en unos minutos.</CardContent>
-      </Card>
-    );
-  }
-
   const activeCases = cases.filter((c: any) => {
     const status = effectiveCaseStatus(c);
     return status === 'activo' || status === 'terminado_apelacion';
@@ -127,28 +132,9 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const recentCases = [...cases]
     .sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))
     .slice(0, 6);
-  const allDeadlines = (data.upcomingDeadlines || []) as any[];
   const deadlines = allDeadlines.slice(0, 5);
   const totalStatus = data.casesByStatus.reduce((acc, item) => acc + item.count, 0);
   const nextDeadline = deadlines.length > 0 ? deadlines[0] : null;
-  const caseById = useMemo(() => new Map(cases.map((caseItem) => [caseItem.id, caseItem])), [cases]);
-  const calendarBuckets = useMemo<Record<CalendarKey, any[]>>(() => {
-    const buckets = CALENDAR_COLUMNS.reduce((acc, column) => {
-      acc[column.key] = [];
-      return acc;
-    }, {} as Record<CalendarKey, any[]>);
-
-    allDeadlines.forEach((deadline) => {
-      const key = classifyStage(deadline?.etapa);
-      buckets[key].push(deadline);
-    });
-
-    Object.values(buckets).forEach((items) => {
-      items.sort((a, b) => String(a?.fecha_programada ?? '').localeCompare(String(b?.fecha_programada ?? '')));
-    });
-
-    return buckets;
-  }, [allDeadlines]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -177,6 +163,35 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     },
     { today: 0, thisMonth: 0, nextMonth: 0, plusTwoMonths: 0 },
   );
+
+  const resolveCaseTitle = (deadline: any) => {
+    const caseId = deadline?.case?.id ?? null;
+    const caseRow = caseId ? caseById.get(caseId) : null;
+    return caseRow?.caratulado || deadline?.case?.caratulado || 'Caso sin título';
+  };
+
+  const resolveCaseClient = (deadline: any) => {
+    const caseId = deadline?.case?.id ?? null;
+    const caseRow = caseId ? caseById.get(caseId) : null;
+    return caseRow?.nombre_cliente || 'Cliente sin registro';
+  };
+
+  const previewCase = selectedDeadline?.case?.id ? caseById.get(selectedDeadline.case.id) : null;
+  const previewStatus = previewCase ? effectiveCaseStatus(previewCase) : null;
+
+  if (!stats) {
+    return (
+      <Card className="border-red-200/60 bg-white/80">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-600">
+            <AlertTriangle className="h-5 w-5" />
+            No se pudieron cargar los datos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-foreground/60">Intenta nuevamente en unos minutos.</CardContent>
+      </Card>
+    );
+  }
 
   const heroDescription =
     stats.activeCases > 0
@@ -211,21 +226,6 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
       caption: `${stats.totalNotes} notas recientes`,
     },
   ];
-
-  const resolveCaseTitle = (deadline: any) => {
-    const caseId = deadline?.case?.id ?? null;
-    const caseRow = caseId ? caseById.get(caseId) : null;
-    return caseRow?.caratulado || deadline?.case?.caratulado || 'Caso sin título';
-  };
-
-  const resolveCaseClient = (deadline: any) => {
-    const caseId = deadline?.case?.id ?? null;
-    const caseRow = caseId ? caseById.get(caseId) : null;
-    return caseRow?.nombre_cliente || 'Cliente sin registro';
-  };
-
-  const previewCase = selectedDeadline?.case?.id ? caseById.get(selectedDeadline.case.id) : null;
-  const previewStatus = previewCase ? effectiveCaseStatus(previewCase) : null;
 
   return (
     <div className="space-y-8">
