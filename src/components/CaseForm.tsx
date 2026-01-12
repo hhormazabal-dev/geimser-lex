@@ -601,7 +601,7 @@ export function CaseForm({
   const newClientRut = watchNewClient('rut');
   const { ref: newClientRutRef, ...newClientRutField } = registerNewClient('rut');
 
-  const step1Done = Boolean(clientePrincipalId) && Boolean(demandantes[0]?.nombre.trim());
+  const step1Done = Boolean(demandantes[0]?.nombre.trim());
   const step2Done = Boolean(caratuladoValue?.trim()) && Boolean(materiaValue?.trim());
   const step3Done = (descripcionInicialValue ?? '').trim().length >= 20;
   const currentStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4;
@@ -1476,7 +1476,7 @@ export function CaseForm({
 	
 	                <div className='space-y-2'>
 	                  <div className='flex items-center justify-between gap-2'>
-	                    <Label htmlFor='cliente_principal_id'>Cliente principal *</Label>
+                    <Label htmlFor='cliente_principal_id'>Cliente principal (opcional)</Label>
 	                    <Button
                       type='button'
                       variant='ghost'
@@ -1490,7 +1490,6 @@ export function CaseForm({
                   <Controller
                     control={control}
                     name='cliente_principal_id'
-                    rules={{ required: 'Selecciona un cliente registrado para continuar.' }}
                     render={({ field }) => (
                       <select
                         id='cliente_principal_id'
@@ -1509,8 +1508,8 @@ export function CaseForm({
                     )}
                   />
                   {clientOptions.length === 0 && (
-                    <p className='text-xs font-medium text-red-500'>
-                      No hay clientes registrados. Crea primero el cliente para habilitar la creación del caso.
+                    <p className='text-xs text-gray-500'>
+                      No hay clientes registrados. Puedes crear el caso igual y vincular el cliente después.
                     </p>
                   )}
                   {errors.cliente_principal_id && (

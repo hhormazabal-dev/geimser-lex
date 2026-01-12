@@ -182,6 +182,13 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     return caseRow?.nombre_cliente || 'Cliente sin registro';
   };
 
+  const resolveCaseRole = (deadline: any) => {
+    const responsableId = deadline?.case?.abogado_responsable ?? null;
+    if (responsableId && responsableId === profile.id) return 'Responsable';
+    if (responsableId && responsableId !== profile.id) return 'Colaborador';
+    return profile.role === 'admin_firma' ? 'Supervisor' : 'Equipo';
+  };
+
   const previewCase = selectedDeadline?.case?.id ? caseById.get(selectedDeadline.case.id) : null;
   const previewStatus = previewCase ? effectiveCaseStatus(previewCase) : null;
 
@@ -366,31 +373,47 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-3 px-4 pb-4 pt-0'>
-              {nextDeadline ? (
-                <div className='space-y-3'>
-                  <div>
-                    <p className='text-[13px] font-semibold text-slate-900'>{nextDeadline.case?.caratulado || 'Caso sin título'}</p>
-                    <p className='text-[11px] text-slate-500'>
-                      {nextDeadline.case?.nombre_cliente || 'Cliente sin registro'}
-                    </p>
-                  </div>
-                  <div className='rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-600'>
-                    <span className='font-medium text-slate-900'>{nextDeadline.etapa}</span>
-                    {nextDeadline.fecha_programada && (
-                      <>
-                        <span className='mx-2 text-slate-400'>•</span>
-                        <span>{formatDate(nextDeadline.fecha_programada)}</span>
-                        <span className='ml-2 inline-flex items-center gap-1 text-[11px] text-sky-600'>
-                          <Clock className='h-3 w-3' />
-                          {formatRelativeTime(nextDeadline.fecha_programada)}
+              {deadlines.length > 0 ? (
+                <div className='space-y-2'>
+                  {deadlines.slice(0, 3).map((deadline: any) => (
+                    <button
+                      key={deadline.id}
+                      type='button'
+                      onClick={() => setSelectedDeadline(deadline)}
+                      className='w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-[12px] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
+                    >
+                      <div className='flex items-center justify-between gap-2'>
+                        <p className='min-w-0 truncate text-[12px] font-semibold text-slate-900'>
+                          {resolveCaseTitle(deadline)}
+                        </p>
+                        <span className='shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                          {resolveCaseRole(deadline)}
                         </span>
-                      </>
-                    )}
-                  </div>
-                  <Link href={`/cases/${nextDeadline.case?.id ?? ''}`} className='inline-flex items-center gap-1 text-[12px] font-medium text-sky-600 hover:text-sky-700'>
-                    Revisar caso
-                    <ArrowRight className='h-3.5 w-3.5' />
-                  </Link>
+                      </div>
+                      <p className='mt-1 truncate text-[11px] text-slate-500'>{resolveCaseClient(deadline)}</p>
+                      <p className='truncate text-[11px] text-slate-600'>{deadline.etapa || 'Actuación pendiente'}</p>
+                      <div className='mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-500'>
+                        <span className='truncate'>
+                          {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
+                        </span>
+                        {deadline.fecha_programada && (
+                          <span className='inline-flex items-center gap-1 text-sky-600'>
+                            <Clock className='h-3 w-3' />
+                            <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                  {deadlines.length > 3 && (
+                    <Link
+                      href="/cases"
+                      className='inline-flex items-center gap-1 text-[11px] font-medium text-sky-600 hover:text-sky-700'
+                    >
+                      Ver más próximas
+                      <ArrowRight className='h-3 w-3' />
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <p className='text-[12px] text-slate-500'>Aún no tienes etapas programadas. Revisa tu cartera y agenda los próximos hitos.</p>

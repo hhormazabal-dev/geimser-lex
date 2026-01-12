@@ -72,7 +72,10 @@ const baseCaseSchema = z.object({
   sentencia_fecha: z.string().optional(),
   abogado_responsable: z.string().uuid('ID de abogado inválido').optional(),
   analista_id: z.string().uuid('ID de analista inválido').optional(),
-  cliente_principal_id: z.string().uuid('ID de cliente inválido'),
+  cliente_principal_id: z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.string().uuid('ID de cliente inválido'),
+  ).optional(),
   clientes_principales_extra_ids: z.array(z.string().uuid('ID de cliente inválido')).optional(),
   workflow_state: z
     .enum(['preparacion', 'en_revision', 'activo', 'cerrado'])
@@ -178,13 +181,6 @@ function isMissingDate(value: unknown) {
 export const createCaseSchema = baseCaseSchema.superRefine((data, ctx) => {
   // aquí data es BaseCaseSchema (no-partial)
   validateWorkflowCommon(data, ctx);
-  if (!data.cliente_principal_id) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Selecciona un cliente principal antes de crear el caso.',
-      path: ['cliente_principal_id'],
-    });
-  }
   if (
     typeof data.honorario_total_uf === 'number' &&
     typeof data.honorario_pagado_uf === 'number' &&

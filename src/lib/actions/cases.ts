@@ -182,10 +182,6 @@ export async function createCase(input: CreateCaseInput) {
       };
     }
 
-    if (!caseInput.cliente_principal_id) {
-      throw new Error('Debes seleccionar un cliente principal antes de crear el caso.');
-    }
-
     // En la práctica, si el creador no es abogado (y por tanto no "se autoasigna"),
     // exigimos abogado responsable para que no existan causas huérfanas.
     if ((profile.role === 'admin_firma' || profile.role === 'analista') && !caseInput.abogado_responsable) {
@@ -361,7 +357,7 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       comuna: extracted.comuna ?? undefined,
       contraparte: extracted.contraparte ?? undefined,
 
-      // 🔴 El schema exige string → nunca dejamos undefined
+      // Mantener requeridos del schema con fallback seguros.
       descripcion_inicial: extracted.descripcion_inicial ?? 'Caso creado desde brief.',
       documentacion_recibida: extracted.documentacion_recibida ?? undefined,
       observaciones: sanitizeObservaciones(extracted.observaciones) ?? `Caso creado desde brief:\n\n${validated.brief}`,
@@ -380,11 +376,6 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
 
       abogado_responsable: profile.id,
     };
-
-  const finalClienteId = (overrides as any)?.cliente_principal_id ?? base.cliente_principal_id;
-  if (!finalClienteId) {
-    throw new Error('Debes indicar el cliente principal al crear el caso.');
-  }
 
   const caseData: CreateCaseInput = {
     ...base,
@@ -421,7 +412,7 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       alcance_cliente_solicitado:
         (overrides as any)?.alcance_cliente_solicitado ??
         (base.alcance_cliente_solicitado as number | undefined),
-      cliente_principal_id: finalClienteId,
+      cliente_principal_id: (overrides as any)?.cliente_principal_id ?? base.cliente_principal_id,
     };
 
     return await createCase(caseData);
