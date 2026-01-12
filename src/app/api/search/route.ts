@@ -42,8 +42,6 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createServerClient();
-  const role = (profile as any)._role_override ?? profile.role;
-
   const MAX_CASES = 8;
   const MAX_CLIENTS = 6;
 
@@ -60,22 +58,7 @@ export async function GET(req: Request) {
     .join(',');
   casesQuery = casesQuery.or(orFilters);
 
-  if (role === 'abogado') {
-    casesQuery = casesQuery.eq('abogado_responsable', profile.id);
-  } else if (role === 'analista') {
-    casesQuery = casesQuery.in('workflow_state', ['preparacion', 'en_revision']);
-  } else if (role === 'cliente') {
-    const { data: links, error: linkError } = await supabase
-      .from('case_clients')
-      .select('case_id')
-      .eq('client_profile_id', profile.id);
-    if (linkError) return json({ error: linkError.message }, 500);
-    const ids = (links ?? []).map((row) => row.case_id);
-    if (ids.length === 0) {
-      return json({ cases: [], clients: [] } satisfies { cases: CaseResult[]; clients: ClientResult[] });
-    }
-    casesQuery = casesQuery.in('id', ids);
-  }
+  const role = (profile as any)._role_override ?? profile.role;
 
   const casesRes = await casesQuery;
   if (casesRes.error) return json({ error: casesRes.error.message }, 500);

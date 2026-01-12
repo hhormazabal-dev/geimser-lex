@@ -1022,23 +1022,7 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
       { count: 'exact' }
     );
 
-    if (profile.role === 'abogado') {
-      const { data: collaboratorRows } = await supabase
-        .from('case_collaborators')
-        .select('case_id')
-        .eq('abogado_id', profile.id)
-        .limit(10000);
-
-      const collaboratorCaseIds = (collaboratorRows ?? [])
-        .map((row: { case_id?: string | null }) => row.case_id)
-        .filter((id): id is string => Boolean(id));
-
-      if (collaboratorCaseIds.length > 0) {
-        query = query.or(`abogado_responsable.eq.${profile.id},id.in.(${collaboratorCaseIds.join(',')})`);
-      } else {
-        query = query.eq('abogado_responsable', profile.id);
-      }
-    } else if (profile.role === 'cliente') {
+    if (profile.role === 'cliente') {
       const { data: clientCases } = await supabase
         .from('case_clients')
         .select('case_id')

@@ -47,7 +47,7 @@ export default async function AbogadoDashboardPage() {
     getCasesByStatus(),
     getCasesByPriority(),
     getUpcomingDeadlines(),
-    getCases({ page: 1, limit: 25 }),
+    getCases({ page: 1, limit: 200 }),
     listQuickLinks().catch(() => []),
     listLegalTemplates().catch(() => []),
   ]);
