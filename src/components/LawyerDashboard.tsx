@@ -228,7 +228,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow="Mi tablero"
         title={`Hola, ${profile.nombre.split(' ')[0]}.`}
@@ -240,19 +240,19 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
         }
       />
 
-        <section className='grid gap-4 lg:grid-cols-[2fr_1.1fr]'>
-          <Card className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
-            <CardContent className='space-y-6 p-6'>
-              <div className='flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between'>
-                <div className='flex-1 space-y-3'>
-                  <p className='text-[11px] uppercase tracking-[0.25em] text-slate-400'>Panel de gestión</p>
-                  <h2 className='text-2xl font-semibold tracking-tight'>Estado de tu cartera</h2>
-                  <p className='max-w-xl text-sm leading-relaxed text-slate-600'>{heroDescription}</p>
+        <section className='grid gap-3 lg:grid-cols-[2fr_1.1fr]'>
+          <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+            <CardContent className='space-y-4 p-4'>
+              <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+                <div className='flex-1 space-y-2'>
+                  <p className='text-[10px] uppercase tracking-[0.25em] text-slate-400'>Panel de gestión</p>
+                  <h2 className='text-xl font-semibold tracking-tight'>Estado de tu cartera</h2>
+                  <p className='max-w-xl text-xs leading-relaxed text-slate-600'>{heroDescription}</p>
                 </div>
                 <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
-                  <div className='flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3'>
+                  <div className='flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2'>
                     <div
-                      className='flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-semibold text-slate-700 shadow-inner'
+                      className='flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-[13px] font-semibold text-slate-700 shadow-inner'
                       style={{
                         background: `linear-gradient(135deg, ${stringToColor(profile.nombre)} 0%, rgba(255,255,255,0.92) 100%)`,
                       }}
@@ -260,42 +260,42 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                       {getInitials(profile.nombre)}
                     </div>
                     <div>
-                      <p className='text-sm font-medium text-slate-900'>{profile.nombre}</p>
-                      <p className='text-xs text-slate-500'>{formatRoleLabel(profile.role)}</p>
+                      <p className='text-[13px] font-medium text-slate-900'>{profile.nombre}</p>
+                      <p className='text-[11px] text-slate-500'>{formatRoleLabel(profile.role)}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className='rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4'>
+              <div className='rounded-xl border border-slate-200/80 bg-slate-50/70 p-3'>
                 <div className='flex flex-wrap items-center justify-between gap-2'>
                   <div>
-                    <p className='text-[11px] uppercase tracking-[0.22em] text-slate-400'>Agenda por actuación</p>
-                    <p className='text-sm text-slate-600'>Próximas fechas ordenadas por tipo de gestión.</p>
+                    <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Agenda por actuación</p>
+                    <p className='text-[12px] text-slate-600'>Próximas fechas ordenadas por tipo de gestión.</p>
                   </div>
-                  <span className='text-xs text-slate-500'>
+                  <span className='text-[11px] text-slate-500'>
                     {allDeadlines.length} actuación{allDeadlines.length === 1 ? '' : 'es'} en 90 días
                   </span>
                 </div>
 
-                <div className='mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+                <div className='mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
                   {CALENDAR_COLUMNS.map((column) => {
                     const items = calendarBuckets[column.key] ?? [];
                     const previewItems = items.slice(0, 3);
 
                     return (
-                      <div key={column.key} className='rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm'>
+                      <div key={column.key} className='rounded-xl border border-slate-200 bg-white/90 p-2.5 shadow-sm'>
                         <div className='flex items-start justify-between gap-2'>
                           <div>
-                            <p className='text-[11px] uppercase tracking-[0.18em] text-slate-400'>{column.label}</p>
-                            <p className='text-xs text-slate-500'>{column.helper}</p>
+                            <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>{column.label}</p>
+                            <p className='text-[11px] text-slate-500'>{column.helper}</p>
                           </div>
-                          <span className='text-xs font-semibold text-slate-700'>{items.length}</span>
+                          <span className='text-[11px] font-semibold text-slate-700'>{items.length}</span>
                         </div>
 
-                        <div className='mt-3 space-y-2'>
+                        <div className='mt-2.5 space-y-2'>
                           {previewItems.length === 0 ? (
-                            <div className='rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-4 text-xs text-slate-400'>
+                            <div className='rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-2.5 py-3 text-[11px] text-slate-400'>
                               Sin actuaciones registradas
                             </div>
                           ) : (
@@ -304,24 +304,24 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                                 key={deadline.id}
                                 type='button'
                                 onClick={() => setSelectedDeadline(deadline)}
-                                className='group w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
+                                className='group w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
                               >
                                 <div className='flex items-start justify-between gap-3'>
                                   <div className='space-y-1'>
-                                    <p className='text-sm font-semibold text-slate-900'>
+                                    <p className='text-[12px] font-semibold text-slate-900'>
                                       {deadline.etapa || 'Actuación pendiente'}
                                     </p>
-                                    <p className='text-xs text-slate-500'>{resolveCaseTitle(deadline)}</p>
+                                    <p className='text-[11px] text-slate-500'>{resolveCaseTitle(deadline)}</p>
                                   </div>
-                                  <span className='rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500'>
+                                  <span className='rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-500'>
                                     {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
                                   </span>
                                 </div>
-                                <div className='mt-1 flex items-center justify-between text-[11px] text-slate-500'>
+                                <div className='mt-1 flex items-center justify-between text-[10px] text-slate-500'>
                                   <span>{resolveCaseClient(deadline)}</span>
                                   {deadline.fecha_programada && (
                                     <span className='inline-flex items-center gap-1 text-sky-600'>
-                                      <Clock className='h-3 w-3' />
+                                      <Clock className='h-2.5 w-2.5' />
                                       {formatRelativeTime(deadline.fecha_programada)}
                                     </span>
                                   )}
@@ -332,7 +332,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                         </div>
 
                         {items.length > previewItems.length && (
-                          <p className='mt-2 text-[11px] text-slate-500'>+{items.length - previewItems.length} más</p>
+                          <p className='mt-2 text-[10px] text-slate-500'>+{items.length - previewItems.length} más</p>
                         )}
                       </div>
                     );
@@ -342,100 +342,100 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
             </CardContent>
           </Card>
 
-          <Card className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
-            <CardHeader className='p-6 pb-3'>
-              <CardTitle className='flex items-center gap-2 text-sm font-semibold text-slate-800'>
-                <Calendar className='h-4 w-4 text-sky-500' />
+          <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+            <CardHeader className='p-4 pb-2'>
+              <CardTitle className='flex items-center gap-2 text-xs font-semibold text-slate-800'>
+                <Calendar className='h-3.5 w-3.5 text-sky-500' />
                 Próxima acción
               </CardTitle>
             </CardHeader>
-            <CardContent className='space-y-4 px-6 pb-6 pt-0'>
+            <CardContent className='space-y-3 px-4 pb-4 pt-0'>
               {nextDeadline ? (
                 <div className='space-y-3'>
                   <div>
-                    <p className='text-sm font-semibold text-slate-900'>{nextDeadline.case?.caratulado || 'Caso sin título'}</p>
-                    <p className='text-xs text-slate-500'>
+                    <p className='text-[13px] font-semibold text-slate-900'>{nextDeadline.case?.caratulado || 'Caso sin título'}</p>
+                    <p className='text-[11px] text-slate-500'>
                       {nextDeadline.case?.nombre_cliente || 'Cliente sin registro'}
                     </p>
                   </div>
-                  <div className='rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600'>
+                  <div className='rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-600'>
                     <span className='font-medium text-slate-900'>{nextDeadline.etapa}</span>
                     {nextDeadline.fecha_programada && (
                       <>
                         <span className='mx-2 text-slate-400'>•</span>
                         <span>{formatDate(nextDeadline.fecha_programada)}</span>
-                        <span className='ml-2 inline-flex items-center gap-1 text-xs text-sky-600'>
-                          <Clock className='h-3.5 w-3.5' />
+                        <span className='ml-2 inline-flex items-center gap-1 text-[11px] text-sky-600'>
+                          <Clock className='h-3 w-3' />
                           {formatRelativeTime(nextDeadline.fecha_programada)}
                         </span>
                       </>
                     )}
                   </div>
-                  <Link href={`/cases/${nextDeadline.case?.id ?? ''}`} className='inline-flex items-center gap-1 text-sm font-medium text-sky-600 hover:text-sky-700'>
+                  <Link href={`/cases/${nextDeadline.case?.id ?? ''}`} className='inline-flex items-center gap-1 text-[12px] font-medium text-sky-600 hover:text-sky-700'>
                     Revisar caso
-                    <ArrowRight className='h-4 w-4' />
+                    <ArrowRight className='h-3.5 w-3.5' />
                   </Link>
                 </div>
               ) : (
-                <p className='text-sm text-slate-500'>Aún no tienes etapas programadas. Revisa tu cartera y agenda los próximos hitos.</p>
+                <p className='text-[12px] text-slate-500'>Aún no tienes etapas programadas. Revisa tu cartera y agenda los próximos hitos.</p>
               )}
 
-              <div className='grid grid-cols-2 gap-3 text-xs text-slate-500'>
-                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                  <p className='text-[11px] uppercase tracking-[0.18em]'>Solicitudes pendientes</p>
-                  <p className='mt-2 text-xl font-semibold text-slate-900'>{stats.pendingRequests}</p>
+              <div className='grid grid-cols-2 gap-2.5 text-[11px] text-slate-500'>
+                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                  <p className='text-[10px] uppercase tracking-[0.18em]'>Solicitudes pendientes</p>
+                  <p className='mt-2 text-lg font-semibold text-slate-900'>{stats.pendingRequests}</p>
                 </div>
-                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                  <p className='text-[11px] uppercase tracking-[0.18em]'>Casos cerrados</p>
-                  <p className='mt-2 text-xl font-semibold text-slate-900'>{stats.completedCases}</p>
+                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                  <p className='text-[10px] uppercase tracking-[0.18em]'>Casos cerrados</p>
+                  <p className='mt-2 text-lg font-semibold text-slate-900'>{stats.completedCases}</p>
                 </div>
               </div>
 
-              <div className='grid grid-cols-2 gap-3 text-xs text-slate-500'>
-                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                  <p className='text-[11px] uppercase tracking-[0.18em]'>Hoy</p>
-                  <p className='mt-2 text-xl font-semibold text-slate-900'>{bucketCounts.today}</p>
+              <div className='grid grid-cols-2 gap-2.5 text-[11px] text-slate-500'>
+                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                  <p className='text-[10px] uppercase tracking-[0.18em]'>Hoy</p>
+                  <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.today}</p>
                 </div>
-                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                  <p className='text-[11px] uppercase tracking-[0.18em]'>Este mes</p>
-                  <p className='mt-2 text-xl font-semibold text-slate-900'>{bucketCounts.thisMonth}</p>
+                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                  <p className='text-[10px] uppercase tracking-[0.18em]'>Este mes</p>
+                  <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.thisMonth}</p>
                 </div>
-                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                  <p className='text-[11px] uppercase tracking-[0.18em]'>Próximo mes</p>
-                  <p className='mt-2 text-xl font-semibold text-slate-900'>{bucketCounts.nextMonth}</p>
+                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                  <p className='text-[10px] uppercase tracking-[0.18em]'>Próximo mes</p>
+                  <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.nextMonth}</p>
                 </div>
-                <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                  <p className='text-[11px] uppercase tracking-[0.18em]'>En 2 meses</p>
-                  <p className='mt-2 text-xl font-semibold text-slate-900'>{bucketCounts.plusTwoMonths}</p>
+                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                  <p className='text-[10px] uppercase tracking-[0.18em]'>En 2 meses</p>
+                  <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.plusTwoMonths}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </section>
 
-        <section className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+        <section className='grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
           {metricCards.map((item) => (
-            <Card key={item.label} className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
-              <CardContent className='space-y-3 p-5'>
+            <Card key={item.label} className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+              <CardContent className='space-y-2.5 p-4'>
                 <div className='flex items-center justify-between'>
-                  <p className='text-xs uppercase tracking-[0.18em] text-slate-400'>{item.label}</p>
-                  <item.icon className='h-4 w-4 text-slate-400' />
+                  <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>{item.label}</p>
+                  <item.icon className='h-3.5 w-3.5 text-slate-400' />
                 </div>
-                <p className='text-3xl font-semibold text-slate-900'>{item.value}</p>
-                <p className='text-xs text-slate-500'>{item.caption}</p>
+                <p className='text-2xl font-semibold text-slate-900'>{item.value}</p>
+                <p className='text-[11px] text-slate-500'>{item.caption}</p>
               </CardContent>
             </Card>
           ))}
         </section>
 
-        <section className='grid gap-6 lg:grid-cols-[2fr_1fr]'>
-          <Card className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
-            <CardHeader className='flex flex-col gap-2 p-6 pb-4 sm:flex-row sm:items-center sm:justify-between'>
+        <section className='grid gap-4 lg:grid-cols-[2fr_1fr]'>
+          <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+            <CardHeader className='flex flex-col gap-2 p-4 pb-3 sm:flex-row sm:items-center sm:justify-between'>
               <div>
-                <CardTitle className='text-lg font-semibold text-slate-900'>Casos bajo tu responsabilidad</CardTitle>
-                <p className='text-sm text-slate-500'>Mantenlos al día para asegurar continuidad con tus clientes.</p>
+                <CardTitle className='text-base font-semibold text-slate-900'>Casos bajo tu responsabilidad</CardTitle>
+                <p className='text-xs text-slate-500'>Mantenlos al día para asegurar continuidad con tus clientes.</p>
                 {data.casesByStatus.length > 0 && (
-                  <div className='mt-3 flex flex-wrap gap-2'>
+                  <div className='mt-2.5 flex flex-wrap gap-2'>
                     {[
                       { key: 'activo', label: 'Activos' },
                       { key: 'terminado', label: 'Terminados' },
@@ -448,7 +448,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                       return (
                         <span
                           key={item.key}
-                          className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700'
+                          className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-700'
                         >
                           <span className='text-slate-500'>{item.label}</span>
                           <span className='font-semibold text-slate-900'>{count}</span>
@@ -458,26 +458,26 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   </div>
                 )}
               </div>
-              <Link href='/cases' className='text-sm font-medium text-sky-600 hover:text-sky-700'>
+              <Link href='/cases' className='text-[12px] font-medium text-sky-600 hover:text-sky-700'>
                 Ver todos
               </Link>
             </CardHeader>
             <CardContent className='p-0'>
               {recentCases.length === 0 ? (
-                <div className='px-6 py-12 text-sm text-slate-500'>
+                <div className='px-4 py-10 text-[12px] text-slate-500'>
                   Aún no tienes casos asignados. El administrador debe derivarte un expediente.
                 </div>
               ) : (
                 <div className='overflow-x-auto'>
-                  <table className='min-w-full divide-y divide-slate-100 text-sm'>
-                    <thead className='bg-slate-50/80 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                  <table className='min-w-full divide-y divide-slate-100 text-[13px]'>
+                    <thead className='bg-slate-50/80 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500'>
                       <tr>
-                        <th scope='col' className='px-6 py-3 text-left'>Caso</th>
-                        <th scope='col' className='px-6 py-3 text-left'>Cliente</th>
-                        <th scope='col' className='px-6 py-3 text-left'>Estado</th>
-                        <th scope='col' className='px-6 py-3 text-left'>Próxima etapa</th>
-                        <th scope='col' className='px-6 py-3 text-left'>Valor</th>
-                        <th scope='col' className='px-6 py-3 text-right'>Acciones</th>
+                        <th scope='col' className='px-4 py-2.5 text-left'>Caso</th>
+                        <th scope='col' className='px-4 py-2.5 text-left'>Cliente</th>
+                        <th scope='col' className='px-4 py-2.5 text-left'>Estado</th>
+                        <th scope='col' className='px-4 py-2.5 text-left'>Próxima etapa</th>
+                        <th scope='col' className='px-4 py-2.5 text-left'>Valor</th>
+                        <th scope='col' className='px-4 py-2.5 text-right'>Acciones</th>
                       </tr>
                     </thead>
                     <tbody className='divide-y divide-slate-100 text-slate-700'>
@@ -487,38 +487,38 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
 
                         return (
                           <tr key={caseItem.id} className='transition hover:bg-slate-50/70'>
-                            <td className='px-6 py-4 align-top'>
+                            <td className='px-4 py-3 align-top'>
                               <div className='space-y-1'>
                                 <p className='font-semibold text-slate-900'>{caseItem.caratulado}</p>
                                 {caseItem.numero_causa && (
-                                  <p className='text-xs font-medium uppercase tracking-[0.18em] text-slate-400'>
+                                  <p className='text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400'>
                                     {caseItem.numero_causa}
                                   </p>
                                 )}
                                 {caseItem.materia && (
-                                  <Badge variant='outline' className='border-slate-200 bg-slate-50 text-[11px] font-medium text-slate-600'>
+                                  <Badge variant='outline' className='border-slate-200 bg-slate-50 text-[10px] font-medium text-slate-600'>
                                     {caseItem.materia}
                                   </Badge>
                                 )}
                               </div>
                             </td>
-                            <td className='px-6 py-4 align-top'>
+                            <td className='px-4 py-3 align-top'>
                               <div className='space-y-1'>
                                 <p className='font-medium text-slate-800'>{caseItem.nombre_cliente}</p>
-                                {caseItem.rut_cliente && <p className='text-xs text-slate-500'>{caseItem.rut_cliente}</p>}
+                                {caseItem.rut_cliente && <p className='text-[11px] text-slate-500'>{caseItem.rut_cliente}</p>}
                               </div>
                             </td>
-                            <td className='px-6 py-4 align-top'>
+                            <td className='px-4 py-3 align-top'>
                               <div className='space-y-2'>
                                 <span
-                                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${
                                     STATUS_CHIPS[effectiveStatus] ?? 'bg-slate-100 text-slate-600 border border-slate-200'
                                   }`}
                                 >
                                   {STATUS_LABELS[effectiveStatus] ?? (effectiveStatus || 'Sin estado')}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                                     PRIORITY_CHIPS[caseItem.prioridad || 'media'] ??
                                     'bg-slate-100 text-slate-600 border border-slate-200'
                                   }`}
@@ -527,31 +527,31 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                                 </span>
                               </div>
                             </td>
-                            <td className='px-6 py-4 align-top'>
+                            <td className='px-4 py-3 align-top'>
                               {nextStage ? (
                                 <div className='space-y-1'>
-                                  <p className='text-sm font-medium text-slate-900'>{nextStage.etapa}</p>
+                                  <p className='text-[12px] font-medium text-slate-900'>{nextStage.etapa}</p>
                                   {nextStage.fecha_programada ? (
-                                    <p className='text-xs text-slate-500'>{formatDate(nextStage.fecha_programada)}</p>
+                                    <p className='text-[11px] text-slate-500'>{formatDate(nextStage.fecha_programada)}</p>
                                   ) : (
-                                    <p className='text-xs text-slate-400'>Sin fecha</p>
+                                    <p className='text-[11px] text-slate-400'>Sin fecha</p>
                                   )}
                                 </div>
                               ) : (
-                                <span className='text-xs text-slate-400'>Sin etapa pendiente</span>
+                                <span className='text-[11px] text-slate-400'>Sin etapa pendiente</span>
                               )}
                             </td>
-                            <td className='px-6 py-4 align-top font-semibold text-slate-900'>
+                            <td className='px-4 py-3 align-top font-semibold text-slate-900'>
                               {caseItem.valor_estimado ? formatCurrency(caseItem.valor_estimado) : <span className='font-normal text-slate-400'>-</span>}
                             </td>
-                            <td className='px-6 py-4 align-top'>
+                            <td className='px-4 py-3 align-top'>
                               <div className='flex items-center justify-end'>
                                 <Link
                                   href={`/cases/${caseItem.id}`}
-                                  className='inline-flex items-center gap-1 text-sm font-medium text-sky-600 hover:text-sky-700'
+                                  className='inline-flex items-center gap-1 text-[12px] font-medium text-sky-600 hover:text-sky-700'
                                 >
                                   Ver detalle
-                                  <ArrowRight className='h-4 w-4' />
+                                  <ArrowRight className='h-3.5 w-3.5' />
                                 </Link>
                               </div>
                             </td>
@@ -565,18 +565,18 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
             </CardContent>
           </Card>
 
-          <div className='space-y-6'>
-            <Card className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
-              <CardHeader className='p-6 pb-4'>
-                <CardTitle className='text-sm font-semibold text-slate-800'>Panorama de tus casos</CardTitle>
+          <div className='space-y-4'>
+            <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+              <CardHeader className='p-4 pb-3'>
+                <CardTitle className='text-xs font-semibold text-slate-800'>Panorama de tus casos</CardTitle>
               </CardHeader>
-              <CardContent className='space-y-4 px-6 pb-6 pt-0'>
+              <CardContent className='space-y-3 px-4 pb-4 pt-0'>
                 {data.casesByStatus.length === 0 ? (
-                  <p className='text-sm text-slate-500'>Aún no hay suficientes datos para mostrar tu distribución.</p>
+                  <p className='text-[12px] text-slate-500'>Aún no hay suficientes datos para mostrar tu distribución.</p>
                 ) : (
                   data.casesByStatus.map((item) => (
                     <div key={item.status}>
-                      <div className='flex items-center justify-between text-xs uppercase tracking-wide text-slate-500'>
+                      <div className='flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-500'>
                         <span>{item.status.replace('_', ' ')}</span>
                         <span className='font-medium text-slate-700'>{item.count}</span>
                       </div>
@@ -591,13 +591,13 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                 )}
 
                 {data.casesByPriority.length > 0 && (
-                  <div className='mt-5 border-t border-slate-100 pt-4'>
-                    <p className='text-xs uppercase tracking-wide text-slate-500'>Prioridad</p>
-                    <div className='mt-3 grid grid-cols-2 gap-3'>
+                  <div className='mt-4 border-t border-slate-100 pt-3'>
+                    <p className='text-[10px] uppercase tracking-wide text-slate-500'>Prioridad</p>
+                    <div className='mt-3 grid grid-cols-2 gap-2.5'>
                       {data.casesByPriority.map((item: CasesByPriority) => (
-                        <div key={item.priority} className='rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs'>
+                        <div key={item.priority} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px]'>
                           <p className='uppercase tracking-wide text-slate-500'>{item.priority}</p>
-                          <p className='mt-1 text-lg font-semibold text-slate-900'>{item.count}</p>
+                          <p className='mt-1 text-base font-semibold text-slate-900'>{item.count}</p>
                         </div>
                       ))}
                     </div>
@@ -606,29 +606,29 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
               </CardContent>
             </Card>
 
-            <Card className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
-              <CardHeader className='flex flex-row items-center justify-between p-6 pb-4'>
-                <CardTitle className='flex items-center gap-2 text-sm font-semibold text-slate-800'>
-                  <Calendar className='h-4 w-4 text-sky-500' />
+            <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+              <CardHeader className='flex flex-row items-center justify-between p-4 pb-3'>
+                <CardTitle className='flex items-center gap-2 text-xs font-semibold text-slate-800'>
+                  <Calendar className='h-3.5 w-3.5 text-sky-500' />
                   Próximas etapas
                 </CardTitle>
                 {deadlines.length > 0 && (
-                  <p className='text-xs text-slate-400'>{deadlines.length} registro{deadlines.length === 1 ? '' : 's'}</p>
+                  <p className='text-[11px] text-slate-400'>{deadlines.length} registro{deadlines.length === 1 ? '' : 's'}</p>
                 )}
               </CardHeader>
-              <CardContent className='space-y-3 px-6 pb-6 pt-0'>
+              <CardContent className='space-y-2.5 px-4 pb-4 pt-0'>
                 {deadlines.length === 0 ? (
-                  <p className='text-sm text-slate-500'>No hay etapas agendadas en los próximos 90 días.</p>
+                  <p className='text-[12px] text-slate-500'>No hay etapas agendadas en los próximos 90 días.</p>
                 ) : (
                   deadlines.map((deadline: any) => (
-                    <div key={deadline.id} className='rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm'>
+                    <div key={deadline.id} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[12px]'>
                       <p className='font-medium text-slate-900'>{deadline.case?.caratulado || 'Caso sin título'}</p>
-                      <p className='text-xs text-slate-500'>Etapa: {deadline.etapa}</p>
-                      <div className='mt-2 flex items-center justify-between text-xs text-slate-500'>
+                      <p className='text-[11px] text-slate-500'>Etapa: {deadline.etapa}</p>
+                      <div className='mt-2 flex items-center justify-between text-[11px] text-slate-500'>
                         <span>{deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}</span>
                         {deadline.fecha_programada && (
                           <span className='inline-flex items-center gap-1 text-sky-600'>
-                            <Clock className='h-3.5 w-3.5' />
+                            <Clock className='h-3 w-3' />
                             {formatRelativeTime(deadline.fecha_programada)}
                           </span>
                         )}
@@ -642,9 +642,9 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
           </div>
         </section>
 
-        <section className='space-y-5'>
-          <h2 className='text-base font-semibold text-slate-800'>Herramientas rápidas</h2>
-          <div className='grid gap-6 lg:grid-cols-2'>
+        <section className='space-y-4'>
+          <h2 className='text-sm font-semibold text-slate-800'>Herramientas rápidas</h2>
+          <div className='grid gap-4 lg:grid-cols-2'>
             <QuickLinksPanel links={quickLinks} />
             <TemplateLibrary templates={templates} />
           </div>
@@ -656,58 +656,58 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
             if (!open) setSelectedDeadline(null);
           }}
         >
-          <DialogContent className='max-w-2xl'>
+          <DialogContent className='max-w-xl'>
             <DialogHeader className='space-y-2'>
-              <p className='text-[11px] uppercase tracking-[0.22em] text-slate-400'>Vista previa</p>
-              <DialogTitle className='text-2xl'>
+              <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Vista previa</p>
+              <DialogTitle className='text-xl'>
                 {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className='text-[12px]'>
                 {selectedDeadline ? resolveCaseClient(selectedDeadline) : 'Cliente sin registro'}
               </DialogDescription>
             </DialogHeader>
 
             <div className='grid gap-4'>
-              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-                <div className='flex items-center justify-between text-xs uppercase tracking-[0.18em] text-slate-500'>
+              <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
+                <div className='flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-slate-500'>
                   <span>Próxima actuación</span>
                   <span className='text-slate-400'>
                     {selectedDeadline?.fecha_programada ? formatDate(selectedDeadline.fecha_programada) : 'Sin fecha'}
                   </span>
                 </div>
-                <p className='mt-2 text-lg font-semibold text-slate-900'>
+                <p className='mt-2 text-base font-semibold text-slate-900'>
                   {selectedDeadline?.etapa || 'Actuación pendiente'}
                 </p>
                 {selectedDeadline?.fecha_programada && (
-                  <p className='mt-1 inline-flex items-center gap-2 text-sm text-sky-600'>
-                    <Clock className='h-4 w-4' />
+                  <p className='mt-1 inline-flex items-center gap-2 text-[12px] text-sky-600'>
+                    <Clock className='h-3.5 w-3.5' />
                     {formatRelativeTime(selectedDeadline.fecha_programada)}
                   </p>
                 )}
               </div>
 
               <div className='grid gap-3 sm:grid-cols-2'>
-                <div className='rounded-xl border border-slate-200 bg-white p-3 text-xs'>
+                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
                   <p className='uppercase tracking-[0.18em] text-slate-400'>Estado</p>
-                  <p className='mt-2 text-sm font-semibold text-slate-900'>
+                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
                     {previewStatus ? STATUS_LABELS[previewStatus] ?? previewStatus : 'Sin estado'}
                   </p>
                 </div>
-                <div className='rounded-xl border border-slate-200 bg-white p-3 text-xs'>
+                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
                   <p className='uppercase tracking-[0.18em] text-slate-400'>Prioridad</p>
-                  <p className='mt-2 text-sm font-semibold text-slate-900'>
+                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
                     {previewCase?.prioridad ?? 'media'}
                   </p>
                 </div>
-                <div className='rounded-xl border border-slate-200 bg-white p-3 text-xs'>
+                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
                   <p className='uppercase tracking-[0.18em] text-slate-400'>Materia</p>
-                  <p className='mt-2 text-sm font-semibold text-slate-900'>
+                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
                     {previewCase?.materia ?? 'Sin materia'}
                   </p>
                 </div>
-                <div className='rounded-xl border border-slate-200 bg-white p-3 text-xs'>
+                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
                   <p className='uppercase tracking-[0.18em] text-slate-400'>Valor estimado</p>
-                  <p className='mt-2 text-sm font-semibold text-slate-900'>
+                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
                     {previewCase?.valor_estimado ? formatCurrency(previewCase.valor_estimado) : '-'}
                   </p>
                 </div>
@@ -716,10 +716,10 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
 
             <DialogFooter className='gap-2'>
               <DialogClose asChild>
-                <Button variant='outline'>Cerrar</Button>
+                <Button variant='outline' size='sm'>Cerrar</Button>
               </DialogClose>
               {selectedDeadline?.case?.id && (
-                <Button asChild>
+                <Button asChild size='sm'>
                   <Link href={`/cases/${selectedDeadline.case.id}`}>Ver caso completo</Link>
                 </Button>
               )}
