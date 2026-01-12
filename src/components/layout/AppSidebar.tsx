@@ -147,30 +147,29 @@ export function AppSidebar({
           title={collapsed ? item.label : undefined}
           aria-current={isActive ? 'page' : undefined}
           className={cn(
-            'relative flex flex-1 items-start gap-3 rounded-2xl border border-white/10 bg-white/20 px-3 py-2.5 transition-all hover:border-primary/30 hover:bg-primary/10',
+            'relative flex flex-1 items-center gap-2.5 rounded-xl border border-white/10 bg-white/20 px-2.5 py-2 transition-all hover:border-primary/30 hover:bg-primary/10',
             isActive && 'border-primary/40 bg-primary/15 shadow-sm',
             collapsed && 'flex-none justify-center px-2',
           )}
         >
           <span
             className={cn(
-              'mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/50 text-foreground/70 transition-colors group-hover:text-foreground',
+              'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/50 text-foreground/70 transition-colors group-hover:text-foreground',
               isActive && 'bg-primary/10 text-primary',
             )}
           >
             {item.icon}
           </span>
           {!collapsed && (
-            <span className="min-w-0 flex-1 text-sm leading-snug">
+            <span className="min-w-0 flex-1 text-[12px] leading-tight">
               <span className="flex items-center gap-2">
                 <span className={cn('truncate font-medium', isActive && 'text-primary')}>{item.label}</span>
                 {item.badge && (
-                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary">
                     {item.badge}
                   </span>
                 )}
               </span>
-              {item.description && <span className="mt-0.5 block truncate text-xs text-foreground/60">{item.description}</span>}
             </span>
           )}
         </Link>
@@ -194,16 +193,16 @@ export function AppSidebar({
   };
 
   const SidebarContent = (
-    <div className={cn('flex h-full min-h-screen flex-col', collapsed ? 'px-3' : 'px-5')}>
-      <div className={cn('flex items-center justify-between', collapsed ? 'py-4' : 'py-5')}>
+      <div className={cn('flex h-full min-h-screen flex-col overflow-x-hidden', collapsed ? 'px-3' : 'px-4')}>
+      <div className={cn('flex items-center justify-between', collapsed ? 'py-3' : 'py-4')}>
         <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 via-white/50 to-white/20 text-primary shadow-sm">
-            <span className="text-sm font-semibold tracking-tight">X</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 via-white/50 to-white/20 text-primary shadow-sm">
+            <span className="text-[12px] font-semibold tracking-tight">X</span>
           </div>
           {!collapsed && (
             <div className="leading-tight">
-              <p className="text-sm font-semibold tracking-tight text-foreground">Xel Chile</p>
-              <p className="text-xs text-foreground/55">Legal CRM</p>
+              <p className="text-[13px] font-semibold tracking-tight text-foreground">Xel Chile</p>
+              <p className="text-[11px] text-foreground/55">Legal CRM</p>
             </div>
           )}
         </div>
@@ -222,45 +221,45 @@ export function AppSidebar({
       </div>
 
       {!collapsed && (
-        <div className="pb-4">
-          <div className="mb-4 rounded-2xl border border-white/20 bg-white/45 px-4 py-3 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-foreground/45">Contexto</p>
-            <div className="mt-2 flex items-start justify-between gap-3">
+        <div className="pb-3">
+          <div className="mb-3 rounded-xl border border-white/20 bg-white/45 px-3 py-2 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-foreground/45">Contexto</p>
+            <div className="mt-2 flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">
+                <p className="truncate text-[13px] font-semibold text-foreground">
                   {activeOrg?.name ?? 'Sin empresa activa'}
                 </p>
-                <p className="text-xs text-foreground/55">
+                <p className="text-[11px] text-foreground/55">
                   {formatRoleLabel(profile.role)}
                   {activeOrg?.status === 'inactive' ? ' · inactiva' : ''}
                 </p>
               </div>
               <Link
                 href="/select-org"
-                className="rounded-xl border border-white/20 bg-white/60 px-3 py-2 text-xs font-semibold text-foreground/70 shadow-sm transition hover:bg-white hover:text-foreground"
+                className="rounded-lg border border-white/20 bg-white/60 px-2.5 py-1.5 text-[11px] font-semibold text-foreground/70 shadow-sm transition hover:bg-white hover:text-foreground"
               >
                 Cambiar
               </Link>
             </div>
           </div>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/45" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/45" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar en navegación…"
-              className="h-11 w-full rounded-2xl border border-white/20 bg-white/50 pl-10 pr-3 text-sm text-foreground shadow-inner outline-none transition focus:border-primary/40 focus:bg-white/80 focus:ring-2 focus:ring-primary/20"
+              placeholder="Buscar…"
+              className="h-9 w-full rounded-xl border border-white/20 bg-white/50 pl-9 pr-3 text-[13px] text-foreground shadow-inner outline-none transition focus:border-primary/40 focus:bg-white/80 focus:ring-2 focus:ring-primary/20"
             />
           </div>
         </div>
       )}
 
       <nav className="flex-1 overflow-y-auto pb-4">
-        <div className={cn('space-y-6', collapsed && 'space-y-4')}>
+        <div className={cn('space-y-5', collapsed && 'space-y-4')}>
           {filteredGroups.map(([group, groupItems]) => (
             <section key={group} className="space-y-2">
               {!collapsed && (
-                <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-foreground/45">{group}</p>
+                <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-foreground/45">{group}</p>
               )}
               <div className="space-y-2">{groupItems.map(renderLink)}</div>
             </section>
@@ -271,13 +270,13 @@ export function AppSidebar({
       <div className="pb-5">
         <div
           className={cn(
-            'rounded-2xl border border-white/20 bg-white/40 shadow-sm',
-            collapsed ? 'p-2' : 'px-4 py-3',
+            'rounded-xl border border-white/20 bg-white/40 shadow-sm',
+            collapsed ? 'p-2' : 'px-3 py-2',
           )}
         >
           <div className={cn('flex items-start gap-3', collapsed && 'justify-center')}>
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold text-white"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[12px] font-semibold text-white"
               style={{ backgroundColor: avatarBg }}
               aria-hidden
             >
@@ -285,11 +284,11 @@ export function AppSidebar({
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{profile.nombre}</p>
-                <p className="text-xs uppercase tracking-wide text-foreground/50">
+                <p className="truncate text-[13px] font-medium text-foreground">{profile.nombre}</p>
+                <p className="text-[11px] uppercase tracking-wide text-foreground/50">
                   {formatRoleLabel(profile.role)}
                 </p>
-                {profile.email && <p className="mt-1 truncate text-xs text-foreground/50">{profile.email}</p>}
+                {profile.email && <p className="mt-1 truncate text-[11px] text-foreground/50">{profile.email}</p>}
               </div>
             )}
           </div>

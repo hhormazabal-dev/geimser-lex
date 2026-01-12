@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowRight, Briefcase, Calendar, Clock, FileText, Target } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Briefcase, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Target } from 'lucide-react';
 
 import { QuickLinksPanel } from '@/components/QuickLinksPanel';
 import { TemplateLibrary } from '@/components/TemplateLibrary';
@@ -83,6 +83,8 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const router = useRouter();
   const stats = data.stats;
   const [selectedDeadline, setSelectedDeadline] = useState<any | null>(null);
+  const [casePage, setCasePage] = useState(1);
+  const [casesPerPage, setCasesPerPage] = useState(5);
   const allDeadlines = (data.upcomingDeadlines || []) as any[];
   const caseById = useMemo(() => new Map(cases.map((caseItem) => [caseItem.id, caseItem])), [cases]);
   const calendarBuckets = useMemo<Record<CalendarKey, any[]>>(() => {
@@ -129,9 +131,12 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     const status = effectiveCaseStatus(c);
     return status === 'activo' || status === 'terminado_apelacion';
   });
-  const recentCases = [...cases]
-    .sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))
-    .slice(0, 6);
+  const sortedCases = [...cases].sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''));
+  const totalCasePages = Math.max(1, Math.ceil(sortedCases.length / casesPerPage));
+  const clampedCasePage = Math.min(casePage, totalCasePages);
+  const caseStart = (clampedCasePage - 1) * casesPerPage;
+  const caseEnd = caseStart + casesPerPage;
+  const paginatedCases = sortedCases.slice(caseStart, caseEnd);
   const deadlines = allDeadlines.slice(0, 5);
   const totalStatus = data.casesByStatus.reduce((acc, item) => acc + item.count, 0);
   const nextDeadline = deadlines.length > 0 ? deadlines[0] : null;
@@ -178,6 +183,12 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
 
   const previewCase = selectedDeadline?.case?.id ? caseById.get(selectedDeadline.case.id) : null;
   const previewStatus = previewCase ? effectiveCaseStatus(previewCase) : null;
+
+  useEffect(() => {
+    if (casePage !== clampedCasePage) {
+      setCasePage(clampedCasePage);
+    }
+  }, [casePage, clampedCasePage]);
 
   if (!stats) {
     return (
@@ -304,18 +315,29 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                                 key={deadline.id}
                                 type='button'
                                 onClick={() => setSelectedDeadline(deadline)}
-                                className='group w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
+                                className='group w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
                               >
                                 <div className='flex items-start justify-between gap-2'>
-                                  <div className='min-w-0 space-y-0.5'>
-                                    <p className='truncate text-[11px] font-semibold text-slate-900'>
+                                  <div className='min-w-0 space-y-1'>
+                                    <p className='max-h-9 overflow-hidden text-[12px] font-semibold leading-snug text-slate-900'>
                                       {deadline.etapa || 'Actuación pendiente'}
                                     </p>
-                                    <p className='truncate text-[10px] text-slate-500'>{resolveCaseTitle(deadline)}</p>
+                                    <p className='max-h-8 overflow-hidden text-[11px] leading-snug text-slate-600'>
+                                      {resolveCaseTitle(deadline)}
+                                    </p>
+                                    <p className='truncate text-[10px] text-slate-500'>{resolveCaseClient(deadline)}</p>
                                   </div>
-                                  <span className='shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-medium text-slate-500'>
-                                    {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
-                                  </span>
+                                  <div className='shrink-0 text-right'>
+                                    <span className='inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-medium text-slate-500'>
+                                      {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
+                                    </span>
+                                    {deadline.fecha_programada && (
+                                      <span className='mt-1 inline-flex items-center gap-1 text-[9px] text-sky-600'>
+                                        <Clock className='h-2.5 w-2.5' />
+                                        {formatRelativeTime(deadline.fecha_programada)}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </button>
                             ))
@@ -435,7 +457,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
               </Link>
             </CardHeader>
             <CardContent className='p-0'>
-              {recentCases.length === 0 ? (
+              {paginatedCases.length === 0 ? (
                 <div className='px-4 py-10 text-[12px] text-slate-500'>
                   Aún no tienes casos asignados. El administrador debe derivarte un expediente.
                 </div>
@@ -453,7 +475,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                       </tr>
                     </thead>
                     <tbody className='divide-y divide-slate-100 text-slate-700'>
-                      {recentCases.map((caseItem) => {
+                      {paginatedCases.map((caseItem) => {
                         const effectiveStatus = effectiveCaseStatus(caseItem) ?? caseItem.estado ?? '';
                         const nextStage = caseItem.case_stages?.find((stage) => (stage.estado ?? '') === 'pendiente');
 
@@ -532,6 +554,57 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {sortedCases.length > 0 && (
+                <div className='flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500'>
+                  <span>
+                    Mostrando {sortedCases.length === 0 ? 0 : caseStart + 1}–{Math.min(caseEnd, sortedCases.length)} de{' '}
+                    {sortedCases.length}
+                  </span>
+                  <div className='flex items-center gap-2'>
+                    <label className='flex items-center gap-2'>
+                      <span className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>Por página</span>
+                      <select
+                        className='rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700'
+                        value={casesPerPage}
+                        onChange={(event) => {
+                          const nextValue = Number(event.target.value);
+                          setCasesPerPage(nextValue);
+                          setCasePage(1);
+                        }}
+                      >
+                        {[5, 10, 20, 30].map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className='flex items-center gap-1'>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='h-7 px-2'
+                        onClick={() => setCasePage((prev) => Math.max(1, prev - 1))}
+                        disabled={clampedCasePage <= 1}
+                      >
+                        <ChevronLeft className='h-3.5 w-3.5' />
+                      </Button>
+                      <span className='min-w-[36px] text-center text-[11px] font-medium text-slate-700'>
+                        {clampedCasePage}/{totalCasePages}
+                      </span>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='h-7 px-2'
+                        onClick={() => setCasePage((prev) => Math.min(totalCasePages, prev + 1))}
+                        disabled={clampedCasePage >= totalCasePages}
+                      >
+                        <ChevronRight className='h-3.5 w-3.5' />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -653,33 +726,48 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
             <DialogHeader className='space-y-2'>
               <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Vista previa</p>
               <DialogTitle className='text-xl'>
-                {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
+                {selectedDeadline?.etapa || 'Actuación pendiente'}
               </DialogTitle>
               <DialogDescription className='text-[12px]'>
-                {selectedDeadline ? resolveCaseClient(selectedDeadline) : 'Cliente sin registro'}
+                {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
+                {selectedDeadline ? ` · ${resolveCaseClient(selectedDeadline)}` : ''}
               </DialogDescription>
             </DialogHeader>
 
             <div className='grid gap-4'>
-              <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                <div className='flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-slate-500'>
-                  <span>Próxima actuación</span>
-                  <span className='text-slate-400'>
-                    {selectedDeadline?.fecha_programada ? formatDate(selectedDeadline.fecha_programada) : 'Sin fecha'}
-                  </span>
-                </div>
-                <p className='mt-2 text-base font-semibold text-slate-900'>
-                  {selectedDeadline?.etapa || 'Actuación pendiente'}
-                </p>
+              <div className='flex flex-wrap items-center gap-2 text-[11px] text-slate-500'>
+                <span className='rounded-full border border-slate-200 bg-slate-50 px-2 py-1'>
+                  {selectedDeadline?.fecha_programada ? formatDate(selectedDeadline.fecha_programada) : 'Sin fecha'}
+                </span>
                 {selectedDeadline?.fecha_programada && (
-                  <p className='mt-1 inline-flex items-center gap-2 text-[12px] text-sky-600'>
-                    <Clock className='h-3.5 w-3.5' />
+                  <span className='inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-sky-600'>
+                    <Clock className='h-3 w-3' />
                     {formatRelativeTime(selectedDeadline.fecha_programada)}
-                  </p>
+                  </span>
+                )}
+                {previewCase?.numero_causa && (
+                  <span className='rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-600'>
+                    N° {previewCase.numero_causa}
+                  </span>
                 )}
               </div>
 
               <div className='grid gap-3 sm:grid-cols-2'>
+                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
+                  <p className='uppercase tracking-[0.18em] text-slate-400'>Caso</p>
+                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
+                    {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
+                  </p>
+                </div>
+                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
+                  <p className='uppercase tracking-[0.18em] text-slate-400'>Cliente</p>
+                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
+                    {selectedDeadline ? resolveCaseClient(selectedDeadline) : 'Cliente sin registro'}
+                  </p>
+                  {previewCase?.rut_cliente && (
+                    <p className='mt-1 text-[10px] text-slate-500'>RUT {previewCase.rut_cliente}</p>
+                  )}
+                </div>
                 <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
                   <p className='uppercase tracking-[0.18em] text-slate-400'>Estado</p>
                   <p className='mt-2 text-[12px] font-semibold text-slate-900'>
@@ -705,6 +793,13 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   </p>
                 </div>
               </div>
+
+              {selectedDeadline?.descripcion && (
+                <div className='rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600'>
+                  <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>Detalle</p>
+                  <p className='mt-2 leading-relaxed text-slate-700'>{selectedDeadline.descripcion}</p>
+                </div>
+              )}
             </div>
 
             <DialogFooter className='gap-2'>
