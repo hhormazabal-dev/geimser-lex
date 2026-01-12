@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowRight, Briefcase, Calendar, Clock, FileText, Target } from 'lucide-react';
 
@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { CasesByPriority, CasesByStatus, DashboardStats } from '@/lib/actions/analytics';
 import type { Case, CaseStage, LegalTemplate, Profile, QuickLink } from '@/lib/supabase/types';
 import { formatRoleLabel } from '@/lib/navigation/role-label';
@@ -54,9 +55,34 @@ const PRIORITY_CHIPS: Record<string, string> = {
   urgente: 'bg-red-50 text-red-600 border border-red-100',
 };
 
+const CALENDAR_COLUMNS = [
+  { key: 'audiencias', label: 'Audiencias', helper: 'Salas y citaciones' },
+  { key: 'juicios', label: 'Juicios', helper: 'Hitos críticos' },
+  { key: 'preparatorias', label: 'Preparatorias', helper: 'Previas a juicio' },
+  { key: 'gestiones', label: 'Gestiones', helper: 'Escritos y otros' },
+] as const;
+
+type CalendarKey = (typeof CALENDAR_COLUMNS)[number]['key'];
+
+const normalizeStageLabel = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+const classifyStage = (label?: string | null): CalendarKey => {
+  const normalized = normalizeStageLabel(label ?? '');
+  if (normalized.includes('preparator')) return 'preparatorias';
+  if (normalized.includes('juicio') || normalized.includes('vista') || normalized.includes('alegato')) return 'juicios';
+  if (normalized.includes('audiencia')) return 'audiencias';
+  return 'gestiones';
+};
+
 export function LawyerDashboard({ profile, data, cases, quickLinks, templates }: LawyerDashboardProps) {
   const router = useRouter();
   const stats = data.stats;
+  const [selectedDeadline, setSelectedDeadline] = useState<any | null>(null);
 
   const effectiveCaseStatus = (caseRow: any) => {
     const sentenciaEstado = (caseRow?.sentencia_estado as string | null | undefined) ?? null;
@@ -105,6 +131,24 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const deadlines = allDeadlines.slice(0, 5);
   const totalStatus = data.casesByStatus.reduce((acc, item) => acc + item.count, 0);
   const nextDeadline = deadlines.length > 0 ? deadlines[0] : null;
+  const caseById = useMemo(() => new Map(cases.map((caseItem) => [caseItem.id, caseItem])), [cases]);
+  const calendarBuckets = useMemo<Record<CalendarKey, any[]>>(() => {
+    const buckets = CALENDAR_COLUMNS.reduce((acc, column) => {
+      acc[column.key] = [];
+      return acc;
+    }, {} as Record<CalendarKey, any[]>);
+
+    allDeadlines.forEach((deadline) => {
+      const key = classifyStage(deadline?.etapa);
+      buckets[key].push(deadline);
+    });
+
+    Object.values(buckets).forEach((items) => {
+      items.sort((a, b) => String(a?.fecha_programada ?? '').localeCompare(String(b?.fecha_programada ?? '')));
+    });
+
+    return buckets;
+  }, [allDeadlines]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -168,6 +212,21 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     },
   ];
 
+  const resolveCaseTitle = (deadline: any) => {
+    const caseId = deadline?.case?.id ?? null;
+    const caseRow = caseId ? caseById.get(caseId) : null;
+    return caseRow?.caratulado || deadline?.case?.caratulado || 'Caso sin título';
+  };
+
+  const resolveCaseClient = (deadline: any) => {
+    const caseId = deadline?.case?.id ?? null;
+    const caseRow = caseId ? caseById.get(caseId) : null;
+    return caseRow?.nombre_cliente || 'Cliente sin registro';
+  };
+
+  const previewCase = selectedDeadline?.case?.id ? caseById.get(selectedDeadline.case.id) : null;
+  const previewStatus = previewCase ? effectiveCaseStatus(previewCase) : null;
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -183,26 +242,101 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
 
         <section className='grid gap-4 lg:grid-cols-[2fr_1.1fr]'>
           <Card className='rounded-2xl border border-slate-200 bg-white shadow-sm'>
-            <CardContent className='flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between'>
-              <div className='flex-1 space-y-3'>
-                <p className='text-[11px] uppercase tracking-[0.25em] text-slate-400'>Panel de gestión</p>
-                <h2 className='text-2xl font-semibold tracking-tight'>Estado de tu cartera</h2>
-                <p className='max-w-xl text-sm leading-relaxed text-slate-600'>{heroDescription}</p>
+            <CardContent className='space-y-6 p-6'>
+              <div className='flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between'>
+                <div className='flex-1 space-y-3'>
+                  <p className='text-[11px] uppercase tracking-[0.25em] text-slate-400'>Panel de gestión</p>
+                  <h2 className='text-2xl font-semibold tracking-tight'>Estado de tu cartera</h2>
+                  <p className='max-w-xl text-sm leading-relaxed text-slate-600'>{heroDescription}</p>
+                </div>
+                <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
+                  <div className='flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3'>
+                    <div
+                      className='flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-semibold text-slate-700 shadow-inner'
+                      style={{
+                        background: `linear-gradient(135deg, ${stringToColor(profile.nombre)} 0%, rgba(255,255,255,0.92) 100%)`,
+                      }}
+                    >
+                      {getInitials(profile.nombre)}
+                    </div>
+                    <div>
+                      <p className='text-sm font-medium text-slate-900'>{profile.nombre}</p>
+                      <p className='text-xs text-slate-500'>{formatRoleLabel(profile.role)}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
-                <div className='flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3'>
-                  <div
-                    className='flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-base font-semibold text-slate-700 shadow-inner'
-                    style={{
-                      background: `linear-gradient(135deg, ${stringToColor(profile.nombre)} 0%, rgba(255,255,255,0.92) 100%)`,
-                    }}
-                  >
-                    {getInitials(profile.nombre)}
-                  </div>
+
+              <div className='rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4'>
+                <div className='flex flex-wrap items-center justify-between gap-2'>
                   <div>
-                    <p className='text-sm font-medium text-slate-900'>{profile.nombre}</p>
-                    <p className='text-xs text-slate-500'>{formatRoleLabel(profile.role)}</p>
+                    <p className='text-[11px] uppercase tracking-[0.22em] text-slate-400'>Agenda por actuación</p>
+                    <p className='text-sm text-slate-600'>Próximas fechas ordenadas por tipo de gestión.</p>
                   </div>
+                  <span className='text-xs text-slate-500'>
+                    {allDeadlines.length} actuación{allDeadlines.length === 1 ? '' : 'es'} en 90 días
+                  </span>
+                </div>
+
+                <div className='mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+                  {CALENDAR_COLUMNS.map((column) => {
+                    const items = calendarBuckets[column.key] ?? [];
+                    const previewItems = items.slice(0, 3);
+
+                    return (
+                      <div key={column.key} className='rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm'>
+                        <div className='flex items-start justify-between gap-2'>
+                          <div>
+                            <p className='text-[11px] uppercase tracking-[0.18em] text-slate-400'>{column.label}</p>
+                            <p className='text-xs text-slate-500'>{column.helper}</p>
+                          </div>
+                          <span className='text-xs font-semibold text-slate-700'>{items.length}</span>
+                        </div>
+
+                        <div className='mt-3 space-y-2'>
+                          {previewItems.length === 0 ? (
+                            <div className='rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-4 text-xs text-slate-400'>
+                              Sin actuaciones registradas
+                            </div>
+                          ) : (
+                            previewItems.map((deadline: any) => (
+                              <button
+                                key={deadline.id}
+                                type='button'
+                                onClick={() => setSelectedDeadline(deadline)}
+                                className='group w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
+                              >
+                                <div className='flex items-start justify-between gap-3'>
+                                  <div className='space-y-1'>
+                                    <p className='text-sm font-semibold text-slate-900'>
+                                      {deadline.etapa || 'Actuación pendiente'}
+                                    </p>
+                                    <p className='text-xs text-slate-500'>{resolveCaseTitle(deadline)}</p>
+                                  </div>
+                                  <span className='rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500'>
+                                    {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
+                                  </span>
+                                </div>
+                                <div className='mt-1 flex items-center justify-between text-[11px] text-slate-500'>
+                                  <span>{resolveCaseClient(deadline)}</span>
+                                  {deadline.fecha_programada && (
+                                    <span className='inline-flex items-center gap-1 text-sky-600'>
+                                      <Clock className='h-3 w-3' />
+                                      {formatRelativeTime(deadline.fecha_programada)}
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+
+                        {items.length > previewItems.length && (
+                          <p className='mt-2 text-[11px] text-slate-500'>+{items.length - previewItems.length} más</p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </CardContent>
@@ -252,8 +386,8 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   <p className='mt-2 text-xl font-semibold text-slate-900'>{stats.pendingRequests}</p>
                 </div>
                 <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                  <p className='text-[11px] uppercase tracking-[0.18em]'>Etapas vencidas</p>
-                  <p className='mt-2 text-xl font-semibold text-slate-900'>{stats.overdueStages}</p>
+                  <p className='text-[11px] uppercase tracking-[0.18em]'>Casos cerrados</p>
+                  <p className='mt-2 text-xl font-semibold text-slate-900'>{stats.completedCases}</p>
                 </div>
               </div>
 
@@ -505,22 +639,6 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
               </CardContent>
             </Card>
 
-            {stats.overdueStages > 0 && (
-              <Card className='rounded-2xl border border-red-200 bg-red-50/90 p-5 text-red-700 shadow-sm'>
-                <CardHeader className='p-0 pb-3'>
-                  <CardTitle className='flex items-center gap-2 text-sm font-semibold'>
-                    <AlertTriangle className='h-4 w-4' />
-                    Etapas vencidas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className='space-y-2 p-0 text-sm'>
-                  <p>Tienes {stats.overdueStages} etapa{stats.overdueStages === 1 ? '' : 's'} que requieren acción inmediata.</p>
-                  <p className='text-xs text-red-600/80'>
-                    Prioriza la reprogramación o actualización del estado para evitar retrasos.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </section>
 
@@ -531,6 +649,83 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
             <TemplateLibrary templates={templates} />
           </div>
         </section>
+
+        <Dialog
+          open={Boolean(selectedDeadline)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedDeadline(null);
+          }}
+        >
+          <DialogContent className='max-w-2xl'>
+            <DialogHeader className='space-y-2'>
+              <p className='text-[11px] uppercase tracking-[0.22em] text-slate-400'>Vista previa</p>
+              <DialogTitle className='text-2xl'>
+                {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedDeadline ? resolveCaseClient(selectedDeadline) : 'Cliente sin registro'}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className='grid gap-4'>
+              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+                <div className='flex items-center justify-between text-xs uppercase tracking-[0.18em] text-slate-500'>
+                  <span>Próxima actuación</span>
+                  <span className='text-slate-400'>
+                    {selectedDeadline?.fecha_programada ? formatDate(selectedDeadline.fecha_programada) : 'Sin fecha'}
+                  </span>
+                </div>
+                <p className='mt-2 text-lg font-semibold text-slate-900'>
+                  {selectedDeadline?.etapa || 'Actuación pendiente'}
+                </p>
+                {selectedDeadline?.fecha_programada && (
+                  <p className='mt-1 inline-flex items-center gap-2 text-sm text-sky-600'>
+                    <Clock className='h-4 w-4' />
+                    {formatRelativeTime(selectedDeadline.fecha_programada)}
+                  </p>
+                )}
+              </div>
+
+              <div className='grid gap-3 sm:grid-cols-2'>
+                <div className='rounded-xl border border-slate-200 bg-white p-3 text-xs'>
+                  <p className='uppercase tracking-[0.18em] text-slate-400'>Estado</p>
+                  <p className='mt-2 text-sm font-semibold text-slate-900'>
+                    {previewStatus ? STATUS_LABELS[previewStatus] ?? previewStatus : 'Sin estado'}
+                  </p>
+                </div>
+                <div className='rounded-xl border border-slate-200 bg-white p-3 text-xs'>
+                  <p className='uppercase tracking-[0.18em] text-slate-400'>Prioridad</p>
+                  <p className='mt-2 text-sm font-semibold text-slate-900'>
+                    {previewCase?.prioridad ?? 'media'}
+                  </p>
+                </div>
+                <div className='rounded-xl border border-slate-200 bg-white p-3 text-xs'>
+                  <p className='uppercase tracking-[0.18em] text-slate-400'>Materia</p>
+                  <p className='mt-2 text-sm font-semibold text-slate-900'>
+                    {previewCase?.materia ?? 'Sin materia'}
+                  </p>
+                </div>
+                <div className='rounded-xl border border-slate-200 bg-white p-3 text-xs'>
+                  <p className='uppercase tracking-[0.18em] text-slate-400'>Valor estimado</p>
+                  <p className='mt-2 text-sm font-semibold text-slate-900'>
+                    {previewCase?.valor_estimado ? formatCurrency(previewCase.valor_estimado) : '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className='gap-2'>
+              <DialogClose asChild>
+                <Button variant='outline'>Cerrar</Button>
+              </DialogClose>
+              {selectedDeadline?.case?.id && (
+                <Button asChild>
+                  <Link href={`/cases/${selectedDeadline.case.id}`}>Ver caso completo</Link>
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 }
