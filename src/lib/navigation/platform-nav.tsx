@@ -95,6 +95,14 @@ export function buildSidebarItems(
         keywords: ['dashboard', 'tablero', 'kpis', 'indicadores', 'riesgo'],
       },
       {
+        href: '/dashboard/abogado',
+        label: 'Vista abogado',
+        description: 'Tablero operativo del abogado',
+        icon: <LayoutDashboard className="h-4 w-4" />,
+        group: 'Principal',
+        keywords: ['abogado', 'tablero', 'operativo'],
+      },
+      {
         href: '/inbox',
         label: 'Inbox',
         description: 'Vencidos, bloqueos y solicitudes',

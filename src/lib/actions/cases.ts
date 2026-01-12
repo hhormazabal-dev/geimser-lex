@@ -1058,9 +1058,15 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
     if (validatedFilters.fecha_inicio_desde) query = query.gte('fecha_inicio', validatedFilters.fecha_inicio_desde);
     if (validatedFilters.fecha_inicio_hasta) query = query.lte('fecha_inicio', validatedFilters.fecha_inicio_hasta);
     if (validatedFilters.search) {
-      const s = validatedFilters.search;
+      const raw = validatedFilters.search;
+      const normalized = raw.normalize('NFKD').replace(/[\u2010-\u2015\u2212]/g, '-').trim();
+      const variants = raw === normalized ? [raw] : [raw, normalized];
+      const orFilters = variants
+        .filter((term) => term.length > 0)
+        .map((term) => `caratulado.ilike.%${term}%,numero_causa.ilike.%${term}%`)
+        .join(',');
       // Búsqueda centrada en identificadores únicos del expediente
-      query = query.or(`caratulado.ilike.%${s}%,numero_causa.ilike.%${s}%`);
+      query = query.or(orFilters);
     }
 
     const from = (validatedFilters.page - 1) * validatedFilters.limit;

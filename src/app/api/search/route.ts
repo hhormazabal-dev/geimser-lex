@@ -18,6 +18,12 @@ type ClientResult = {
   rut: string | null;
 };
 
+const DASH_VARIANTS = /[\u2010-\u2015\u2212]/g;
+
+function normalizeSearchTerm(value: string) {
+  return value.normalize('NFKD').replace(DASH_VARIANTS, '-').trim();
+}
+
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
 }
@@ -27,7 +33,9 @@ export async function GET(req: Request) {
   if (!profile) return json({ error: 'No autenticado' }, 401);
 
   const url = new URL(req.url);
-  const q = (url.searchParams.get('q') ?? '').trim();
+  const rawQuery = (url.searchParams.get('q') ?? '').trim();
+  const normalizedQuery = normalizeSearchTerm(rawQuery);
+  const q = rawQuery;
 
   if (q.length < 2) {
     return json({ cases: [], clients: [] } satisfies { cases: CaseResult[]; clients: ClientResult[] });
@@ -45,7 +53,12 @@ export async function GET(req: Request) {
     .order('updated_at', { ascending: false })
     .limit(MAX_CASES);
 
-  casesQuery = casesQuery.or(`caratulado.ilike.%${q}%,numero_causa.ilike.%${q}%`);
+  const variants = rawQuery === normalizedQuery ? [rawQuery] : [rawQuery, normalizedQuery];
+  const orFilters = variants
+    .filter((term) => term.length > 0)
+    .map((term) => `caratulado.ilike.%${term}%,numero_causa.ilike.%${term}%`)
+    .join(',');
+  casesQuery = casesQuery.or(orFilters);
 
   if (role === 'abogado') {
     casesQuery = casesQuery.eq('abogado_responsable', profile.id);
@@ -99,4 +112,3 @@ export async function GET(req: Request) {
 
   return json({ cases, clients } satisfies { cases: CaseResult[]; clients: ClientResult[] });
 }
-

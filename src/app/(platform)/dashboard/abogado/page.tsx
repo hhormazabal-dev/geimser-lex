@@ -26,14 +26,11 @@ export default async function AbogadoDashboardPage() {
     redirect('/login');
   }
 
-  // En este tablero aceptamos 'abogado' y 'cliente'
-  if (profile.role === 'admin_firma') {
-    redirect('/dashboard/admin');
-  }
+  // En este tablero aceptamos 'abogado', 'cliente' y 'admin_firma'
   if (profile.role === 'analista') {
     redirect('/dashboard/analista');
   }
-  if (profile.role !== 'abogado' && profile.role !== 'cliente') {
+  if (profile.role !== 'abogado' && profile.role !== 'cliente' && profile.role !== 'admin_firma') {
     redirect('/login');
   }
 
