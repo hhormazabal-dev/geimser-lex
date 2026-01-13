@@ -21,10 +21,13 @@ import {
 
 export function buildSidebarItems(
   role: Role,
-  opts?: { isSuperAdmin?: boolean; canTransition?: boolean },
+  opts?: { isSuperAdmin?: boolean; canTransition?: boolean; activeOrgName?: string | null },
 ): SidebarItem[] {
   const isSuperAdmin = Boolean(opts?.isSuperAdmin);
   const canTransition = Boolean(opts?.canTransition);
+  const isDeudaCero = String(opts?.activeOrgName ?? '')
+    .trim()
+    .toLowerCase() === 'deuda cero';
   const transitionItem: SidebarItem | null = canTransition
     ? {
         href: '/transicion',
@@ -134,6 +137,18 @@ export function buildSidebarItems(
         group: 'CRM',
         keywords: ['cartera', 'contactos', 'personas', 'empresas'],
       },
+      ...(isDeudaCero
+        ? [
+            {
+              href: '/dashboard/admin/leads',
+              label: 'Leads Deuda Cero',
+              description: 'Seguimiento y conversión a casos',
+              icon: <UserPlus className="h-4 w-4" />,
+              group: 'CRM',
+              keywords: ['leads', 'intake', 'deuda cero'],
+            },
+          ]
+        : []),
       {
         href: '/dashboard/admin/clients',
         label: 'Cartera',

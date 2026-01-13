@@ -33,8 +33,6 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
   if (!isSuperAdmin && !canTransition && role !== 'cliente' && !activeOrgId) {
     redirect('/select-org');
   }
-  const sidebarItems = buildSidebarItems(role, { isSuperAdmin: Boolean(isSuperAdmin), canTransition });
-
   // Org switcher: lista empresas disponibles para el usuario (para cambiar contexto sin salir).
   let organizations: Array<{ id: string; name: string; status: 'active' | 'inactive' }> = [];
   if (isSuperAdmin) {
@@ -55,6 +53,25 @@ export default async function PlatformLayout({ children }: PlatformLayoutProps) 
       organizations = (data ?? []) as any;
     }
   }
+
+  let activeOrgName: string | null = null;
+  if (activeOrgId) {
+    activeOrgName = organizations.find((org) => org.id === activeOrgId)?.name ?? null;
+    if (!activeOrgName) {
+      const { data: orgRow } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .eq('id', activeOrgId)
+        .maybeSingle();
+      activeOrgName = orgRow?.name ?? null;
+    }
+  }
+
+  const sidebarItems = buildSidebarItems(role, {
+    isSuperAdmin: Boolean(isSuperAdmin),
+    canTransition,
+    activeOrgName,
+  });
 
   const footerHint = (
     <div className="space-y-2">

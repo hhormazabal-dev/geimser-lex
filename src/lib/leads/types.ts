@@ -1,0 +1,24 @@
+export type LeadRecord = {
+  id: string;
+  organization_id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  rut: string | null;
+  message: string | null;
+  lead_type: string | null;
+  status: string | null;
+  source: string | null;
+  raw_payload: unknown;
+  created_at: string | null;
+  last_contact_at: string | null;
+  next_follow_up_at: string | null;
+  contact_notes: string | null;
+  case_id: string | null;
+  case_caratulado: string | null;
+  case_materia: string | null;
+  case_descripcion: string | null;
+  case_prioridad: string | null;
+  case_contraparte: string | null;
+  converted_at: string | null;
+};
