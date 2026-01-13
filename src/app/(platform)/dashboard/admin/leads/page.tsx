@@ -8,6 +8,7 @@ import { getCurrentProfile } from '@/lib/auth/roles';
 import { createServerClient } from '@/lib/supabase/server';
 import { listDeudaCeroLeads } from '@/lib/actions/leads';
 import { getLeadStatusLabel, getLeadStatusTone, normalizeLeadStatus } from '@/lib/leads/status';
+import { isDeudaCeroOrgName } from '@/lib/leads/org';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,7 +56,7 @@ export default async function DeudaCeroLeadsPage() {
     .eq('id', orgId)
     .maybeSingle();
 
-  if (!orgRow || String(orgRow.name ?? '').trim().toLowerCase() !== 'deuda cero') {
+  if (!orgRow || !isDeudaCeroOrgName(orgRow.name)) {
     redirect('/dashboard/admin');
   }
 

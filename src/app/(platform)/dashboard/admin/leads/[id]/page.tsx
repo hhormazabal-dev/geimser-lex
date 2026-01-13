@@ -9,6 +9,7 @@ import { getDeudaCeroLead } from '@/lib/actions/leads';
 import { getAssignableLawyers } from '@/lib/actions/profiles';
 import { DeudaCeroLeadDetail } from '@/components/admin/DeudaCeroLeadDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { isDeudaCeroOrgName } from '@/lib/leads/org';
 
 interface LeadDetailPageProps {
   params: Promise<{ id: string }>;
@@ -30,7 +31,7 @@ export default async function DeudaCeroLeadDetailPage({ params }: LeadDetailPage
     .eq('id', orgId)
     .maybeSingle();
 
-  if (!orgRow || String(orgRow.name ?? '').trim().toLowerCase() !== 'deuda cero') {
+  if (!orgRow || !isDeudaCeroOrgName(orgRow.name)) {
     redirect('/dashboard/admin');
   }
 

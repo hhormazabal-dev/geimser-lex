@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/roles';
 import { createServerClient } from '@/lib/supabase/server';
 import { createCase } from '@/lib/actions/cases';
 import type { LeadRecord } from '@/lib/leads/types';
+import { isDeudaCeroOrgName } from '@/lib/leads/org';
 import {
   LEAD_STATUS_VALUES,
   LEAD_CONTACT_STATUSES,
@@ -12,7 +13,6 @@ import {
 } from '@/lib/leads/status';
 
 const LEAD_SOURCE = 'website_deudacero';
-const ORG_NAME = 'Deuda Cero';
 const PRIORITY_VALUES = new Set(['baja', 'media', 'alta', 'urgente']);
 
 function normalizeText(value?: string | null) {
@@ -25,10 +25,6 @@ function parseDateInput(value?: string | null) {
   if (!raw) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
   return new Date(`${raw}T12:00:00Z`).toISOString();
-}
-
-function isDeudaCeroName(name?: string | null) {
-  return String(name ?? '').trim().toLowerCase() === ORG_NAME.toLowerCase();
 }
 
 function buildLeadObservaciones(lead: LeadRecord) {
@@ -59,7 +55,7 @@ async function requireDeudaCeroAdmin() {
     .maybeSingle();
 
   if (orgError) throw orgError;
-  if (!orgRow || !isDeudaCeroName(orgRow.name)) {
+  if (!orgRow || !isDeudaCeroOrgName(orgRow.name)) {
     throw new Error('Esta vista es exclusiva para Deuda Cero.');
   }
 

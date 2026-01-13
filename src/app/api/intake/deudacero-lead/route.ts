@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
+import { DEUDA_CERO_ORG_ALIASES } from '@/lib/leads/org';
 
-const ORG_NAME = 'Deuda Cero';
 const LEAD_SOURCE = 'website_deudacero';
 
 function safeEqual(a: string, b: string) {
@@ -30,10 +30,11 @@ function pickString(payload: Record<string, unknown>, keys: string[]) {
 }
 
 async function ensureOrganizationId(supabase: any) {
+  const orgFilters = DEUDA_CERO_ORG_ALIASES.map((name) => `name.ilike.${name}`).join(',');
   const { data: orgRow, error: orgErr } = await supabase
     .from('organizations')
     .select('id')
-    .eq('name', ORG_NAME)
+    .or(orgFilters)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -43,7 +44,7 @@ async function ensureOrganizationId(supabase: any) {
 
   const { data: created, error: createErr } = await supabase
     .from('organizations')
-    .insert({ name: ORG_NAME, status: 'active', is_default: false })
+    .insert({ name: DEUDA_CERO_ORG_ALIASES[1] ?? 'Deudas Cero', status: 'active', is_default: false })
     .select('id')
     .single();
 

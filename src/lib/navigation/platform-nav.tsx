@@ -1,5 +1,6 @@
 import type { SidebarItem } from '@/components/layout/AppSidebar';
 import type { Role } from '@/lib/auth/roles';
+import { isDeudaCeroOrgName } from '@/lib/leads/org';
 import {
   Bell,
   Building2,
@@ -25,9 +26,7 @@ export function buildSidebarItems(
 ): SidebarItem[] {
   const isSuperAdmin = Boolean(opts?.isSuperAdmin);
   const canTransition = Boolean(opts?.canTransition);
-  const isDeudaCero = String(opts?.activeOrgName ?? '')
-    .trim()
-    .toLowerCase() === 'deuda cero';
+  const isDeudaCero = isDeudaCeroOrgName(opts?.activeOrgName ?? null);
   const transitionItem: SidebarItem | null = canTransition
     ? {
         href: '/transicion',
