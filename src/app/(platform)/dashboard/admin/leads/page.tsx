@@ -48,7 +48,7 @@ export default async function DeudaCeroLeadsPage() {
   const orgId = (profile as any)?.active_organization_id ?? null;
   if (!orgId) redirect('/select-org');
 
-  const supabase = await createServerClient();
+  const supabase = (await createServerClient()) as any;
   const { data: orgRow } = await supabase
     .from('organizations')
     .select('id, name')

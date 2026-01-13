@@ -192,7 +192,7 @@ export function DeudaCeroLeadDetail({ lead, lawyers }: { lead: LeadRecord; lawye
                   Estado
                   <select
                     value={status}
-                    onChange={(event) => setStatus(event.target.value)}
+                    onChange={(event) => setStatus(normalizeLeadStatus(event.target.value) ?? 'new')}
                     className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
                   >
                     {LEAD_STATUS_OPTIONS.map((option) => (

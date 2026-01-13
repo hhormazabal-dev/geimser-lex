@@ -11,18 +11,19 @@ import { DeudaCeroLeadDetail } from '@/components/admin/DeudaCeroLeadDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface LeadDetailPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default async function DeudaCeroLeadDetailPage({ params }: LeadDetailPageProps) {
+  const { id } = await params;
   const profile = await getCurrentProfile();
-  if (!profile) redirect(`/login?redirectTo=/dashboard/admin/leads/${params.id}`);
+  if (!profile) redirect(`/login?redirectTo=/dashboard/admin/leads/${id}`);
   if (profile.role !== 'admin_firma') redirect('/dashboard/admin');
 
   const orgId = (profile as any)?.active_organization_id ?? null;
   if (!orgId) redirect('/select-org');
 
-  const supabase = await createServerClient();
+  const supabase = (await createServerClient()) as any;
   const { data: orgRow } = await supabase
     .from('organizations')
     .select('id, name')
@@ -33,10 +34,7 @@ export default async function DeudaCeroLeadDetailPage({ params }: LeadDetailPage
     redirect('/dashboard/admin');
   }
 
-  const [leadResult, lawyers] = await Promise.all([
-    getDeudaCeroLead(params.id),
-    getAssignableLawyers(),
-  ]);
+  const [leadResult, lawyers] = await Promise.all([getDeudaCeroLead(id), getAssignableLawyers()]);
 
   if (!leadResult.success || !leadResult.lead) {
     return (

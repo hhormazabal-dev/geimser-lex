@@ -51,7 +51,7 @@ async function requireDeudaCeroAdmin() {
   const orgId = (profile as any)?.active_organization_id ?? null;
   if (!orgId) throw new Error('Debes seleccionar una empresa activa.');
 
-  const supabase = await createServerClient();
+  const supabase = (await createServerClient()) as any;
   const { data: orgRow, error: orgError } = await supabase
     .from('organizations')
     .select('id, name')
@@ -401,6 +401,8 @@ export async function convertLeadToCase(input: {
       estado: 'activo',
       etapa_actual: 'Ingreso Demanda',
       abogado_responsable: abogadoResponsableId,
+      honorario_moneda: 'UF',
+      modalidad_cobro: 'prepago',
       observaciones: buildLeadObservaciones(lead as LeadRecord),
     });
 
