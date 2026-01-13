@@ -135,6 +135,34 @@ function normalizeDateOnlyInput(value?: string | null) {
   return trimmed.includes('T') ? (trimmed.split('T')[0] ?? trimmed) : trimmed;
 }
 
+async function closePendingStagesForFinalCase(caseRecord: Pick<Case, 'id' | 'estado' | 'sentencia_estado' | 'sentencia_fecha'>) {
+  const isFinal =
+    caseRecord.sentencia_estado === 'dictada' ||
+    ['terminado', 'terminado_apelacion', 'terminado_desistido_demandante', 'archivado'].includes(caseRecord.estado ?? '');
+  if (!isFinal) return;
+
+  const closeDate =
+    normalizeDateOnlyInput(caseRecord.sentencia_fecha ?? null) ??
+    new Date().toISOString().split('T')[0]!;
+
+  const supabase = await getPrivilegedSB();
+  const { error } = await supabase
+    .from('case_stages')
+    .update({
+      estado: 'completado',
+      fecha_cumplida: closeDate,
+    })
+    .eq('case_id', caseRecord.id)
+    .neq('estado', 'completado');
+
+  if (error) {
+    console.error('Error cerrando etapas pendientes por sentencia:', {
+      case_id: caseRecord.id,
+      message: error.message,
+    });
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*                         Tipado fuerte de WorkflowState                      */
 /* -------------------------------------------------------------------------- */
@@ -307,6 +335,8 @@ export async function createCase(input: CreateCaseInput) {
         }),
       });
     }
+
+    await closePendingStagesForFinalCase(newCase as Case);
 
     await logAuditAction({
       action: 'CREATE',
@@ -665,6 +695,8 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
         }),
       });
     }
+
+    await closePendingStagesForFinalCase(updatedCase as Case);
 
     revalidatePath(`/cases/${caseId}`);
     revalidatePath('/cases');

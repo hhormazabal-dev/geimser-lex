@@ -29,6 +29,16 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface CaseEditLog {
+  id: string;
+  action: string | null;
+  entity_id: string | null;
+  diff_json?: Json | null;
+  created_at: string;
+  actor?: { id: string; nombre: string | null; email: string | null } | null;
+  case?: { id: string; caratulado: string | null; numero_causa: string | null } | null;
+}
+
 export interface SecurityAlert {
   alert_type: string;
   description: string;
@@ -164,6 +174,69 @@ export async function getAuditLogs(filters?: {
     return { success: true, logs: normalized, total: count ?? 0 };
   } catch (error) {
     console.error('getAuditLogs', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+export async function getCaseEditLogs(filters?: {
+  actions?: string[];
+  limit?: number;
+  offset?: number;
+}): Promise<{ success: boolean; logs?: CaseEditLog[]; total?: number; error?: string }> {
+  try {
+    const profile = await requireAuth();
+    if (profile.role !== 'admin_firma') throw new Error('Sin permisos para ver logs de auditoría');
+
+    const supabase = await createServerClient();
+    const actions = filters?.actions?.length ? filters.actions : ['UPDATE'];
+    const limit = filters?.limit ?? 100;
+    const offset = filters?.offset ?? 0;
+
+    let query = supabase
+      .from('audit_log')
+      .select(
+        'id, action, entity_id, diff_json, created_at, actor:profiles(id, nombre, email)',
+        { count: 'exact' }
+      )
+      .eq('entity_type', 'case')
+      .not('entity_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .in('action', actions)
+      .range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    const rows = (data as any[] | null) ?? [];
+    const caseIds = rows.map((row) => row.entity_id).filter((id): id is string => Boolean(id));
+    let caseById = new Map<string, { id: string; caratulado: string | null; numero_causa: string | null }>();
+    if (caseIds.length > 0) {
+      const { data: casesData, error: caseError } = await supabase
+        .from('cases')
+        .select('id, caratulado, numero_causa')
+        .in('id', caseIds);
+      if (caseError) throw caseError;
+      caseById = new Map(
+        (casesData ?? []).map((row: any) => [
+          row.id,
+          { id: row.id, caratulado: row.caratulado ?? null, numero_causa: row.numero_causa ?? null },
+        ])
+      );
+    }
+
+    const logs: CaseEditLog[] = rows.map((row) => ({
+      id: row.id,
+      action: row.action ?? null,
+      entity_id: row.entity_id ?? null,
+      diff_json: (row.diff_json ?? null) as Json | null,
+      created_at: row.created_at ?? new Date().toISOString(),
+      actor: row.actor ?? null,
+      case: row.entity_id ? caseById.get(row.entity_id) ?? null : null,
+    }));
+
+    return { success: true, logs, total: count ?? 0 };
+  } catch (error) {
+    console.error('getCaseEditLogs', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
