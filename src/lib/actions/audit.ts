@@ -149,7 +149,7 @@ export async function getAuditLogs(filters?: {
 
     const supabase = await createServerClient();
 
-    const query = supabase
+    let query = supabase
       .from('audit_log')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
@@ -192,7 +192,7 @@ export async function getCaseEditLogs(filters?: {
     const limit = filters?.limit ?? 100;
     const offset = filters?.offset ?? 0;
 
-    let query = supabase
+    const query = supabase
       .from('audit_log')
       .select(
         'id, action, entity_id, diff_json, created_at, actor:profiles(id, nombre, email)',
