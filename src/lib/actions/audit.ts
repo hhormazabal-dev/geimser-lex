@@ -149,7 +149,7 @@ export async function getAuditLogs(filters?: {
 
     const supabase = await createServerClient();
 
-    let query = supabase
+    const query = supabase
       .from('audit_log')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
