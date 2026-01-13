@@ -5,14 +5,13 @@ import { requireAuth } from '@/lib/auth/roles';
 import { createServerClient } from '@/lib/supabase/server';
 import { createCase } from '@/lib/actions/cases';
 import type { LeadRecord } from '@/lib/leads/types';
-import { isDeudaCeroOrgName } from '@/lib/leads/org';
+import { DEUDA_CERO_LEAD_SOURCES, isDeudaCeroOrgName } from '@/lib/leads/org';
 import {
   LEAD_STATUS_VALUES,
   LEAD_CONTACT_STATUSES,
   normalizeLeadStatus,
 } from '@/lib/leads/status';
 
-const LEAD_SOURCE = 'website_deudacero';
 const PRIORITY_VALUES = new Set(['baja', 'media', 'alta', 'urgente']);
 
 function normalizeText(value?: string | null) {
@@ -95,7 +94,7 @@ export async function listDeudaCeroLeads(): Promise<{ success: boolean; data?: L
         ].join(', '),
       )
       .eq('organization_id', orgId)
-      .eq('source', LEAD_SOURCE)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -143,7 +142,7 @@ export async function getDeudaCeroLead(id: string): Promise<{ success: boolean; 
         ].join(', '),
       )
       .eq('organization_id', orgId)
-      .eq('source', LEAD_SOURCE)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
       .eq('id', leadId)
       .maybeSingle();
 
@@ -179,7 +178,7 @@ export async function updateLeadStatus(input: {
       .from('leads')
       .select('id, case_id')
       .eq('organization_id', orgId)
-      .eq('source', LEAD_SOURCE)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
       .eq('id', leadId)
       .maybeSingle();
 
@@ -208,7 +207,7 @@ export async function updateLeadStatus(input: {
       .from('leads')
       .update(updates)
       .eq('organization_id', orgId)
-      .eq('source', LEAD_SOURCE)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
       .eq('id', leadId)
       .select(
         [
@@ -280,7 +279,7 @@ export async function updateLeadCaseData(input: {
       .from('leads')
       .update(updates)
       .eq('organization_id', orgId)
-      .eq('source', LEAD_SOURCE)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
       .eq('id', leadId)
       .select(
         [
@@ -365,7 +364,7 @@ export async function convertLeadToCase(input: {
         ].join(', '),
       )
       .eq('organization_id', orgId)
-      .eq('source', LEAD_SOURCE)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
       .eq('id', leadId)
       .maybeSingle();
 
@@ -411,7 +410,7 @@ export async function convertLeadToCase(input: {
       .from('leads')
       .update({ status: 'convertido', case_id: result.case.id, converted_at: nowIso })
       .eq('organization_id', orgId)
-      .eq('source', LEAD_SOURCE)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
       .eq('id', leadId)
       .select(
         [

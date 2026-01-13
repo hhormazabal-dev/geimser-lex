@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
-import { DEUDA_CERO_ORG_ALIASES } from '@/lib/leads/org';
-
-const LEAD_SOURCE = 'website_deudacero';
+import { DEUDA_CERO_ORG_ALIASES, normalizeDeudaCeroLeadSource } from '@/lib/leads/org';
 
 function safeEqual(a: string, b: string) {
   const bufA = Buffer.from(a);
@@ -81,6 +79,9 @@ export async function POST(req: NextRequest) {
   const rut = pickString(payload, ['rut', 'rut_cliente']);
   const message = pickString(payload, ['mensaje', 'message', 'comentarios', 'comment']);
   const leadType = pickString(payload, ['tipo_lead', 'tipoLead', 'lead_type', 'type']);
+  const leadSource = normalizeDeudaCeroLeadSource(
+    pickString(payload, ['source', 'lead_source', 'leadSource', 'origen', 'origin']),
+  );
 
   if (!fullName || !email) {
     return NextResponse.json({ ok: false, error: 'nombre y email requeridos' }, { status: 400 });
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
         message: message ?? null,
         lead_type: leadType ?? null,
         status: 'new',
-        source: LEAD_SOURCE,
+        source: leadSource,
         convertible_to_case: true,
         raw_payload: payload,
       })
