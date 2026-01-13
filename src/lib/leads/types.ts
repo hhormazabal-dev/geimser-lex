@@ -9,12 +9,15 @@ export type LeadRecord = {
   lead_type: string | null;
   status: string | null;
   source: string | null;
+  origin: string | null;
   raw_payload: unknown;
   created_at: string | null;
   last_contact_at: string | null;
   next_follow_up_at: string | null;
   contact_notes: string | null;
   case_id: string | null;
+  assigned_lawyer_id: string | null;
+  assigned_at: string | null;
   case_caratulado: string | null;
   case_materia: string | null;
   case_descripcion: string | null;

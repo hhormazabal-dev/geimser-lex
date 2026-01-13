@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { DEUDA_CERO_ORG_ALIASES, normalizeDeudaCeroLeadSource } from '@/lib/leads/org';
+import { detectLeadOrigin } from '@/lib/leads/origin';
 
 function safeEqual(a: string, b: string) {
   const bufA = Buffer.from(a);
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
   const leadSource = normalizeDeudaCeroLeadSource(
     pickString(payload, ['source', 'lead_source', 'leadSource', 'origen', 'origin']),
   );
+  const leadOrigin = detectLeadOrigin(payload);
 
   if (!fullName || !email) {
     return NextResponse.json({ ok: false, error: 'nombre y email requeridos' }, { status: 400 });
@@ -103,6 +105,7 @@ export async function POST(req: NextRequest) {
         lead_type: leadType ?? null,
         status: 'new',
         source: leadSource,
+        origin: leadOrigin,
         convertible_to_case: true,
         raw_payload: payload,
       })

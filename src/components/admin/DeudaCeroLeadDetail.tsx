@@ -2,16 +2,17 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { updateLeadCaseData, updateLeadStatus, convertLeadToCase } from '@/lib/actions/leads';
+import { updateLeadAssignment, updateLeadCaseData, updateLeadStatus, convertLeadToCase } from '@/lib/actions/leads';
 import { LEAD_STATUS_OPTIONS, getLeadStatusLabel, getLeadStatusTone, normalizeLeadStatus } from '@/lib/leads/status';
 import type { LeadRecord } from '@/lib/leads/types';
+import { detectLeadOrigin, getLeadOriginLabel } from '@/lib/leads/origin';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { formatDate, formatDateShort, formatRelativeTime } from '@/lib/utils';
+import { formatDate, formatDateShort, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import { ArrowUpRight, CheckCircle2, Loader2 } from 'lucide-react';
 
 const PRIORITY_OPTIONS = [
@@ -34,19 +35,57 @@ type LawyerOption = {
   email?: string | null;
 };
 
-export function DeudaCeroLeadDetail({ lead, lawyers }: { lead: LeadRecord; lawyers: LawyerOption[] }) {
+type AuditLogEntry = {
+  id: string;
+  action: string;
+  created_at: string | null;
+  actor?: { nombre?: string | null } | null;
+};
+
+function formatAuditAction(action?: string | null) {
+  const normalized = String(action ?? '').toUpperCase();
+  if (normalized === 'LEAD_STATUS') return 'Tipificacion';
+  if (normalized === 'LEAD_CASE_DATA') return 'Datos de caso';
+  if (normalized === 'LEAD_ASSIGN') return 'Asignacion de abogado';
+  if (normalized === 'LEAD_CONVERT') return 'Conversion a caso';
+  return normalized || 'Accion';
+}
+
+export function DeudaCeroLeadDetail({
+  lead,
+  lawyers,
+  auditLogs = [],
+}: {
+  lead: LeadRecord;
+  lawyers: LawyerOption[];
+  auditLogs?: AuditLogEntry[];
+}) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [currentLead, setCurrentLead] = useState(lead);
   const [status, setStatus] = useState(normalizeLeadStatus(lead.status) ?? 'new');
   const [followUpDate, setFollowUpDate] = useState(toDateInput(lead.next_follow_up_at));
   const [contactNotes, setContactNotes] = useState(lead.contact_notes ?? '');
+  const [assignedLawyerId, setAssignedLawyerId] = useState(lead.assigned_lawyer_id ?? '');
   const [caseCaratulado, setCaseCaratulado] = useState(lead.case_caratulado ?? '');
   const [caseMateria, setCaseMateria] = useState(lead.case_materia ?? '');
   const [caseDescripcion, setCaseDescripcion] = useState(lead.case_descripcion ?? '');
   const [casePrioridad, setCasePrioridad] = useState(lead.case_prioridad ?? 'media');
   const [caseContraparte, setCaseContraparte] = useState(lead.case_contraparte ?? '');
-  const [lawyerId, setLawyerId] = useState('');
+  const [lawyerId, setLawyerId] = useState(lead.assigned_lawyer_id ?? '');
+
+  const assignedLawyer = useMemo(
+    () => lawyers.find((lawyer) => lawyer.id === currentLead.assigned_lawyer_id) ?? null,
+    [lawyers, currentLead.assigned_lawyer_id],
+  );
+  const originLabel = useMemo(() => {
+    const direct = getLeadOriginLabel(currentLead.origin);
+    if (direct !== 'Desconocido') return direct;
+    if (currentLead.raw_payload && typeof currentLead.raw_payload === 'object' && !Array.isArray(currentLead.raw_payload)) {
+      return getLeadOriginLabel(detectLeadOrigin(currentLead.raw_payload as Record<string, unknown>));
+    }
+    return direct;
+  }, [currentLead.origin, currentLead.raw_payload]);
 
   const isReadyToConvert = useMemo(() => {
     return Boolean(
@@ -113,6 +152,29 @@ export function DeudaCeroLeadDetail({ lead, lawyers }: { lead: LeadRecord; lawye
     });
   };
 
+  const handleAssignmentSave = () => {
+    startTransition(async () => {
+      const result = await updateLeadAssignment({
+        id: currentLead.id,
+        assignedLawyerId: assignedLawyerId || null,
+      });
+
+      if (!result.success || !result.lead) {
+        toast({
+          title: 'No se pudo asignar',
+          description: result.error ?? 'Intenta nuevamente en unos minutos.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setCurrentLead(result.lead);
+      setAssignedLawyerId(result.lead.assigned_lawyer_id ?? '');
+      setLawyerId(result.lead.assigned_lawyer_id ?? '');
+      toast({ title: 'Asignacion guardada' });
+    });
+  };
+
   const handleConvert = () => {
     startTransition(async () => {
       const result = await convertLeadToCase({ id: currentLead.id, abogadoResponsableId: lawyerId });
@@ -151,9 +213,11 @@ export function DeudaCeroLeadDetail({ lead, lawyers }: { lead: LeadRecord; lawye
               {currentLead.phone && <span>· {currentLead.phone}</span>}
               {currentLead.rut && <span>· {currentLead.rut}</span>}
               {currentLead.lead_type && <span>· {currentLead.lead_type}</span>}
+              <span>· Origen: {originLabel}</span>
             </div>
             <div className="text-xs text-slate-400">
               Recibido {currentLead.created_at ? formatRelativeTime(currentLead.created_at) : 'recientemente'}
+              {currentLead.created_at && ` · Enviado ${formatDateTime(currentLead.created_at)}`}
               {currentLead.last_contact_at && ` · Ultimo contacto ${formatDate(currentLead.last_contact_at)}`}
             </div>
             {currentLead.message && (
@@ -315,10 +379,14 @@ export function DeudaCeroLeadDetail({ lead, lawyers }: { lead: LeadRecord; lawye
               ) : (
                 <>
                   <label className="space-y-2 text-sm font-medium text-slate-700">
-                    Abogado responsable
+                    Abogado asignado
                     <select
-                      value={lawyerId}
-                      onChange={(event) => setLawyerId(event.target.value)}
+                      value={assignedLawyerId}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        setAssignedLawyerId(nextValue);
+                        setLawyerId(nextValue);
+                      }}
                       className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
                     >
                       <option value="">Selecciona abogado</option>
@@ -329,6 +397,10 @@ export function DeudaCeroLeadDetail({ lead, lawyers }: { lead: LeadRecord; lawye
                       ))}
                     </select>
                   </label>
+
+                  <Button onClick={handleAssignmentSave} disabled={isPending} variant="outline" className="w-full">
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar asignacion'}
+                  </Button>
 
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                     <p className="font-semibold">Checklist</p>
@@ -391,6 +463,14 @@ export function DeudaCeroLeadDetail({ lead, lawyers }: { lead: LeadRecord; lawye
                 <span>Seguimiento</span>
                 <span>{currentLead.next_follow_up_at ? formatDate(currentLead.next_follow_up_at) : 'No agendado'}</span>
               </div>
+              <div className="flex items-center justify-between">
+                <span>Asignado</span>
+                <span>
+                  {currentLead.assigned_lawyer_id
+                    ? assignedLawyer?.nombre ?? assignedLawyer?.email ?? 'Asignado'
+                    : 'No'}
+                </span>
+              </div>
               {currentLead.case_id && (
                 <Button asChild variant="outline" className="w-full justify-between">
                   <Link href={`/cases/${currentLead.case_id}`}>
@@ -403,6 +483,25 @@ export function DeudaCeroLeadDetail({ lead, lawyers }: { lead: LeadRecord; lawye
           </Card>
         </aside>
       </div>
+
+      <Card className="rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Historial de acciones</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-slate-600">
+          {auditLogs.length === 0 && <p className="text-sm text-slate-500">Sin acciones registradas.</p>}
+          {auditLogs.map((log) => (
+            <div key={log.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-2">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-800">{formatAuditAction(log.action)}</p>
+                <p className="text-xs text-slate-500">
+                  {log.actor?.nombre ?? 'Usuario'} · {log.created_at ? formatDateTime(log.created_at) : 'Fecha desconocida'}
+                </p>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {isPending && (
         <div className="flex items-center gap-2 text-xs text-slate-500">

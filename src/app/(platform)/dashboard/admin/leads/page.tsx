@@ -9,11 +9,12 @@ import { createServerClient } from '@/lib/supabase/server';
 import { listDeudaCeroLeads } from '@/lib/actions/leads';
 import { getLeadStatusLabel, getLeadStatusTone, normalizeLeadStatus } from '@/lib/leads/status';
 import { isDeudaCeroOrgName } from '@/lib/leads/org';
+import { detectLeadOrigin, getLeadOriginLabel } from '@/lib/leads/origin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { formatDate, formatDateShort, formatRelativeTime } from '@/lib/utils';
+import { formatDate, formatDateShort, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import type { LeadRecord } from '@/lib/leads/types';
 import { ArrowUpRight, ClipboardList, UserPlus } from 'lucide-react';
 
@@ -39,6 +40,15 @@ function buildNotification(lead: LeadRecord) {
 
 function countByStatus(leads: LeadRecord[], status: string) {
   return leads.filter((lead) => normalizeLeadStatus(lead.status) === status).length;
+}
+
+function resolveOriginLabel(lead: LeadRecord) {
+  const direct = getLeadOriginLabel(lead.origin);
+  if (direct !== 'Desconocido') return direct;
+  if (lead.raw_payload && typeof lead.raw_payload === 'object' && !Array.isArray(lead.raw_payload)) {
+    return getLeadOriginLabel(detectLeadOrigin(lead.raw_payload as Record<string, unknown>));
+  }
+  return direct;
 }
 
 export default async function DeudaCeroLeadsPage() {
@@ -79,12 +89,20 @@ export default async function DeudaCeroLeadsPage() {
           title="Leads y seguimiento"
           description="Centraliza el intake, registra contacto y prepara casos listos para el pipeline de Xel."
           actions={
-            <Button asChild variant="outline">
-              <Link href="/cases" className="inline-flex items-center gap-2">
-                Ver casos
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button asChild variant="outline">
+                <Link href="/dashboard/admin/leads/control" className="inline-flex items-center gap-2">
+                  Panel de control
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/cases" className="inline-flex items-center gap-2">
+                  Ver casos
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           }
         />
 
@@ -148,10 +166,13 @@ export default async function DeudaCeroLeadsPage() {
                     <span>{lead.email}</span>
                     {lead.phone && <span>· {lead.phone}</span>}
                     {lead.lead_type && <span>· {lead.lead_type}</span>}
+                    <span>· Origen: {resolveOriginLabel(lead)}</span>
+                    <span>· {lead.assigned_lawyer_id ? 'Asignado a abogado' : 'Sin asignacion'}</span>
                   </div>
 
                   <div className="text-xs text-slate-400">
                     Recibido {lead.created_at ? formatRelativeTime(lead.created_at) : 'recientemente'}
+                    {lead.created_at && ` · Enviado ${formatDateTime(lead.created_at)}`}
                     {lead.last_contact_at && ` · Ultimo contacto ${formatDate(lead.last_contact_at)}`}
                   </div>
 

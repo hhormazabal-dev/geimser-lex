@@ -10,6 +10,7 @@ import { getAssignableLawyers } from '@/lib/actions/profiles';
 import { DeudaCeroLeadDetail } from '@/components/admin/DeudaCeroLeadDetail';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { isDeudaCeroOrgName } from '@/lib/leads/org';
+import { getAuditHistory } from '@/lib/audit/log';
 
 interface LeadDetailPageProps {
   params: Promise<{ id: string }>;
@@ -35,7 +36,11 @@ export default async function DeudaCeroLeadDetailPage({ params }: LeadDetailPage
     redirect('/dashboard/admin');
   }
 
-  const [leadResult, lawyers] = await Promise.all([getDeudaCeroLead(id), getAssignableLawyers()]);
+  const [leadResult, lawyers, auditResult] = await Promise.all([
+    getDeudaCeroLead(id),
+    getAssignableLawyers(),
+    getAuditHistory('lead', id),
+  ]);
 
   if (!leadResult.success || !leadResult.lead) {
     return (
@@ -55,11 +60,12 @@ export default async function DeudaCeroLeadDetailPage({ params }: LeadDetailPage
     nombre: lawyer.nombre ?? null,
     email: lawyer.email ?? null,
   }));
+  const auditLogs = auditResult?.success ? auditResult.logs ?? [] : [];
 
   return (
     <div className="min-h-screen bg-transparent">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-        <DeudaCeroLeadDetail lead={leadResult.lead} lawyers={lawyerOptions} />
+        <DeudaCeroLeadDetail lead={leadResult.lead} lawyers={lawyerOptions} auditLogs={auditLogs as any} />
       </div>
     </div>
   );

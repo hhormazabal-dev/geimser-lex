@@ -4,8 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { requireAuth } from '@/lib/auth/roles';
 import { createServerClient } from '@/lib/supabase/server';
 import { createCase } from '@/lib/actions/cases';
+import { logAuditAction } from '@/lib/audit/log';
 import type { LeadRecord } from '@/lib/leads/types';
 import { DEUDA_CERO_LEAD_SOURCES, isDeudaCeroOrgName } from '@/lib/leads/org';
+import { detectLeadOrigin, normalizeLeadOrigin, type LeadOrigin } from '@/lib/leads/origin';
 import {
   LEAD_STATUS_VALUES,
   LEAD_CONTACT_STATUSES,
@@ -24,6 +26,22 @@ function parseDateInput(value?: string | null) {
   if (!raw) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
   return new Date(`${raw}T12:00:00Z`).toISOString();
+}
+
+function resolveLeadOrigin(lead: Pick<LeadRecord, 'origin' | 'raw_payload'>): LeadOrigin {
+  const normalized = normalizeLeadOrigin(lead.origin);
+  if (normalized !== 'unknown') return normalized;
+  if (lead.raw_payload && typeof lead.raw_payload === 'object' && !Array.isArray(lead.raw_payload)) {
+    return detectLeadOrigin(lead.raw_payload as Record<string, unknown>);
+  }
+  return 'unknown';
+}
+
+function toDateKey(value?: string | null) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
 }
 
 function buildLeadObservaciones(lead: LeadRecord) {
@@ -79,12 +97,15 @@ export async function listDeudaCeroLeads(): Promise<{ success: boolean; data?: L
           'lead_type',
           'status',
           'source',
+          'origin',
           'raw_payload',
           'created_at',
           'last_contact_at',
           'next_follow_up_at',
           'contact_notes',
           'case_id',
+          'assigned_lawyer_id',
+          'assigned_at',
           'case_caratulado',
           'case_materia',
           'case_descripcion',
@@ -127,12 +148,15 @@ export async function getDeudaCeroLead(id: string): Promise<{ success: boolean; 
           'lead_type',
           'status',
           'source',
+          'origin',
           'raw_payload',
           'created_at',
           'last_contact_at',
           'next_follow_up_at',
           'contact_notes',
           'case_id',
+          'assigned_lawyer_id',
+          'assigned_at',
           'case_caratulado',
           'case_materia',
           'case_descripcion',
@@ -221,12 +245,15 @@ export async function updateLeadStatus(input: {
           'lead_type',
           'status',
           'source',
+          'origin',
           'raw_payload',
           'created_at',
           'last_contact_at',
           'next_follow_up_at',
           'contact_notes',
           'case_id',
+          'assigned_lawyer_id',
+          'assigned_at',
           'case_caratulado',
           'case_materia',
           'case_descripcion',
@@ -241,6 +268,16 @@ export async function updateLeadStatus(input: {
 
     revalidatePath('/dashboard/admin/leads');
     revalidatePath(`/dashboard/admin/leads/${leadId}`);
+
+    await logAuditAction({
+      action: 'LEAD_STATUS',
+      entity_type: 'lead',
+      entity_id: leadId,
+      diff_json: {
+        status: normalizedStatus,
+        next_follow_up_at: updates.next_follow_up_at,
+      },
+    });
 
     return { success: true, lead: data as LeadRecord };
   } catch (error) {
@@ -293,12 +330,15 @@ export async function updateLeadCaseData(input: {
           'lead_type',
           'status',
           'source',
+          'origin',
           'raw_payload',
           'created_at',
           'last_contact_at',
           'next_follow_up_at',
           'contact_notes',
           'case_id',
+          'assigned_lawyer_id',
+          'assigned_at',
           'case_caratulado',
           'case_materia',
           'case_descripcion',
@@ -313,6 +353,17 @@ export async function updateLeadCaseData(input: {
 
     revalidatePath('/dashboard/admin/leads');
     revalidatePath(`/dashboard/admin/leads/${leadId}`);
+
+    await logAuditAction({
+      action: 'LEAD_CASE_DATA',
+      entity_type: 'lead',
+      entity_id: leadId,
+      diff_json: {
+        case_caratulado: updates.case_caratulado,
+        case_materia: updates.case_materia,
+        case_prioridad: updates.case_prioridad,
+      },
+    });
 
     return { success: true, lead: data as LeadRecord };
   } catch (error) {
@@ -349,12 +400,15 @@ export async function convertLeadToCase(input: {
           'lead_type',
           'status',
           'source',
+          'origin',
           'raw_payload',
           'created_at',
           'last_contact_at',
           'next_follow_up_at',
           'contact_notes',
           'case_id',
+          'assigned_lawyer_id',
+          'assigned_at',
           'case_caratulado',
           'case_materia',
           'case_descripcion',
@@ -424,12 +478,15 @@ export async function convertLeadToCase(input: {
           'lead_type',
           'status',
           'source',
+          'origin',
           'raw_payload',
           'created_at',
           'last_contact_at',
           'next_follow_up_at',
           'contact_notes',
           'case_id',
+          'assigned_lawyer_id',
+          'assigned_at',
           'case_caratulado',
           'case_materia',
           'case_descripcion',
@@ -446,11 +503,192 @@ export async function convertLeadToCase(input: {
     revalidatePath(`/dashboard/admin/leads/${leadId}`);
     revalidatePath('/cases');
 
+    await logAuditAction({
+      action: 'LEAD_CONVERT',
+      entity_type: 'lead',
+      entity_id: leadId,
+      diff_json: { case_id: result.case.id, abogado_responsable: abogadoResponsableId },
+    });
+
     return { success: true, caseId: result.case.id, lead: updated as LeadRecord };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'No se pudo convertir el lead en caso.',
+    };
+  }
+}
+
+export async function updateLeadAssignment(input: {
+  id: string;
+  assignedLawyerId: string | null;
+}): Promise<{ success: boolean; lead?: LeadRecord; error?: string }> {
+  try {
+    const { supabase, orgId } = await requireDeudaCeroAdmin();
+    const leadId = normalizeText(input.id);
+    if (!leadId) return { success: false, error: 'Lead inválido.' };
+
+    const assignedLawyerId = normalizeText(input.assignedLawyerId) ?? null;
+    const updates: Record<string, unknown> = {
+      assigned_lawyer_id: assignedLawyerId,
+      assigned_at: assignedLawyerId ? new Date().toISOString() : null,
+    };
+
+    const { data, error } = await supabase
+      .from('leads')
+      .update(updates)
+      .eq('organization_id', orgId)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
+      .eq('id', leadId)
+      .select(
+        [
+          'id',
+          'organization_id',
+          'full_name',
+          'email',
+          'phone',
+          'rut',
+          'message',
+          'lead_type',
+          'status',
+          'source',
+          'origin',
+          'raw_payload',
+          'created_at',
+          'last_contact_at',
+          'next_follow_up_at',
+          'contact_notes',
+          'case_id',
+          'assigned_lawyer_id',
+          'assigned_at',
+          'case_caratulado',
+          'case_materia',
+          'case_descripcion',
+          'case_prioridad',
+          'case_contraparte',
+          'converted_at',
+        ].join(', '),
+      )
+      .single();
+
+    if (error) throw error;
+
+    revalidatePath('/dashboard/admin/leads');
+    revalidatePath(`/dashboard/admin/leads/${leadId}`);
+
+    await logAuditAction({
+      action: 'LEAD_ASSIGN',
+      entity_type: 'lead',
+      entity_id: leadId,
+      diff_json: { assigned_lawyer_id: assignedLawyerId },
+    });
+
+    return { success: true, lead: data as LeadRecord };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'No se pudo asignar el lead.',
+    };
+  }
+}
+
+export async function getLeadControlPanelData(days: number = 30) {
+  try {
+    const { supabase, orgId } = await requireDeudaCeroAdmin();
+    const now = new Date();
+    const fromDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const fromWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fromDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const { data: leads, error } = await supabase
+      .from('leads')
+      .select('id, created_at, origin, raw_payload, status, case_id, assigned_lawyer_id')
+      .eq('organization_id', orgId)
+      .in('source', DEUDA_CERO_LEAD_SOURCES)
+      .gte('created_at', fromDate.toISOString());
+
+    if (error) throw error;
+
+    const rows = (leads ?? []) as Array<{
+      id: string;
+      created_at: string | null;
+      origin: string | null;
+      raw_payload: unknown;
+      status: string | null;
+      case_id: string | null;
+      assigned_lawyer_id: string | null;
+    }>;
+
+    const dailyMap = new Map<
+      string,
+      { total: number; bot: number; form: number; unknown: number; assigned: number; converted: number; typed: number }
+    >();
+
+    const ensureDay = (key: string) => {
+      if (!dailyMap.has(key)) {
+        dailyMap.set(key, { total: 0, bot: 0, form: 0, unknown: 0, assigned: 0, converted: 0, typed: 0 });
+      }
+      return dailyMap.get(key)!;
+    };
+
+    const sum = {
+      today: { total: 0, bot: 0, form: 0, unknown: 0, assigned: 0, converted: 0, typed: 0 },
+      week: { total: 0, bot: 0, form: 0, unknown: 0, assigned: 0, converted: 0, typed: 0 },
+      month: { total: 0, bot: 0, form: 0, unknown: 0, assigned: 0, converted: 0, typed: 0 },
+    };
+
+    const applySum = (bucket: typeof sum.today, origin: LeadOrigin, row: typeof rows[number]) => {
+      bucket.total += 1;
+      bucket[origin] += 1;
+      if (row.assigned_lawyer_id) bucket.assigned += 1;
+      if (row.case_id) bucket.converted += 1;
+      if (row.status && row.status !== 'new') bucket.typed += 1;
+    };
+
+    for (const row of rows) {
+      const origin = resolveLeadOrigin({ origin: row.origin, raw_payload: row.raw_payload } as LeadRecord);
+      const dateKey = toDateKey(row.created_at);
+      if (dateKey) {
+        const day = ensureDay(dateKey);
+        day.total += 1;
+        day[origin] += 1;
+        if (row.assigned_lawyer_id) day.assigned += 1;
+        if (row.case_id) day.converted += 1;
+        if (row.status && row.status !== 'new') day.typed += 1;
+      }
+
+      const createdAt = row.created_at ? new Date(row.created_at) : null;
+      if (!createdAt || Number.isNaN(createdAt.getTime())) continue;
+      if (createdAt >= fromDay) applySum(sum.today, origin, row);
+      if (createdAt >= fromWeek) applySum(sum.week, origin, row);
+      if (createdAt >= fromDate) applySum(sum.month, origin, row);
+    }
+
+    const daily = Array.from(dailyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({ date, ...data }));
+
+    const { data: recentActions } = await supabase
+      .from('audit_log')
+      .select('id, action, created_at, actor:profiles(nombre)')
+      .eq('organization_id', orgId)
+      .eq('entity_type', 'lead')
+      .order('created_at', { ascending: false })
+      .limit(15);
+
+    return {
+      success: true,
+      summary: sum,
+      daily,
+      recentActions: recentActions ?? [],
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'No se pudo cargar el panel de control.',
+      summary: null,
+      daily: [],
+      recentActions: [],
     };
   }
 }
