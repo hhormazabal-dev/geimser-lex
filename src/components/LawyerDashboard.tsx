@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { CasesByPriority, CasesByStatus, DashboardStats } from '@/lib/actions/analytics';
+import type { DashboardStats } from '@/lib/actions/analytics';
 import type { Case, CaseStage, LegalTemplate, Profile, QuickLink } from '@/lib/supabase/types';
 import { formatRoleLabel } from '@/lib/navigation/role-label';
 import { formatCurrency, formatDate, formatRelativeTime, getInitials, stringToColor } from '@/lib/utils';
@@ -21,8 +21,8 @@ interface LawyerDashboardProps {
   profile: Profile;
   data: {
     stats: DashboardStats | null;
-    casesByStatus: CasesByStatus[];
-    casesByPriority: CasesByPriority[];
+    casesByStatus: Array<{ status: string; count: number; percentage: number }>;
+    casesByPriority: Array<{ priority: string; count: number; percentage: number }>;
     upcomingDeadlines: any[];
   };
   cases: (Case & { case_stages?: Pick<CaseStage, 'id' | 'etapa' | 'estado' | 'fecha_programada'>[] })[];
@@ -42,7 +42,7 @@ const STATUS_CHIPS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   activo: 'Activo',
   suspendido: 'Suspendido',
-  archivado: 'Archivado',
+  archivado: 'Archivado (cerrado)',
   terminado_apelacion: 'Terminado – Apelación',
   terminado: 'Terminado',
   terminado_desistido_demandante: 'Terminada (Desistida)',
@@ -112,6 +112,98 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     return (caseRow?.estado as string | null | undefined) ?? null;
   };
 
+  const todayIsoDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const statusSummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    cases.forEach((caseRow: any) => {
+      const status = effectiveCaseStatus(caseRow) ?? 'sin_estado';
+      counts[status] = (counts[status] ?? 0) + 1;
+    });
+    const total = Object.values(counts).reduce((acc, n) => acc + n, 0);
+    const entries = Object.entries(counts).map(([status, count]) => ({
+      status,
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 1000) / 10 : 0,
+    }));
+    entries.sort((a, b) => b.count - a.count);
+    return { total, entries, counts };
+  }, [cases]);
+
+  const prioritySummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    cases.forEach((caseRow: any) => {
+      const pr = String((caseRow as any).prioridad ?? '').trim().toLowerCase() || 'media';
+      counts[pr] = (counts[pr] ?? 0) + 1;
+    });
+    const total = Object.values(counts).reduce((acc, n) => acc + n, 0);
+    const entries = Object.entries(counts).map(([priority, count]) => ({
+      priority,
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 1000) / 10 : 0,
+    }));
+    entries.sort((a, b) => b.count - a.count);
+    return { total, entries, counts };
+  }, [cases]);
+
+  const activePhaseLabel = (caseRow: any): string | null => {
+    const status = effectiveCaseStatus(caseRow);
+    if (status !== 'activo') return null;
+
+    const workflow = String(caseRow?.workflow_state ?? '').trim();
+    const notifEstado = String(caseRow?.notificacion_demanda_estado ?? '').trim();
+    const notifFecha = String(caseRow?.notificacion_demanda_fecha ?? '').slice(0, 10);
+    const audienciaFecha = String((caseRow as any)?.audiencia_inicial_fecha ?? '').slice(0, 10);
+    const sentenciaEstado = String(caseRow?.sentencia_estado ?? '').trim();
+
+    if (notifFecha && notifEstado !== 'realizada') return 'En notificación';
+    if (audienciaFecha) return audienciaFecha >= todayIsoDate ? 'Audiencia programada' : 'Audiencia realizada';
+    if (sentenciaEstado === 'programada') return 'Sentencia programada';
+    if (sentenciaEstado === 'pendiente') return 'Sentencia pendiente';
+    if (workflow === 'preparacion') return 'En preparación';
+    if (workflow === 'en_revision') return 'En revisión';
+    return 'En tramitación';
+  };
+
+  const nextMilestone = (caseRow: any): { label: string; date: string } | null => {
+    const candidates: Array<{ label: string; date: string | null; include: boolean }> = [
+      {
+        label: String(caseRow?.next_action_title ?? 'Próxima acción'),
+        date: String(caseRow?.next_action_at ?? '').slice(0, 10) || null,
+        include: true,
+      },
+      {
+        label: 'Notificación demanda',
+        date: String(caseRow?.notificacion_demanda_fecha ?? '').slice(0, 10) || null,
+        include: String(caseRow?.notificacion_demanda_estado ?? '').trim() !== 'realizada',
+      },
+      {
+        label: 'Audiencia',
+        date: String((caseRow as any)?.audiencia_inicial_fecha ?? '').slice(0, 10) || null,
+        include: true,
+      },
+      {
+        label: 'Sentencia',
+        date: String(caseRow?.sentencia_fecha ?? '').slice(0, 10) || null,
+        include: !['dictada', 'no_registra'].includes(String(caseRow?.sentencia_estado ?? '').trim()),
+      },
+    ];
+
+    const stages = (caseRow?.case_stages ?? []) as Array<{ etapa?: string | null; fecha_programada?: string | null; estado?: string | null }>;
+    for (const stage of stages) {
+      const date = String(stage.fecha_programada ?? '').slice(0, 10) || null;
+      if (!date) continue;
+      if (String(stage.estado ?? '').trim() === 'completado') continue;
+      candidates.push({ label: stage.etapa ?? 'Etapa', date, include: true });
+    }
+
+    const upcoming = candidates
+      .filter((c) => c.include && c.date && c.date >= todayIsoDate)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    if (upcoming.length === 0) return null;
+    return { label: upcoming[0]!.label, date: upcoming[0]!.date! };
+  };
+
   useEffect(() => {
     // Evita que el dashboard quede "pegado" al volver atrás desde /cases/... (BFCache / client cache).
     router.refresh();
@@ -139,7 +231,11 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const caseEnd = caseStart + casesPerPage;
   const paginatedCases = sortedCases.slice(caseStart, caseEnd);
   const deadlines = allDeadlines.slice(0, 5);
-  const totalStatus = data.casesByStatus.reduce((acc, item) => acc + item.count, 0);
+  const casesByStatusDisplay =
+    data.casesByStatus && data.casesByStatus.length > 0 ? data.casesByStatus : statusSummary.entries;
+  const casesByPriorityDisplay =
+    data.casesByPriority && data.casesByPriority.length > 0 ? data.casesByPriority : prioritySummary.entries;
+  const totalStatus = casesByStatusDisplay.reduce((acc, item) => acc + item.count, 0);
   const nextDeadline = deadlines.length > 0 ? deadlines[0] : null;
 
   const today = new Date();
@@ -454,7 +550,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
               <div>
                 <CardTitle className='text-base font-semibold text-slate-900'>Casos bajo tu responsabilidad</CardTitle>
                 <p className='text-xs text-slate-500'>Mantenlos al día para asegurar continuidad con tus clientes.</p>
-                {data.casesByStatus.length > 0 && (
+                {casesByStatusDisplay.length > 0 && (
                   <div className='mt-2.5 flex flex-wrap gap-2'>
                     {[
                       { key: 'activo', label: 'Activos' },
@@ -462,9 +558,9 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                       { key: 'terminado_apelacion', label: 'Terminado apelación' },
                       { key: 'suspendido', label: 'Suspendidos' },
                       { key: 'archivado', label: 'Archivados' },
+                      { key: 'terminado_desistido_demandante', label: 'Desistidos' },
                     ].map((item) => {
-                      const match = data.casesByStatus.find((row) => row.status === item.key);
-                      const count = match?.count ?? 0;
+                      const count = casesByStatusDisplay.find((row) => row.status === item.key)?.count ?? 0;
                       return (
                         <span
                           key={item.key}
@@ -477,6 +573,9 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                     })}
                   </div>
                 )}
+                <p className='mt-2 text-[11px] text-slate-500'>
+                  Archivado: expediente cerrado sin seguimiento activo (no genera vencimientos).
+                </p>
               </div>
               <Link href='/cases' className='text-[12px] font-medium text-sky-600 hover:text-sky-700'>
                 Ver todos
@@ -485,7 +584,9 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
             <CardContent className='p-0'>
               {paginatedCases.length === 0 ? (
                 <div className='px-4 py-10 text-[12px] text-slate-500'>
-                  Aún no tienes casos asignados. El administrador debe derivarte un expediente.
+                  {profile.role === 'abogado'
+                    ? 'Aún no tienes casos asignados. El administrador debe derivarte un expediente.'
+                    : 'No hay casos disponibles para mostrar en este momento.'}
                 </div>
               ) : (
                 <div className='overflow-x-auto'>
@@ -503,7 +604,8 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                     <tbody className='divide-y divide-slate-100 text-slate-700'>
                       {paginatedCases.map((caseItem) => {
                         const effectiveStatus = effectiveCaseStatus(caseItem) ?? caseItem.estado ?? '';
-                        const nextStage = caseItem.case_stages?.find((stage) => (stage.estado ?? '') === 'pendiente');
+                        const phase = activePhaseLabel(caseItem);
+                        const upcoming = nextMilestone(caseItem);
 
                         return (
                           <tr key={caseItem.id} className='transition hover:bg-slate-50/70'>
@@ -545,20 +647,23 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                                 >
                                   {caseItem.prioridad || 'media'}
                                 </span>
+                                {phase && (
+                                  <span className='inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700'>
+                                    {phase}
+                                  </span>
+                                )}
                               </div>
                             </td>
                             <td className='px-4 py-3 align-top'>
-                              {nextStage ? (
+                              {upcoming ? (
                                 <div className='space-y-1'>
-                                  <p className='text-[12px] font-medium text-slate-900'>{nextStage.etapa}</p>
-                                  {nextStage.fecha_programada ? (
-                                    <p className='text-[11px] text-slate-500'>{formatDate(nextStage.fecha_programada)}</p>
-                                  ) : (
-                                    <p className='text-[11px] text-slate-400'>Sin fecha</p>
-                                  )}
+                                  <p className='text-[12px] font-medium text-slate-900'>{upcoming.label}</p>
+                                  <p className='text-[11px] text-slate-500'>
+                                    {formatDate(upcoming.date)} · {formatRelativeTime(upcoming.date)}
+                                  </p>
                                 </div>
                               ) : (
-                                <span className='text-[11px] text-slate-400'>Sin etapa pendiente</span>
+                                <span className='text-[11px] text-slate-400'>Sin hitos con fecha</span>
                               )}
                             </td>
                             <td className='px-4 py-3 align-top font-semibold text-slate-900'>
@@ -642,13 +747,13 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                 <CardTitle className='text-xs font-semibold text-slate-800'>Panorama de tus casos</CardTitle>
               </CardHeader>
               <CardContent className='space-y-3 px-4 pb-4 pt-0'>
-                {data.casesByStatus.length === 0 ? (
+                {casesByStatusDisplay.length === 0 ? (
                   <p className='text-[12px] text-slate-500'>Aún no hay suficientes datos para mostrar tu distribución.</p>
                 ) : (
-                  data.casesByStatus.map((item) => (
+                  casesByStatusDisplay.map((item) => (
                     <div key={item.status}>
                       <div className='flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-500'>
-                        <span>{item.status.replace('_', ' ')}</span>
+                        <span>{STATUS_LABELS[item.status] ?? item.status.replace(/_/g, ' ')}</span>
                         <span className='font-medium text-slate-700'>{item.count}</span>
                       </div>
                       <div className='mt-2 h-2 rounded-full bg-slate-100'>
@@ -661,11 +766,11 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                   ))
                 )}
 
-                {data.casesByPriority.length > 0 && (
+                {casesByPriorityDisplay.length > 0 && (
                   <div className='mt-4 border-t border-slate-100 pt-3'>
                     <p className='text-[10px] uppercase tracking-wide text-slate-500'>Prioridad</p>
                     <div className='mt-3 grid grid-cols-2 gap-2.5'>
-                      {data.casesByPriority.map((item: CasesByPriority) => (
+                      {casesByPriorityDisplay.map((item) => (
                         <div key={item.priority} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px]'>
                           <p className='uppercase tracking-wide text-slate-500'>{item.priority}</p>
                           <p className='mt-1 text-base font-semibold text-slate-900'>{item.count}</p>
