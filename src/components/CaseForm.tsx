@@ -584,20 +584,12 @@ export function CaseForm({
   const notificacionEstado = watch('notificacion_demanda_estado');
   const marcarValidado = watch('marcar_validado');
   const workflowState = watch('workflow_state');
-  const modalidadCobro = watch('modalidad_cobro');
-  const honorarioMoneda = watch('honorario_moneda');
-  const honorarioTotal = watch('honorario_total_uf');
   const audienciaInicialTipo = watch('audiencia_inicial_tipo');
   const audienciaInicialFecha = watch('audiencia_inicial_fecha');
   const audienciaInicialRequiereTestigos = watch('audiencia_inicial_requiere_testigos');
   const sentenciaEstado = watch('sentencia_estado');
   const estadoExpediente = watch('estado');
   const terminoDocumentoId = watch('termino_documento_id');
-  const honorarioPagado = watch('honorario_pagado_uf');
-  const honorarioPendiente =
-    typeof honorarioTotal === 'number' && !Number.isNaN(honorarioTotal)
-      ? Math.max((honorarioTotal ?? 0) - (honorarioPagado ?? 0), 0)
-      : undefined;
   const newClientRut = watchNewClient('rut');
   const { ref: newClientRutRef, ...newClientRutField } = registerNewClient('rut');
 
@@ -642,17 +634,9 @@ export function CaseForm({
       return { ...t, fecha: iso };
     });
 
-    const shouldDistributeCosts =
-      (modalidadCobro ?? 'prepago') === 'prepago' &&
-      honorarioMoneda === 'UF' &&
-      typeof honorarioTotal === 'number' &&
-      Number.isFinite(honorarioTotal) &&
-      honorarioTotal > 0;
-
     return {
       total: templates.length,
       items,
-      shouldDistributeCosts,
     };
   })();
 
@@ -2416,156 +2400,16 @@ export function CaseForm({
 
 	          <section id='case-form-step-3' className='space-y-4 scroll-mt-24'>
 	            <div>
-	              <h2 className='text-lg font-semibold text-gray-900'>Honorarios y cobro prepago</h2>
-              <p className='text-sm text-gray-500'>Define cómo se cobrará este caso. El timeline bloqueará etapas hasta registrar el pago correspondiente.</p>
-            </div>
-
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='modalidad_cobro'>Modalidad de cobro</Label>
-                <select
-                  id='modalidad_cobro'
-                  className='form-input'
-                  {...register('modalidad_cobro')}
-                  disabled={isLoading}
-                >
-                  <option value='prepago'>Prepago por etapas</option>
-                  <option value='postpago'>Postpago</option>
-                  <option value='mixto'>Mixto</option>
-                </select>
-                {errors.modalidad_cobro && (
-                  <p className='text-sm text-red-600'>{errors.modalidad_cobro.message}</p>
-                )}
+	              <h2 className='text-lg font-semibold text-gray-900'>Antecedentes</h2>
+                <p className='text-sm text-gray-500'>
+                  Los cobros y pagos se gestionan por fuera del expediente en la sección <span className="font-medium">Cobros</span>.
+                </p>
               </div>
 
-              <div className='space-y-2'>
-                <Label htmlFor='honorario_moneda'>Moneda base</Label>
-                <select
-                  id='honorario_moneda'
-                  className='form-input'
-                  {...register('honorario_moneda')}
-                  disabled={isLoading}
-                >
-                  <option value='UF'>UF</option>
-                  <option value='CLP'>CLP</option>
-                  <option value='USD'>USD</option>
-                </select>
-                {errors.honorario_moneda && (
-                  <p className='text-sm text-red-600'>{errors.honorario_moneda.message}</p>
-                )}
+              <div className='rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700'>
+                Crea el caso y luego registra cobros desde <span className="font-semibold">Cobros</span> (no se configuran al crear el expediente).
               </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='tarifa_referencia'>Tarifa de referencia</Label>
-                <Input
-                  id='tarifa_referencia'
-                  placeholder='Ej: civil_juicio_ordinario_mayor_cuantia'
-                  {...register('tarifa_referencia')}
-                  disabled={isLoading}
-                />
-                <p className='text-xs text-gray-500'>Usa el identificador definido en la tabla de tarifas de Xel Chile para asociar el timeline automáticamente.</p>
-                {errors.tarifa_referencia && (
-                  <p className='text-sm text-red-600'>{errors.tarifa_referencia.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='honorario_total_uf'>Honorario total (UF)</Label>
-                <Input
-                  id='honorario_total_uf'
-                  type='number'
-                  min='0'
-                  step='0.01'
-                  placeholder='30'
-                  {...register('honorario_total_uf', { setValueAs: toOptionalNumber })}
-                  disabled={isLoading || honorarioMoneda !== 'UF'}
-                />
-                {honorarioMoneda !== 'UF' && (
-                  <p className='text-xs text-gray-500'>Para otras monedas detalla el valor en notas.</p>
-                )}
-                {errors.honorario_total_uf && (
-                  <p className='text-sm text-red-600'>{errors.honorario_total_uf.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='honorario_pagado_uf'>Monto pagado (UF)</Label>
-                <Input
-                  id='honorario_pagado_uf'
-                  type='number'
-                  min='0'
-                  step='0.01'
-                  placeholder='0'
-                  {...register('honorario_pagado_uf', { setValueAs: toOptionalNumber })}
-                  disabled={isLoading || honorarioMoneda !== 'UF'}
-                />
-                {errors.honorario_pagado_uf && (
-                  <p className='text-sm text-red-600'>{errors.honorario_pagado_uf.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label>Saldo pendiente (UF)</Label>
-                <div className='h-10 flex items-center rounded-md border border-dashed border-gray-300 px-3 text-sm font-medium text-gray-700 bg-gray-50'>
-                  {honorarioPendiente !== undefined ? formatUf(honorarioPendiente) : '—'}
-                </div>
-              </div>
-            </div>
-
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='honorario_variable_porcentaje'>Componente variable (%)</Label>
-                <Input
-                  id='honorario_variable_porcentaje'
-                  type='number'
-                  min='0'
-                  max='100'
-                  step='0.1'
-                  placeholder='10'
-                  {...register('honorario_variable_porcentaje', { setValueAs: toOptionalNumber })}
-                  disabled={isLoading}
-                />
-                {errors.honorario_variable_porcentaje && (
-                  <p className='text-sm text-red-600'>{errors.honorario_variable_porcentaje.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='honorario_variable_base'>Base del variable</Label>
-                <Textarea
-                  id='honorario_variable_base'
-                  rows={2}
-                  placeholder='Ej: 10% de lo obtenido o de lo ahorrado por la defensa.'
-                  {...register('honorario_variable_base')}
-                  disabled={isLoading}
-                />
-                {errors.honorario_variable_base && (
-                  <p className='text-sm text-red-600'>{errors.honorario_variable_base.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div className='space-y-2'>
-              <Label htmlFor='honorario_notas'>Notas de honorarios</Label>
-              <Textarea
-                id='honorario_notas'
-                rows={3}
-                placeholder='Detalle acuerdos específicos, descuentos, o condiciones especiales.'
-                {...register('honorario_notas')}
-                disabled={isLoading}
-              />
-              {errors.honorario_notas && (
-                <p className='text-sm text-red-600'>{errors.honorario_notas.message}</p>
-              )}
-            </div>
-
-            <div className='rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900'>
-              <p className='font-medium'>Prepago por etapas</p>
-              <p className='mt-1'>El cliente podrá avanzar pagando etapa por etapa. Cada fase del timeline exigirá un pago registrado para habilitar las acciones del equipo jurídico. Puedes copiar y compartir los enlaces de Payku desde el detalle del caso.</p>
-            </div>
-          </section>
+	          </section>
 
 	          <section id='case-form-step-4' className='space-y-4 scroll-mt-24'>
 	            <div>
@@ -2683,7 +2527,6 @@ export function CaseForm({
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{CASE_WORKFLOW_STATES.find((s) => s.value === workflowState)?.label ?? '—'}</Badge>
                 <Badge variant="outline">{CASE_PRIORITIES.find((p) => p.value === watch('prioridad'))?.label ?? '—'}</Badge>
-                {modalidadCobro && <Badge variant="outline">{modalidadCobro}</Badge>}
               </div>
               {audienciaInicialTipo && (
                 <p className="mt-2 text-xs text-foreground/60">
@@ -2716,14 +2559,6 @@ export function CaseForm({
                 <p className="mt-2 text-xs text-foreground/55">
                   Mostrando {timelinePreview.items.length} de {timelinePreview.total} etapas.
                 </p>
-              )}
-              {timelinePreview.shouldDistributeCosts && (
-                <div className="mt-4 rounded-2xl border border-amber-200/60 bg-amber-50/70 p-4 text-sm text-amber-900">
-                  <p className="font-semibold">Prepago por etapas</p>
-                  <p className="mt-1 text-xs text-amber-900/80">
-                    El honorario total en UF se distribuye automáticamente por etapa (y bloquea avance hasta pago).
-                  </p>
-                </div>
               )}
             </CardContent>
           </Card>

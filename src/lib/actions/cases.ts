@@ -21,7 +21,6 @@ import {
 
 import { getStageTemplatesByMateria } from '@/lib/validators/stages';
 import type { StageTemplate } from '@/lib/validators/stages';
-import { findLegalFeeItemById } from '@/lib/pricing/legalFees';
 import { ZodError } from 'zod';
 
 import type {
@@ -1283,22 +1282,7 @@ async function createInitialStages(caseRecord: Case) {
   const templates: StageTemplate[] = getStageTemplatesByMateria(caseRecord.materia || 'Civil');
   const baseDate = caseRecord.fecha_inicio ? new Date(caseRecord.fecha_inicio) : new Date();
 
-  const tarifaReferencia = findLegalFeeItemById(caseRecord.tarifa_referencia);
-  const totalAsignado =
-    typeof caseRecord.honorario_total_uf === 'number'
-      ? Number(caseRecord.honorario_total_uf)
-      : tarifaReferencia?.montoUf ?? null;
-
-  const shouldDistributeCosts =
-    (caseRecord.modalidad_cobro ?? 'prepago') === 'prepago' &&
-    caseRecord.honorario_moneda === 'UF' &&
-    totalAsignado !== null;
-  const honorarioTotal = shouldDistributeCosts ? totalAsignado : null;
-
-  const toFixedUf = (value: number) => Number(value.toFixed(2));
-
   let cumulativeDays = 0;
-  let allocatedUf = 0;
 
   const stages: CaseStageInsert[] = templates.map((template: StageTemplate, index: number) => {
     cumulativeDays += template.diasEstimados;
@@ -1306,19 +1290,6 @@ async function createInitialStages(caseRecord: Case) {
     const scheduledDate = new Date(baseDate.getTime());
     scheduledDate.setDate(scheduledDate.getDate() + cumulativeDays);
     const fechaStr = scheduledDate.toISOString().split('T')[0]; // YYYY-MM-DD
-
-    let costoEtapa: number | null = null;
-    if (honorarioTotal !== null) {
-      const porcentaje = template.porcentajeHonorario ?? 0;
-      if (porcentaje > 0) {
-        if (index === templates.length - 1) {
-          costoEtapa = toFixedUf(honorarioTotal - allocatedUf);
-        } else {
-          costoEtapa = toFixedUf(honorarioTotal * porcentaje);
-          allocatedUf += costoEtapa;
-        }
-      }
-    }
 
     return {
       case_id: caseRecord.id,
@@ -1330,14 +1301,14 @@ async function createInitialStages(caseRecord: Case) {
       fecha_programada: fechaStr ?? null, // string|null, nunca undefined
       fecha_cumplida: null,
       responsable_id: null,
-      requiere_pago: shouldDistributeCosts,
-      costo_uf: costoEtapa,
-      porcentaje_variable: template.porcentajeVariable ?? null,
+      // Cobros se gestionan por fuera del expediente (sección /billing).
+      requiere_pago: false,
+      costo_uf: null,
+      porcentaje_variable: null,
       estado_pago: 'pendiente',
       enlace_pago: null,
-      notas_pago: template.notasPago ?? null,
-      monto_variable_base:
-        template.porcentajeVariable && template.notasPago ? template.notasPago : null,
+      notas_pago: null,
+      monto_variable_base: null,
       monto_pagado_uf: 0,
     };
   });

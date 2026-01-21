@@ -239,15 +239,6 @@ export function TimelinePanel({
   };
 
   const handleCompleteStage = async (stage: CaseStage) => {
-    if (stage.requiere_pago && stage.estado_pago !== 'pagado') {
-      toast({
-        title: 'Gestión pendiente en Cobros',
-        description: 'Esta etapa tiene un cobro pendiente. Registra el pago en Cobros para poder completarla.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     try {
       setProcessingStage(stage.id);
       const normalize = (value: string) =>
@@ -759,10 +750,14 @@ export function TimelinePanel({
                           <p className='text-sm font-semibold text-foreground'>{stage.etapa}</p>
                           <div className='mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-foreground/55'>
                             {typeof stage.orden === 'number' && stage.orden > 0 && <span>Orden {stage.orden}</span>}
-                            {stage.costo_uf !== null && stage.costo_uf !== undefined && <span>Costo {formatUf(stage.costo_uf)}</span>}
-                            {stage.monto_pagado_uf !== null && stage.monto_pagado_uf !== undefined && (
-                              <span>Pagado {formatUf(stage.monto_pagado_uf)}</span>
-                            )}
+                            {showBillingSection &&
+                              stage.costo_uf !== null &&
+                              stage.costo_uf !== undefined && <span>Costo {formatUf(stage.costo_uf)}</span>}
+                            {showBillingSection &&
+                              stage.monto_pagado_uf !== null &&
+                              stage.monto_pagado_uf !== undefined && (
+                                <span>Pagado {formatUf(stage.monto_pagado_uf)}</span>
+                              )}
                             {stage.fecha_programada && <span>Programada {formatDate(stage.fecha_programada)}</span>}
                             {stage.fecha_cumplida && <span>Cumplida {formatDate(stage.fecha_cumplida)}</span>}
                           </div>
@@ -772,7 +767,7 @@ export function TimelinePanel({
                         </div>
                       </div>
 
-                      {(stage.enlace_pago || canEditPayments) && (
+                      {showBillingSection && (stage.enlace_pago || canEditPayments) && (
                         <div className='mt-3 flex flex-wrap items-center gap-2'>
                           {stage.enlace_pago && (
                             <a
