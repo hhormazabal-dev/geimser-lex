@@ -91,7 +91,8 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
           'next_action_at',
         ].join(','),
       )
-      .neq('estado', 'archivado');
+      // Inbox: solo casos activos / en seguimiento. No alertar casos finalizados.
+      .not('estado', 'in', '("archivado","terminado","terminado_desistido_demandante")');
     if (casesError) throw casesError;
 
     const deadlineItems: WorkQueueStage[] = [];
@@ -135,8 +136,12 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
         add('sentencia', `Sentencia · ${sentEstado.replace(/_/g, ' ')}`, c.sentencia_fecha ?? null);
       }
 
-      // Desistimiento (si existe fecha).
-      add('desistimiento', 'Desistimiento', c.fecha_desistimiento ?? null);
+      // Desistimiento: si viene planificado (fecha futura), se muestra como vencimiento.
+      // Si la fecha ya pasó, lo tratamos como hito histórico (no alerta).
+      const desist = normalizeDateOnly(c.fecha_desistimiento ?? null);
+      if (desist && desist >= today) {
+        add('desistimiento', 'Desistimiento', desist);
+      }
     }
 
     const overdueDeadlines = deadlineItems

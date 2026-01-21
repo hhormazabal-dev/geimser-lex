@@ -503,6 +503,24 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       throw new Error('Debes adjuntar y asociar un documento de término antes de marcar el caso como “Terminado”.');
     }
 
+    // Reglas de prioridad: un caso terminado/desistido/sentenciado no debe marcarse como "urgente".
+    if (rest.prioridad === 'urgente') {
+      const nextFechaDesistimiento =
+        rest.fecha_desistimiento !== undefined
+          ? normalizeDateOnlyInput(rest.fecha_desistimiento as any)
+          : ((existingCase as any).fecha_desistimiento ?? null);
+      const nextSentenciaEstado = (rest.sentencia_estado ?? (existingCase as any).sentencia_estado ?? null) as
+        | string
+        | null;
+      const isFinalEstado = ['terminado', 'terminado_desistido_demandante', 'archivado'].includes(nextEstado);
+      const hasDesistimiento = Boolean(nextFechaDesistimiento);
+      const hasSentenciaDictada = String(nextSentenciaEstado ?? '').trim() === 'dictada';
+
+      if (isFinalEstado || hasDesistimiento || hasSentenciaDictada) {
+        throw new Error('No puedes marcar como “urgente” un caso terminado, desistido o con sentencia dictada.');
+      }
+    }
+
     const updatePayload: CaseUpdate & Record<string, any> = {
       updated_at: nowIso,
 
