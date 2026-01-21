@@ -16,11 +16,13 @@ import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { DailyStatementsPanel } from '@/components/DailyStatementsPanel';
 import { ComplianceMonitoringPanel } from '@/components/ComplianceMonitoringPanel';
 import { CaseAuditHistoryPanel } from '@/components/CaseAuditHistoryPanel';
+import { CaseMilestonesTimeline } from '@/components/CaseMilestonesTimeline';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
 import { useToast } from '@/hooks/use-toast';
 import { authorizeCaseAdvance, assignLawyer, listAvailableLawyers } from '@/lib/actions/cases';
+import { deriveCaseMilestones } from '@/lib/cases/milestones';
 import { createCaseCounterparty, deleteCaseCounterparty } from '@/lib/actions/counterparties';
 import {
   listCaseEvents,
@@ -150,6 +152,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     | 'checklist'
     | 'clients'
   >('overview');
+  const [showInternalStages, setShowInternalStages] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const [stageCatalog, setStageCatalog] = useState<CaseStage[]>(caseData.case_stages ?? []);
@@ -387,6 +390,11 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     caseData.sentencia_fecha,
     stageCatalog,
   ]);
+
+  const caseMilestones = useMemo(
+    () => deriveCaseMilestones({ ...caseData, case_stages: stageCatalog } as any),
+    [caseData, stageCatalog],
+  );
 
   const parties = useMemo(() => {
     const primaryClientId = caseData.cliente_principal_id ?? null;
@@ -1147,54 +1155,18 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         Fechas clave
                       </p>
                       <div className="mt-3 space-y-1.5 text-sm text-foreground/65">
-                        {caseData.fecha_inicio && (
-                          <p>
-                            Inicio · <span className="font-medium text-foreground">{formatDate(caseData.fecha_inicio)}</span>
-                          </p>
-                        )}
-                        {caseData.notificacion_demanda_fecha && (
-                          <p>
-                            Notificación ·{' '}
-                            <span className="font-medium text-foreground">
-                              {formatDate(caseData.notificacion_demanda_fecha)}
-                            </span>
-                          </p>
-                        )}
-                        {(caseData as any).audiencia_inicial_fecha && (
-                          <p>
-                            Audiencia ·{' '}
-                            <span className="font-medium text-foreground">
-                              {formatDate((caseData as any).audiencia_inicial_fecha)}
-                            </span>
-                            {(caseData as any).audiencia_inicial_tipo ? (
-                              <span className="text-xs text-foreground/50"> · {(caseData as any).audiencia_inicial_tipo}</span>
-                            ) : null}
-                          </p>
-                        )}
-                        {caseData.sentencia_fecha && (
-                          <p>
-                            Sentencia · <span className="font-medium text-foreground">{formatDate(caseData.sentencia_fecha)}</span>
-                            {caseData.sentencia_estado ? (
-                              <span className="text-xs text-foreground/50"> · {caseData.sentencia_estado}</span>
-                            ) : null}
-                          </p>
-                        )}
-                        {(caseData as any).fecha_desistimiento && (
-                          <p>
-                            Desistimiento ·{' '}
-                            <span className="font-medium text-foreground">
-                              {formatDate((caseData as any).fecha_desistimiento)}
-                            </span>
-                          </p>
-                        )}
-                        {caseData.next_action_at && (
-                          <p>
-                            Próxima acción ·{' '}
-                            <span className="font-medium text-foreground">{formatDate(caseData.next_action_at)}</span>
-                            {caseData.next_action_title ? (
-                              <span className="text-xs text-foreground/50"> · {caseData.next_action_title}</span>
-                            ) : null}
-                          </p>
+                        {caseMilestones.length === 0 ? (
+                          <p className="text-foreground/55">Sin fechas registradas</p>
+                        ) : (
+                          caseMilestones.slice(0, 6).map((milestone) => (
+                            <p key={milestone.key}>
+                              {milestone.label} ·{' '}
+                              <span className="font-medium text-foreground">{formatDate(milestone.date)}</span>
+                              {milestone.detail ? (
+                                <span className="text-xs text-foreground/50"> · {milestone.detail}</span>
+                              ) : null}
+                            </p>
+                          ))
                         )}
                       </div>
                     </div>
@@ -1344,33 +1316,45 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,4.5fr)_minmax(0,2.5fr)] xl:items-start">
               <div className="space-y-6">
-                <TimelinePanel
-                  caseId={caseData.id}
-                  caseMateria={caseData.materia ?? 'General'}
-                  initialStages={stageCatalog}
-                  autoLoadStages={false}
-                  canManageStages={canManageStages}
-                  showPrivateStages={showPrivateContent}
-                  clientContext={{
-                    role: profile.role === 'usuario' ? 'cliente' : profile.role,
-                    alcanceAutorizado: clientAdvance.autorizado,
-                    alcanceSolicitado: clientAdvance.solicitado,
-                  }}
-                  onClientProgressChange={(progress) => {
-                    setClientAdvance((prev) => {
-                      const nextSolicitado = progress.solicitado ?? prev.solicitado;
-                      const nextAutorizado = progress.autorizado ?? prev.autorizado;
-                      if (
-                        nextSolicitado === prev.solicitado &&
-                        nextAutorizado === prev.autorizado
-                      ) {
-                        return prev;
-                      }
-                      return { solicitado: nextSolicitado, autorizado: nextAutorizado };
-                    });
-                  }}
-                  onStagesLoaded={setStageCatalog}
-                />
+                <CaseMilestonesTimeline milestones={caseMilestones} />
+                {canManageStages ? (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowInternalStages((prev) => !prev)}
+                    >
+                      {showInternalStages ? 'Ocultar etapas internas' : 'Ver etapas internas'}
+                    </Button>
+                  </div>
+                ) : null}
+                {showInternalStages ? (
+                  <TimelinePanel
+                    caseId={caseData.id}
+                    caseMateria={caseData.materia ?? 'General'}
+                    initialStages={stageCatalog}
+                    autoLoadStages={false}
+                    canManageStages={canManageStages}
+                    showPrivateStages={showPrivateContent}
+                    clientContext={{
+                      role: profile.role === 'usuario' ? 'cliente' : profile.role,
+                      alcanceAutorizado: clientAdvance.autorizado,
+                      alcanceSolicitado: clientAdvance.solicitado,
+                    }}
+                    onClientProgressChange={(progress) => {
+                      setClientAdvance((prev) => {
+                        const nextSolicitado = progress.solicitado ?? prev.solicitado;
+                        const nextAutorizado = progress.autorizado ?? prev.autorizado;
+                        if (nextSolicitado === prev.solicitado && nextAutorizado === prev.autorizado) {
+                          return prev;
+                        }
+                        return { solicitado: nextSolicitado, autorizado: nextAutorizado };
+                      });
+                    }}
+                    onStagesLoaded={setStageCatalog}
+                  />
+                ) : null}
               </div>
               <div className="space-y-6">
                 <DocumentsPanel
@@ -1393,30 +1377,47 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           )}
 
           {activeTab === 'timeline' && (
-            <TimelinePanel
-              caseId={caseData.id}
-              caseMateria={caseData.materia ?? 'General'}
-              initialStages={stageCatalog}
-              autoLoadStages={false}
-              canManageStages={canManageStages}
-              showPrivateStages={showPrivateContent}
-              clientContext={{
-                role: profile.role === 'usuario' ? 'cliente' : profile.role,
-                alcanceAutorizado: clientAdvance.autorizado,
-                alcanceSolicitado: clientAdvance.solicitado,
-              }}
-              onClientProgressChange={(progress) => {
-                setClientAdvance((prev) => {
-                  const nextSolicitado = progress.solicitado ?? prev.solicitado;
-                  const nextAutorizado = progress.autorizado ?? prev.autorizado;
-                  if (nextSolicitado === prev.solicitado && nextAutorizado === prev.autorizado) {
-                    return prev;
-                  }
-                  return { solicitado: nextSolicitado, autorizado: nextAutorizado };
-                });
-              }}
-              onStagesLoaded={setStageCatalog}
-            />
+            <div className="space-y-6">
+              <CaseMilestonesTimeline milestones={caseMilestones} />
+              {canManageStages ? (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowInternalStages((prev) => !prev)}
+                  >
+                    {showInternalStages ? 'Ocultar etapas internas' : 'Ver etapas internas'}
+                  </Button>
+                </div>
+              ) : null}
+              {showInternalStages ? (
+                <TimelinePanel
+                  caseId={caseData.id}
+                  caseMateria={caseData.materia ?? 'General'}
+                  initialStages={stageCatalog}
+                  autoLoadStages={false}
+                  canManageStages={canManageStages}
+                  showPrivateStages={showPrivateContent}
+                  clientContext={{
+                    role: profile.role === 'usuario' ? 'cliente' : profile.role,
+                    alcanceAutorizado: clientAdvance.autorizado,
+                    alcanceSolicitado: clientAdvance.solicitado,
+                  }}
+                  onClientProgressChange={(progress) => {
+                    setClientAdvance((prev) => {
+                      const nextSolicitado = progress.solicitado ?? prev.solicitado;
+                      const nextAutorizado = progress.autorizado ?? prev.autorizado;
+                      if (nextSolicitado === prev.solicitado && nextAutorizado === prev.autorizado) {
+                        return prev;
+                      }
+                      return { solicitado: nextSolicitado, autorizado: nextAutorizado };
+                    });
+                  }}
+                  onStagesLoaded={setStageCatalog}
+                />
+              ) : null}
+            </div>
           )}
 
           {activeTab === 'documents' && (

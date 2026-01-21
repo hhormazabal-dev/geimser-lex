@@ -83,13 +83,31 @@ export function formatRelativeTime(date?: string | Date | null): string {
   const d = toDate(date ?? null)
   if (isNaN(d.getTime())) return 'Fecha inválida'
 
-  const diff = (Date.now() - d.getTime()) / 1000
-  if (diff < 60) return 'hace unos segundos'
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)} minutos`
-  if (diff < 86400) return `hace ${Math.floor(diff / 3600)} horas`
-  if (diff < 2592000) return `hace ${Math.floor(diff / 86400)} días`
-  if (diff < 31104000) return `hace ${Math.floor(diff / 2592000)} meses`
-  return `hace ${Math.floor(diff / 31104000)} años`
+  const deltaSeconds = (d.getTime() - Date.now()) / 1000
+  const absSeconds = Math.abs(deltaSeconds)
+  const isFuture = deltaSeconds > 0
+
+  const fmt = (n: number, unit: string) => (isFuture ? `en ${n} ${unit}` : `hace ${n} ${unit}`)
+
+  if (absSeconds < 60) return isFuture ? 'en menos de 1 minuto' : 'hace unos segundos'
+  if (absSeconds < 3600) {
+    const minutes = isFuture ? Math.ceil(absSeconds / 60) : Math.floor(absSeconds / 60)
+    return fmt(minutes, minutes === 1 ? 'minuto' : 'minutos')
+  }
+  if (absSeconds < 86400) {
+    const hours = isFuture ? Math.ceil(absSeconds / 3600) : Math.floor(absSeconds / 3600)
+    return fmt(hours, hours === 1 ? 'hora' : 'horas')
+  }
+  if (absSeconds < 2592000) {
+    const days = isFuture ? Math.ceil(absSeconds / 86400) : Math.floor(absSeconds / 86400)
+    return fmt(days, days === 1 ? 'día' : 'días')
+  }
+  if (absSeconds < 31104000) {
+    const months = isFuture ? Math.ceil(absSeconds / 2592000) : Math.floor(absSeconds / 2592000)
+    return fmt(months, months === 1 ? 'mes' : 'meses')
+  }
+  const years = isFuture ? Math.ceil(absSeconds / 31104000) : Math.floor(absSeconds / 31104000)
+  return fmt(years, years === 1 ? 'año' : 'años')
 }
 
 /* ───────────────── RUT ───────────────── */

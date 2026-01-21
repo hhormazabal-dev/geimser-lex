@@ -684,8 +684,7 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       }
     }
 
-    // Mantiene coherencia entre hitos del caso (audiencias, notificación, sentencia, desistimiento) y etapas.
-    await syncCaseMilestonesToTimeline(updatedCase as Case);
+    // Nota: los hitos (fechas clave) viven en el propio caso. Evitamos autogenerar/insertar etapas al actualizar.
 
     await logAuditAction({
       action: 'UPDATE',
@@ -1154,8 +1153,7 @@ export async function getCaseById(caseId: string) {
       isCollaborator = true;
     }
 
-    // Sincroniza hitos del caso (audiencias, notificación, sentencia, desistimiento) al timeline.
-    await syncCaseMilestonesToTimeline(caseRow as Case);
+    // Nota: Ver un caso no debe mutar datos (evita "reset" y escrituras innecesarias).
     const [lawyerProfile, stagesRes, notesRes, docsRes, reqsRes, counterpartiesRes, clientsRes] = await Promise.all([
       (async () => {
         if (!caseRow.abogado_responsable) return null;

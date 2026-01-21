@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { NotesPanel } from '@/components/NotesPanel';
 import { DocumentsPanel } from '@/components/DocumentsPanel';
-import { TimelinePanel } from '@/components/TimelinePanel';
 import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
+import { CaseMilestonesTimeline } from '@/components/CaseMilestonesTimeline';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
+import { deriveCaseMilestones } from '@/lib/cases/milestones';
 import { 
   Scale, 
   FileText, 
@@ -36,8 +37,13 @@ type CaseFieldsForClient = Pick<
   | 'estado'
   | 'prioridad'
   | 'etapa_actual'
+  | 'notificacion_demanda_fecha'
+  | 'notificacion_demanda_estado'
   | 'sentencia_estado'
   | 'sentencia_fecha'
+  | 'fecha_desistimiento'
+  | 'next_action_at'
+  | 'next_action_title'
   | 'honorario_moneda'
   | 'honorario_total_uf'
   | 'honorario_pagado_uf'
@@ -89,6 +95,10 @@ function getSentenceStatusLabel(status?: string | null): string {
 export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
   const [selectedCase, setSelectedCase] = useState<ClientPortalCase | null>(cases[0] || null);
   const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'documents' | 'notes' | 'messages' | 'requests'>('overview');
+  const caseMilestones = useMemo(
+    () => (selectedCase ? deriveCaseMilestones(selectedCase as any) : []),
+    [selectedCase],
+  );
   const lawyerData = selectedCase?.abogado_responsable_profile
     ? {
         nombre: selectedCase.abogado_responsable_profile.nombre ?? null,
@@ -507,12 +517,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                           <CardTitle className='text-lg'>Progreso Reciente</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <TimelinePanel 
-                            caseId={selectedCase.id}
-                            caseMateria={selectedCase.materia ?? 'General'}
-                            canManageStages={false}
-                            showPrivateStages={false}
-                          />
+                          <CaseMilestonesTimeline milestones={caseMilestones} />
                         </CardContent>
                       </Card>
 
@@ -534,12 +539,7 @@ export function ClientDashboard({ profile, cases }: ClientDashboardProps) {
                   )}
 
                   {activeTab === 'timeline' && (
-                    <TimelinePanel 
-                      caseId={selectedCase.id}
-                      caseMateria={selectedCase.materia ?? 'General'}
-                      canManageStages={false}
-                      showPrivateStages={false}
-                    />
+                    <CaseMilestonesTimeline milestones={caseMilestones} />
                   )}
 
                   {activeTab === 'documents' && (
