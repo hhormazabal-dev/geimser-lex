@@ -1147,49 +1147,36 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         Fechas clave
                       </p>
                       <div className="mt-3 space-y-1.5 text-sm text-foreground/65">
-                        {stageInsights.startDate && (
+                        {caseData.fecha_inicio && (
                           <p>
-                            Inicio · <span className="font-medium text-foreground">{formatDate(stageInsights.startDate)}</span>
+                            Inicio · <span className="font-medium text-foreground">{formatDate(caseData.fecha_inicio)}</span>
                           </p>
                         )}
-                        {stageInsights.notificacionDate && (
+                        {caseData.notificacion_demanda_fecha && (
                           <p>
                             Notificación ·{' '}
                             <span className="font-medium text-foreground">
-                              {formatDate(stageInsights.notificacionDate)}
+                              {formatDate(caseData.notificacion_demanda_fecha)}
                             </span>
                           </p>
                         )}
-                        {stageInsights.nextAudience?.fecha_programada && (
+                        {(caseData as any).audiencia_inicial_fecha && (
                           <p>
-                            Audiencia próxima ·{' '}
+                            Audiencia ·{' '}
                             <span className="font-medium text-foreground">
-                              {formatDate(stageInsights.nextAudience.fecha_programada)}
+                              {formatDate((caseData as any).audiencia_inicial_fecha)}
                             </span>
-                            <span className="text-xs text-foreground/50"> · {stageInsights.nextAudience.etapa}</span>
-                          </p>
-                        )}
-                        {stageInsights.nextScheduled?.fecha_programada && (
-                          <p>
-                            Próximo hito ·{' '}
-                            <span className="font-medium text-foreground">
-                              {formatDate(stageInsights.nextScheduled.fecha_programada)}
-                            </span>
-                            <span className="text-xs text-foreground/50"> · {stageInsights.nextScheduled.etapa}</span>
-                          </p>
-                        )}
-                        {stageInsights.lastCompleted?.fecha_cumplida && (
-                          <p>
-                            Último hito ·{' '}
-                            <span className="font-medium text-foreground">
-                              {formatDate(stageInsights.lastCompleted.fecha_cumplida)}
-                            </span>
-                            <span className="text-xs text-foreground/50"> · {stageInsights.lastCompleted.etapa}</span>
+                            {(caseData as any).audiencia_inicial_tipo ? (
+                              <span className="text-xs text-foreground/50"> · {(caseData as any).audiencia_inicial_tipo}</span>
+                            ) : null}
                           </p>
                         )}
                         {caseData.sentencia_fecha && (
                           <p>
                             Sentencia · <span className="font-medium text-foreground">{formatDate(caseData.sentencia_fecha)}</span>
+                            {caseData.sentencia_estado ? (
+                              <span className="text-xs text-foreground/50"> · {caseData.sentencia_estado}</span>
+                            ) : null}
                           </p>
                         )}
                         {(caseData as any).fecha_desistimiento && (
@@ -1200,23 +1187,13 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                             </span>
                           </p>
                         )}
-                        {caseData.fecha_termino && (
+                        {caseData.next_action_at && (
                           <p>
-                            Término · <span className="font-medium text-foreground">{formatDate(caseData.fecha_termino)}</span>
-                          </p>
-                        )}
-                        {stageInsights.durationDays !== null && (
-                          <p>
-                            {caseData.fecha_termino || (caseData.sentencia_estado === 'dictada' && caseData.sentencia_fecha)
-                              ? 'Duración total'
-                              : 'Duración'}
-                            {' '}·{' '}
-                            <span className="font-medium text-foreground">{stageInsights.durationDays} días</span>
-                            {stageInsights.durationEndDate && (
-                              <span className="text-xs text-foreground/50">
-                                {' '}· al {formatDate(stageInsights.durationEndDate)}
-                              </span>
-                            )}
+                            Próxima acción ·{' '}
+                            <span className="font-medium text-foreground">{formatDate(caseData.next_action_at)}</span>
+                            {caseData.next_action_title ? (
+                              <span className="text-xs text-foreground/50"> · {caseData.next_action_title}</span>
+                            ) : null}
                           </p>
                         )}
                       </div>

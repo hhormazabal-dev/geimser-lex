@@ -37,6 +37,8 @@ interface TimelinePanelProps {
   caseMateria?: string;
   initialStages?: CaseStage[];
   autoLoadStages?: boolean;
+  // Si es false, el timeline muestra solo etapas con fechas reales (programada o cumplida).
+  showUndatedStages?: boolean;
   canManageStages?: boolean;
   showPrivateStages?: boolean;
   // Si es false, la UI del timeline NO debe mostrar información ni acciones de cobro/pagos.
@@ -66,6 +68,7 @@ export function TimelinePanel({
   caseMateria = 'Civil',
   initialStages,
   autoLoadStages = true,
+  showUndatedStages = false,
   canManageStages = false,
   showPrivateStages = true,
   showBillingSection = false,
@@ -600,6 +603,9 @@ export function TimelinePanel({
   const filteredStages = showPrivateStages 
     ? stages 
     : stages.filter(stage => stage.es_publica);
+  const visibleStages = showUndatedStages
+    ? filteredStages
+    : filteredStages.filter((stage) => Boolean(stage.fecha_programada || stage.fecha_cumplida));
 
   const stageTemplates = getStageTemplatesByMateria(caseMateria);
   const totalCostoEtapas = stages.reduce((sum, stage) => sum + (stage.costo_uf ?? 0), 0);
@@ -654,7 +660,7 @@ export function TimelinePanel({
 		        <div className='flex items-center justify-between'>
 		          <CardTitle className='flex items-center gap-2'>
 		            <Clock className='h-5 w-5' />
-		            {`Timeline Procesal (${filteredStages.length})`}
+		            {`Timeline Procesal (${visibleStages.length})`}
 		          </CardTitle>
 		          <div className='flex items-center gap-2'>
 		            {showBillingSection && showPaymentTimeline && (
@@ -1034,14 +1040,14 @@ export function TimelinePanel({
             </p>
           </div>
           <div className='relative lg:rounded-3xl lg:border lg:border-white/40 lg:bg-white/60 lg:p-6 lg:shadow-inner'>
-            {filteredStages.length > 0 && (
+            {visibleStages.length > 0 && (
               <>
                 <div className='pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-white via-white/80 to-transparent lg:hidden' />
                 <div className='pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white via-white/80 to-transparent lg:hidden' />
               </>
             )}
             <div className='flex gap-4 overflow-x-auto pb-4 pl-2 pr-10 scroll-smooth snap-x snap-mandatory sm:pl-4 sm:pr-14 lg:grid lg:[grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] lg:gap-4 lg:overflow-visible lg:p-0 lg:snap-none'>
-	              {filteredStages.map((stage, index) => {
+	              {visibleStages.map((stage, index) => {
 	                const stageResponsable = (stage as { responsable?: { nombre?: string | null } | null }).responsable;
 	                const stageOrder = stage.orden ?? index + 1;
 	                const isAuthorizedStage = clientMode && stageOrder <= clientProgress.autorizado;
@@ -1184,36 +1190,15 @@ export function TimelinePanel({
           </div>
         </div>
 
-        {filteredStages.length === 0 && (
+        {visibleStages.length === 0 && (
           <div className='py-10 text-center text-foreground/60'>
             <Clock className='mx-auto mb-4 h-12 w-12 text-foreground/20' />
-            <p className='text-base font-medium text-foreground/70'>No hay etapas definidas para este caso</p>
+            <p className='text-base font-medium text-foreground/70'>No hay etapas con fechas registradas</p>
             {canManageStages && (
               <p className='mt-2 text-sm'>
-                Haz clic en "Nueva Etapa" para agregar la primera etapa
+                Agrega una etapa con fecha para que aparezca aquí.
               </p>
             )}
-          </div>
-        )}
-
-        {stageTemplates.length > 0 && (
-          <div className='mt-6 border-t border-white/30 pt-5'>
-            <h3 className='text-sm font-semibold text-foreground/70'>Plan estimado de referencia para materia {caseMateria || 'Civil'}</h3>
-            <p className='mt-1 text-xs text-foreground/50'>Duraciones aproximadas en días a partir del inicio del caso.</p>
-            <ul className='mt-3 space-y-2 text-sm text-foreground/60'>
-              {stageTemplates.map((template, idx) => (
-                <li key={`${template.etapa}-${idx}`} className='flex items-start gap-2'>
-                  <span className='mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-sky-500/70' />
-                  <span>
-                    <span className='font-medium text-foreground/75'>{template.etapa}</span>
-                    <span className='block text-foreground/50'>
-                      {template.descripcion}
-                      {template.diasEstimados ? ` · ≈ ${template.diasEstimados} días` : ''}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
           </div>
         )}
           </>
