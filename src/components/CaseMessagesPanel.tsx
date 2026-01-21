@@ -10,6 +10,8 @@ import { formatDateTime } from '@/lib/utils';
 import { Loader2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+const caseMessagesCache = new Map<string, CaseMessageDTO[]>();
+
 interface CaseMessagesPanelProps {
   caseId: string;
   initialMessages: CaseMessageDTO[];
@@ -18,18 +20,27 @@ interface CaseMessagesPanelProps {
 }
 
 export function CaseMessagesPanel({ caseId, initialMessages, currentProfileId, allowSend = true }: CaseMessagesPanelProps) {
-  const [messages, setMessages] = useState<CaseMessageDTO[]>(initialMessages);
+  const [messages, setMessages] = useState<CaseMessageDTO[]>(
+    caseMessagesCache.get(caseId) ?? initialMessages,
+  );
   const [message, setMessage] = useState('');
   const [isPending, startTransition] = useTransition();
   const [isRefreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    const cached = caseMessagesCache.get(caseId);
+    if (cached) {
+      setMessages(cached);
+      return;
+    }
     setMessages(initialMessages);
+    caseMessagesCache.set(caseId, initialMessages);
   }, [initialMessages, caseId]);
 
   useEffect(() => {
-    if (initialMessages.length === 0) {
+    const cached = caseMessagesCache.get(caseId) ?? [];
+    if (cached.length === 0 && initialMessages.length === 0) {
       refreshMessages();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -53,7 +64,11 @@ export function CaseMessagesPanel({ caseId, initialMessages, currentProfileId, a
           caseId,
           contenido: message.trim(),
         });
-        setMessages((prev) => [...prev, newMessage]);
+        setMessages((prev) => {
+          const next = [...prev, newMessage];
+          caseMessagesCache.set(caseId, next);
+          return next;
+        });
         setMessage('');
       } catch (error: any) {
         toast({
@@ -70,6 +85,7 @@ export function CaseMessagesPanel({ caseId, initialMessages, currentProfileId, a
     try {
       const refreshed = await listCaseMessages(caseId, { limit: 100 });
       setMessages(refreshed);
+      caseMessagesCache.set(caseId, refreshed);
     } catch (error: any) {
       toast({
         title: 'Error al actualizar',

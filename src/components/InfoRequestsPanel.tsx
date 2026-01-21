@@ -34,8 +34,11 @@ import {
   INFO_REQUEST_PRIORITIES 
 } from '@/lib/validators/info-requests';
 
+const infoRequestsCache = new Map<string, InfoRequest[]>();
+
 interface InfoRequestsPanelProps {
   caseId: string;
+  initialRequests?: InfoRequest[];
   canCreateRequests?: boolean;
   canRespondRequests?: boolean;
   showPrivateRequests?: boolean;
@@ -43,12 +46,17 @@ interface InfoRequestsPanelProps {
 
 export function InfoRequestsPanel({ 
   caseId, 
+  initialRequests,
   canCreateRequests = false,
   canRespondRequests = false,
   showPrivateRequests = true 
 }: InfoRequestsPanelProps) {
-  const [requests, setRequests] = useState<InfoRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [requests, setRequests] = useState<InfoRequest[]>(
+    infoRequestsCache.get(caseId) ?? initialRequests ?? [],
+  );
+  const [isLoading, setIsLoading] = useState(
+    !(infoRequestsCache.has(caseId) || initialRequests !== undefined),
+  );
   const [isCreating, setIsCreating] = useState(false);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -73,6 +81,7 @@ export function InfoRequestsPanel({
       
       if (result.success) {
         setRequests(result.requests);
+        infoRequestsCache.set(caseId, result.requests);
       } else {
         toast({
           title: 'Error',
@@ -93,8 +102,21 @@ export function InfoRequestsPanel({
   };
 
   useEffect(() => {
+    const cached = infoRequestsCache.get(caseId);
+    if (cached) {
+      setRequests(cached);
+      setIsLoading(false);
+      return;
+    }
+    if (initialRequests !== undefined) {
+      setRequests(initialRequests);
+      infoRequestsCache.set(caseId, initialRequests);
+      setIsLoading(false);
+      return;
+    }
     loadRequests();
-  }, [caseId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, initialRequests]);
 
   const handleCreateRequest = async () => {
     if (!newRequest.titulo.trim() || !newRequest.descripcion.trim()) {

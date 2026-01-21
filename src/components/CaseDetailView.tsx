@@ -15,6 +15,7 @@ import { InfoRequestsPanel } from '@/components/InfoRequestsPanel';
 import { CaseMessagesPanel } from '@/components/CaseMessagesPanel';
 import { DailyStatementsPanel } from '@/components/DailyStatementsPanel';
 import { ComplianceMonitoringPanel } from '@/components/ComplianceMonitoringPanel';
+import { CaseAuditHistoryPanel } from '@/components/CaseAuditHistoryPanel';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { formatDate, formatCurrency, getInitials, stringToColor } from '@/lib/utils';
 import { CASE_SENTENCE_STATUSES } from '@/lib/validators/case';
@@ -48,7 +49,7 @@ import {
   ListChecks,
   ShieldCheck,
 } from 'lucide-react';
-import type { Profile, Case, CaseStage, CaseCounterparty } from '@/lib/supabase/types';
+import type { Profile, Case, CaseStage, CaseCounterparty, Document, Note, InfoRequest } from '@/lib/supabase/types';
 import type { CaseMessageDTO } from '@/lib/actions/messages';
 import { LawyerChecklistPanel } from '@/components/LawyerChecklistPanel';
 
@@ -126,6 +127,9 @@ interface CaseDetailViewProps {
       is_primary?: boolean;
     }>;
     case_stages?: CaseStage[];
+    notes?: Note[];
+    documents?: Document[];
+    info_requests?: InfoRequest[];
     counterparties?: CaseCounterparty[];
   };
   profile: Profile;
@@ -343,6 +347,19 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     })();
 
     const notificacionDate = caseData.notificacion_demanda_fecha ?? notificationFromStages ?? null;
+    const startDate = (() => {
+      const candidates = [
+        caseData.fecha_inicio,
+        ...sorted.flatMap((stage) => [stage.fecha_programada, stage.fecha_cumplida]),
+      ].filter((value): value is string => Boolean(value));
+
+      const rows = candidates
+        .map((value) => ({ value, time: parseDateOnly(value)?.getTime() ?? null }))
+        .filter((row): row is { value: string; time: number } => typeof row.time === 'number')
+        .sort((a, b) => a.time - b.time);
+
+      return rows.length > 0 ? rows[0]!.value : null;
+    })();
     const endDate =
       caseData.fecha_termino ??
       (caseData.sentencia_estado === 'dictada' ? caseData.sentencia_fecha : null) ??
@@ -351,13 +368,14 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
 
     return {
       etapaActual: currentStage?.etapa ?? caseData.etapa_actual ?? null,
+      startDate,
       nextScheduled,
       lastCompleted,
       notificacionDate,
       nextAudience,
       lastAudience,
       durationEndDate: endDate,
-      durationDays: daysBetween(caseData.fecha_inicio, endDate),
+      durationDays: daysBetween(startDate ?? caseData.fecha_inicio, endDate),
       todayIso,
     };
   }, [
@@ -1129,9 +1147,9 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         Fechas clave
                       </p>
                       <div className="mt-3 space-y-1.5 text-sm text-foreground/65">
-                        {caseData.fecha_inicio && (
+                        {stageInsights.startDate && (
                           <p>
-                            Inicio · <span className="font-medium text-foreground">{formatDate(caseData.fecha_inicio)}</span>
+                            Inicio · <span className="font-medium text-foreground">{formatDate(stageInsights.startDate)}</span>
                           </p>
                         )}
                         {stageInsights.notificacionDate && (
@@ -1352,6 +1370,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                 <TimelinePanel
                   caseId={caseData.id}
                   caseMateria={caseData.materia ?? 'General'}
+                  initialStages={stageCatalog}
+                  autoLoadStages={false}
                   canManageStages={canManageStages}
                   showPrivateStages={showPrivateContent}
                   clientContext={{
@@ -1378,6 +1398,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               <div className="space-y-6">
                 <DocumentsPanel
                   caseId={caseData.id}
+                  initialDocuments={caseData.documents ?? []}
                   canUpload={canManageDocuments}
                   canEdit={canManageDocuments}
                   canDelete={canManageDocuments}
@@ -1385,6 +1406,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                 />
                 <InfoRequestsPanel
                   caseId={caseData.id}
+                  initialRequests={caseData.info_requests ?? []}
                   canCreateRequests={true}
                   canRespondRequests={canManageRequests}
                   showPrivateRequests={showPrivateContent}
@@ -1397,6 +1419,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             <TimelinePanel
               caseId={caseData.id}
               caseMateria={caseData.materia ?? 'General'}
+              initialStages={stageCatalog}
+              autoLoadStages={false}
               canManageStages={canManageStages}
               showPrivateStages={showPrivateContent}
               clientContext={{
@@ -1422,6 +1446,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             <DocumentsPanel
               caseId={caseData.id}
               caseMateria={caseData.materia ?? null}
+              initialDocuments={caseData.documents ?? []}
               initialDocumentationReceived={caseData.documentacion_recibida ?? null}
               canRequestDocuments={profile.role !== 'cliente'}
               canUpload={canManageDocuments}
@@ -1522,6 +1547,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                   )}
                 </CardContent>
               </Card>
+              <CaseAuditHistoryPanel caseId={caseData.id} />
             </div>
           )}
 
@@ -1542,6 +1568,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           {activeTab === 'notes' && (
             <NotesPanel
               caseId={caseData.id}
+              initialNotes={caseData.notes ?? []}
               canCreateNotes={canManageNotes}
               canEditNotes={canManageNotes}
               showPrivateNotes={showPrivateContent}
@@ -1560,6 +1587,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           {activeTab === 'requests' && (
             <InfoRequestsPanel
               caseId={caseData.id}
+              initialRequests={caseData.info_requests ?? []}
               canCreateRequests={true}
               canRespondRequests={canManageRequests}
               showPrivateRequests={showPrivateContent}

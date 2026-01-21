@@ -35,6 +35,8 @@ import { STAGE_STATUSES, STAGE_PAYMENT_STATUSES, STAGE_AUDIENCE_TYPES, getStageT
 interface TimelinePanelProps {
   caseId: string;
   caseMateria?: string;
+  initialStages?: CaseStage[];
+  autoLoadStages?: boolean;
   canManageStages?: boolean;
   showPrivateStages?: boolean;
   // Si es false, la UI del timeline NO debe mostrar información ni acciones de cobro/pagos.
@@ -62,6 +64,8 @@ type DraftStageState = {
 export function TimelinePanel({
   caseId,
   caseMateria = 'Civil',
+  initialStages,
+  autoLoadStages = true,
   canManageStages = false,
   showPrivateStages = true,
   showBillingSection = false,
@@ -69,8 +73,8 @@ export function TimelinePanel({
   onClientProgressChange,
   onStagesLoaded,
 }: TimelinePanelProps) {
-  const [stages, setStages] = useState<CaseStage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [stages, setStages] = useState<CaseStage[]>(initialStages ?? []);
+  const [isLoading, setIsLoading] = useState(initialStages === undefined);
   const [isCreating, setIsCreating] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newStage, setNewStage] = useState<DraftStageState>({
@@ -95,6 +99,14 @@ export function TimelinePanel({
   });
   const [activeSection, setActiveSection] = useState<'proceso' | 'cobro'>('proceso');
   const [hasInitializedSection, setHasInitializedSection] = useState(false);
+
+  useEffect(() => {
+    if (initialStages === undefined) return;
+    setStages(initialStages);
+    setIsLoading(false);
+    onStagesLoaded?.(initialStages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, initialStages]);
 
   const loadStages = async () => {
     setIsLoading(true);
@@ -124,8 +136,11 @@ export function TimelinePanel({
   };
 
   useEffect(() => {
+    if (!autoLoadStages) return;
+    if (initialStages !== undefined) return;
     loadStages();
-  }, [caseId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, autoLoadStages, initialStages]);
 
   useEffect(() => {
     if (isLoading) return;

@@ -31,9 +31,13 @@ import type { Document } from '@/lib/supabase/types';
 import { ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from '@/lib/validators/documents';
 import { DOCUMENT_CHECKLISTS, type ChecklistMateria } from '@/lib/legal/documentChecklists';
 
+const documentsCache = new Map<string, Document[]>();
+const documentationReceivedCache = new Map<string, string>();
+
 interface DocumentsPanelProps {
   caseId: string;
   caseMateria?: string | null;
+  initialDocuments?: Document[];
   initialDocumentationReceived?: string | null;
   canRequestDocuments?: boolean;
   canUpload?: boolean;
@@ -45,6 +49,7 @@ interface DocumentsPanelProps {
 export function DocumentsPanel({ 
   caseId, 
   caseMateria = null,
+  initialDocuments,
   initialDocumentationReceived = null,
   canRequestDocuments = false,
   canUpload = false, 
@@ -52,12 +57,18 @@ export function DocumentsPanel({
   canDelete = false,
   showPrivateDocuments = true 
 }: DocumentsPanelProps) {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [documents, setDocuments] = useState<Document[]>(
+    documentsCache.get(caseId) ?? initialDocuments ?? [],
+  );
+  const [isLoading, setIsLoading] = useState(
+    !(documentsCache.has(caseId) || initialDocuments !== undefined),
+  );
   const [isUploading, setIsUploading] = useState(false);
   const [editingDocument, setEditingDocument] = useState<string | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [documentationReceived, setDocumentationReceived] = useState<string>(initialDocumentationReceived ?? '');
+  const [documentationReceived, setDocumentationReceived] = useState<string>(
+    documentationReceivedCache.get(caseId) ?? initialDocumentationReceived ?? '',
+  );
   const [isSavingChecklist, setIsSavingChecklist] = useState(false);
   const [isRequestingItem, setIsRequestingItem] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,6 +81,7 @@ export function DocumentsPanel({
       
       if (result.success) {
         setDocuments(result.documents);
+        documentsCache.set(caseId, result.documents);
       } else {
         toast({
           title: 'Error',
@@ -90,12 +102,30 @@ export function DocumentsPanel({
   };
 
   useEffect(() => {
+    const cached = documentsCache.get(caseId);
+    if (cached) {
+      setDocuments(cached);
+      setIsLoading(false);
+      return;
+    }
+    if (initialDocuments !== undefined) {
+      setDocuments(initialDocuments);
+      documentsCache.set(caseId, initialDocuments);
+      setIsLoading(false);
+      return;
+    }
     loadDocuments();
-  }, [caseId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, initialDocuments]);
 
   useEffect(() => {
+    const cached = documentationReceivedCache.get(caseId);
+    if (cached !== undefined) {
+      setDocumentationReceived(cached);
+      return;
+    }
     setDocumentationReceived(initialDocumentationReceived ?? '');
-  }, [initialDocumentationReceived]);
+  }, [caseId, initialDocumentationReceived]);
 
   const normalizedMateria = (caseMateria ?? '').trim();
   const checklistMateria: ChecklistMateria | null =
@@ -132,6 +162,7 @@ export function DocumentsPanel({
       const result = await updateCase(caseId, { documentacion_recibida: next });
       if (result.success) {
         setDocumentationReceived(next);
+        documentationReceivedCache.set(caseId, next);
         toast({ title: 'Checklist actualizado' });
       } else {
         toast({

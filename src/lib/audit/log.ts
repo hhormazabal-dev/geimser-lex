@@ -159,3 +159,86 @@ export async function getAuditStats(days: number = 30) {
     };
   }
 }
+
+type CaseAuditHistoryOptions = {
+  limit?: number;
+};
+
+/**
+ * Obtiene historial de auditoría asociado a un caso:
+ * - case (entity_id = caseId)
+ * - case_stage / document / note / info_request (por IDs asociados al caseId)
+ */
+export async function getCaseAuditHistory(caseId: string, options: CaseAuditHistoryOptions = {}) {
+  try {
+    const profile = await getCurrentProfile();
+    if (!profile) throw new Error('No autenticado');
+
+    const supabase = await createServerClient();
+
+    // Validación de acceso vía RLS: si no puede leer el caso, no puede ver auditoría.
+    const { data: caseRow, error: caseError } = await supabase
+      .from('cases')
+      .select('id')
+      .eq('id', caseId)
+      .maybeSingle();
+    if (caseError || !caseRow?.id) throw new Error('Sin permisos para ver auditoría de este caso');
+
+    const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
+
+    const [stageIdsRes, docIdsRes, noteIdsRes, reqIdsRes] = await Promise.all([
+      supabase.from('case_stages').select('id').eq('case_id', caseId),
+      supabase.from('documents').select('id').eq('case_id', caseId),
+      supabase.from('notes').select('id').eq('case_id', caseId),
+      supabase.from('info_requests').select('id').eq('case_id', caseId),
+    ]);
+
+    const stageIds = (stageIdsRes.data ?? []).map((row: any) => row.id).filter(Boolean);
+    const documentIds = (docIdsRes.data ?? []).map((row: any) => row.id).filter(Boolean);
+    const noteIds = (noteIdsRes.data ?? []).map((row: any) => row.id).filter(Boolean);
+    const requestIds = (reqIdsRes.data ?? []).map((row: any) => row.id).filter(Boolean);
+
+    const selectWithActor = `
+      *,
+      actor:profiles(nombre, role)
+    `;
+
+    const fetchLogs = async (entityType: string, ids: string[] | 'case') => {
+      let query = supabase.from('audit_log').select(selectWithActor).eq('entity_type', entityType);
+      if (ids === 'case') {
+        query = query.eq('entity_id', caseId);
+      } else {
+        if (ids.length === 0) return [] as any[];
+        query = query.in('entity_id', ids);
+      }
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(limit);
+      if (error) {
+        console.error('Error fetching audit logs:', { entityType, message: error.message });
+        return [] as any[];
+      }
+      return data ?? [];
+    };
+
+    const [caseLogs, stageLogs, documentLogs, noteLogs, requestLogs] = await Promise.all([
+      fetchLogs('case', 'case'),
+      fetchLogs('case_stage', stageIds),
+      fetchLogs('document', documentIds),
+      fetchLogs('note', noteIds),
+      fetchLogs('info_request', requestIds),
+    ]);
+
+    const merged = [...caseLogs, ...stageLogs, ...documentLogs, ...noteLogs, ...requestLogs]
+      .filter((row) => row && row.created_at)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, limit);
+
+    return { success: true, logs: merged };
+  } catch (error) {
+    console.error('Error in getCaseAuditHistory:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
+      logs: [],
+    };
+  }
+}

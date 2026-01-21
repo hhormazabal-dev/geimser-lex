@@ -11,8 +11,11 @@ import { Plus, Edit, Trash2, MessageSquare, Lock, Globe, Loader2 } from 'lucide-
 import type { Note } from '@/lib/supabase/types';
 import type { CreateNoteInput } from '@/lib/validators/notes';
 
+const notesCache = new Map<string, Note[]>();
+
 interface NotesPanelProps {
   caseId: string;
+  initialNotes?: Note[];
   canCreateNotes?: boolean;
   canEditNotes?: boolean;
   showPrivateNotes?: boolean;
@@ -20,12 +23,13 @@ interface NotesPanelProps {
 
 export function NotesPanel({ 
   caseId, 
+  initialNotes,
   canCreateNotes = false, 
   canEditNotes = false,
   showPrivateNotes = true 
 }: NotesPanelProps) {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [notes, setNotes] = useState<Note[]>(notesCache.get(caseId) ?? initialNotes ?? []);
+  const [isLoading, setIsLoading] = useState(!(notesCache.has(caseId) || initialNotes !== undefined));
   const [isCreating, setIsCreating] = useState(false);
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [newNote, setNewNote] = useState({
@@ -41,6 +45,7 @@ export function NotesPanel({
       
       if (result.success) {
         setNotes(result.notes);
+        notesCache.set(caseId, result.notes);
       } else {
         toast({
           title: 'Error',
@@ -61,8 +66,21 @@ export function NotesPanel({
   };
 
   useEffect(() => {
+    const cached = notesCache.get(caseId);
+    if (cached) {
+      setNotes(cached);
+      setIsLoading(false);
+      return;
+    }
+    if (initialNotes !== undefined) {
+      setNotes(initialNotes);
+      notesCache.set(caseId, initialNotes);
+      setIsLoading(false);
+      return;
+    }
     loadNotes();
-  }, [caseId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, initialNotes]);
 
   const handleCreateNote = async () => {
     if (!newNote.contenido.trim()) {
