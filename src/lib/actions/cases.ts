@@ -676,6 +676,9 @@ export async function updateCase(caseId: string, input: UpdateCaseInput) {
       } as any);
     }
 
+    // Mantiene coherencia entre hitos del caso (audiencias, notificación, sentencia, desistimiento) y etapas.
+    await syncCaseMilestonesToTimeline(updatedCase as Case);
+
     await logAuditAction({
       action: 'UPDATE',
       entity_type: 'case',
@@ -1142,6 +1145,9 @@ export async function getCaseById(caseId: string) {
       if (!collaborator) throw new Error('Sin permisos para ver este caso');
       isCollaborator = true;
     }
+
+    // Sincroniza hitos del caso (audiencias, notificación, sentencia, desistimiento) al timeline.
+    await syncCaseMilestonesToTimeline(caseRow as Case);
     const [lawyerProfile, stagesRes, notesRes, docsRes, reqsRes, counterpartiesRes, clientsRes] = await Promise.all([
       (async () => {
         if (!caseRow.abogado_responsable) return null;
@@ -1366,7 +1372,7 @@ async function syncPendingStageSchedule(caseRecord: Pick<Case, 'id' | 'materia' 
   const supabase = await getPrivilegedSB();
   const { data: stages, error } = await supabase
     .from('case_stages')
-    .select('id, orden, estado, fecha_cumplida')
+    .select('id, orden, estado, fecha_programada, fecha_cumplida')
     .eq('case_id', caseRecord.id);
   if (error) throw error;
 
@@ -1379,6 +1385,8 @@ async function syncPendingStageSchedule(caseRecord: Pick<Case, 'id' | 'materia' 
       const nextDate = scheduleByOrder.get(order);
       if (!nextDate) return null;
       if (stage.estado === 'completado' || stage.fecha_cumplida) return null;
+      // No pisar fechas reales/ajustadas manualmente (audiencias, hitos, etc.)
+      if (stage.fecha_programada) return null;
       return { id: stage.id as string, fecha_programada: nextDate, updated_at: nowIso };
     })
     .filter(Boolean) as Array<{ id: string; fecha_programada: string; updated_at: string }>;
@@ -1390,6 +1398,166 @@ async function syncPendingStageSchedule(caseRecord: Pick<Case, 'id' | 'materia' 
       supabase.from('case_stages').update({ fecha_programada: u.fecha_programada, updated_at: u.updated_at }).eq('id', u.id),
     ),
   );
+}
+
+async function syncCaseMilestonesToTimeline(caseRecord: Case) {
+  try {
+    const supabase = await getPrivilegedSB();
+
+    const { data: stagesRaw, error: stagesError } = await supabase
+      .from('case_stages')
+      .select('id, etapa, orden, estado, fecha_programada, fecha_cumplida, audiencia_tipo, requiere_testigos')
+      .eq('case_id', caseRecord.id)
+      .order('orden', { ascending: true });
+
+    if (stagesError) {
+      console.error('Error cargando etapas para sincronizar hitos:', stagesError);
+      return;
+    }
+
+    const stages = (stagesRaw as any[] | null) ?? [];
+
+    const normalize = (value: string) =>
+      value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    const ensureStage = async (opts: {
+      label: string;
+      match: (stage: any) => boolean;
+      date: string;
+      mode: 'programada' | 'cumplida';
+    }) => {
+      const date = normalizeDateOnlyInput(opts.date);
+      if (!date) return;
+
+      const existing =
+        stages.find((stage) => opts.match(stage)) ??
+        null;
+
+      const setPayload = (() => {
+        if (opts.mode === 'cumplida') {
+          return { estado: 'completado' as const, fecha_cumplida: date, fecha_programada: null as any };
+        }
+        return { fecha_programada: date };
+      })();
+
+      if (!existing) {
+        const maxOrden = stages.reduce((max, row) => Math.max(max, Number(row.orden ?? 0)), 0);
+        const insertPayload: any = {
+          case_id: caseRecord.id,
+          etapa: opts.label,
+          descripcion: `Etapa creada automáticamente desde los hitos del caso (${opts.label}).`,
+          estado: opts.mode === 'cumplida' ? 'completado' : 'pendiente',
+          orden: Math.max(maxOrden + 1, 1),
+          es_publica: true,
+          responsable_id: null,
+          fecha_programada: opts.mode === 'programada' ? date : null,
+          fecha_cumplida: opts.mode === 'cumplida' ? date : null,
+        };
+
+        const { data: inserted, error: insertError } = await supabase
+          .from('case_stages')
+          .insert(insertPayload)
+          .select('id')
+          .single();
+
+        if (insertError) {
+          console.error('Error creando etapa milestone:', { label: opts.label, message: insertError.message });
+          return;
+        }
+
+        await logAuditAction({
+          action: 'SYNC_MILESTONE',
+          entity_type: 'case_stage',
+          entity_id: inserted?.id ?? undefined,
+          diff_json: { created: insertPayload },
+        });
+        return;
+      }
+
+      const shouldUpdate = (() => {
+        if (opts.mode === 'cumplida') {
+          return existing.estado !== 'completado' || existing.fecha_cumplida !== date;
+        }
+        return existing.fecha_programada !== date;
+      })();
+
+      if (!shouldUpdate) return;
+
+      const { error: updateError } = await supabase
+        .from('case_stages')
+        .update(setPayload as any)
+        .eq('id', existing.id);
+
+      if (updateError) {
+        console.error('Error actualizando etapa milestone:', { label: opts.label, message: updateError.message });
+        return;
+      }
+
+      await logAuditAction({
+        action: 'SYNC_MILESTONE',
+        entity_type: 'case_stage',
+        entity_id: existing.id,
+        diff_json: { from: existing, to: { ...existing, ...setPayload } },
+      });
+    };
+
+    // Audiencia inicial: usar la lógica existente para encontrar la mejor etapa a actualizar/crear.
+    const audienciaTipoRaw = String((caseRecord as any).audiencia_inicial_tipo ?? '').trim();
+    const audienciaFechaRaw = (caseRecord as any).audiencia_inicial_fecha as string | null | undefined;
+    const audienciaTipo =
+      audienciaTipoRaw.startsWith('preparatoria') ? 'preparatoria' : audienciaTipoRaw.startsWith('juicio') ? 'juicio' : null;
+
+    if (audienciaTipo && audienciaFechaRaw) {
+      await applyInitialAudiencePreferences(caseRecord, {
+        audienciaTipo,
+        fechaProgramada: audienciaFechaRaw,
+        requiereTestigos: Boolean((caseRecord as any).audiencia_inicial_requiere_testigos),
+      });
+    }
+
+    // Notificación de demanda (si está marcada como realizada, se considera hito cumplido).
+    const notifEstado = (caseRecord as any).notificacion_demanda_estado as string | null | undefined;
+    const notifFecha = (caseRecord as any).notificacion_demanda_fecha as string | null | undefined;
+    if (notifFecha) {
+      await ensureStage({
+        label: 'Notificación de demanda',
+        match: (stage) => normalize(String(stage.etapa ?? '')).includes('notific'),
+        date: notifFecha,
+        mode: notifEstado === 'realizada' ? 'cumplida' : 'programada',
+      });
+    }
+
+    // Sentencia (programada/dictada).
+    const sentenciaEstado = (caseRecord as any).sentencia_estado as string | null | undefined;
+    const sentenciaFecha = (caseRecord as any).sentencia_fecha as string | null | undefined;
+    if (sentenciaFecha && (sentenciaEstado === 'programada' || sentenciaEstado === 'dictada')) {
+      await ensureStage({
+        label: 'Sentencia',
+        match: (stage) => {
+          const name = normalize(String(stage.etapa ?? ''));
+          return name.includes('sentenc') || name.includes('fallo');
+        },
+        date: sentenciaFecha,
+        mode: sentenciaEstado === 'dictada' ? 'cumplida' : 'programada',
+      });
+    }
+
+    // Desistimiento (si aplica).
+    const desistFecha = (caseRecord as any).fecha_desistimiento as string | null | undefined;
+    if (desistFecha) {
+      await ensureStage({
+        label: 'Desistimiento',
+        match: (stage) => normalize(String(stage.etapa ?? '')).includes('desist'),
+        date: desistFecha,
+        mode: 'cumplida',
+      });
+    }
+  } catch (error) {
+    console.error('Error sincronizando hitos del caso al timeline:', error);
+  }
 }
 
 async function applyInitialAudiencePreferences(
