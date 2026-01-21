@@ -68,6 +68,26 @@ function bucketPriority(bucket: NormalizedItem['bucket']): number {
 }
 
 function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
+  const kindFromStageId = (stageId: string): string | null => {
+    const raw = String(stageId ?? '');
+    // formatos:
+    // - `${caseId}:${kind}` (fechas del caso)
+    // - `${caseId}:audiencia:${stageId}` (audiencias reales desde etapas)
+    const parts = raw.split(':');
+    if (parts.length < 2) return null;
+    return parts[1] ?? null;
+  };
+
+  const overdueHint = (stageId: string) => {
+    const kind = kindFromStageId(stageId);
+    if (kind === 'audiencia') return { label: 'Audiencia vencida', tone: 'danger' as const };
+    if (kind === 'notificacion') return { label: 'Notificación vencida', tone: 'danger' as const };
+    if (kind === 'sentencia') return { label: 'Seguimiento sentencia', tone: 'warning' as const };
+    if (kind === 'next_action') return { label: 'Acción pendiente', tone: 'warning' as const };
+    if (kind === 'desistimiento') return { label: 'Revisar desistimiento', tone: 'warning' as const };
+    return { label: 'Revisar pendiente', tone: 'warning' as const };
+  };
+
   const deadlines: NormalizedItem[] = [
     ...data.overdueStages.map((s) => ({
       type: 'deadline' as const,
@@ -84,7 +104,7 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
         ...(s.workflow_state ? [{ label: s.workflow_state.replace(/_/g, ' '), variant: 'outline' as const }] : []),
         ...(s.materia ? [{ label: s.materia, variant: 'outline' as const }] : []),
       ],
-      hint: { label: 'Atención inmediata', tone: 'danger' as const },
+      hint: overdueHint(s.stage_id),
       href: `/cases/${s.case_id}`,
     })),
     ...data.dueNext7Days.map((s) => ({

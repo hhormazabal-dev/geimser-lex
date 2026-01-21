@@ -55,7 +55,7 @@ function normalizeDateOnly(value: string | null | undefined) {
 
 export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQueueData; error?: string }> {
   try {
-    await requireAuth();
+    const profile = await requireAuth();
     const supabase = await createServerClient();
 
     const today = isoDateOnly(new Date());
@@ -70,7 +70,7 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
     const requestsRes = await requestsQuery;
     if (requestsRes.error) throw requestsRes.error;
 
-    // Vencimientos: basados en fechas del caso (no en etapas).
+    // Vencimientos: basados en fechas del caso y audiencias reales del expediente.
     // Nota: RLS ya filtra por org activa + permisos.
     const { data: cases, error: casesError } = await supabase
       .from('cases')
@@ -130,10 +130,12 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
         add('notificacion', 'Notificación demanda', c.notificacion_demanda_fecha ?? null);
       }
 
-      // Sentencia (si no está dictada y existe fecha).
+      // Sentencia:
+      // - 'pendiente' no es un vencimiento: se excluye del Inbox para evitar "atención inmediata" falsa.
+      // - 'programada' sí puede alertar (fecha informada explícitamente).
       const sentEstado = String(c.sentencia_estado ?? '').trim();
-      if (sentEstado && sentEstado !== 'dictada' && sentEstado !== 'no_registra') {
-        add('sentencia', `Sentencia · ${sentEstado.replace(/_/g, ' ')}`, c.sentencia_fecha ?? null);
+      if (sentEstado === 'programada') {
+        add('sentencia', 'Sentencia programada', c.sentencia_fecha ?? null);
       }
 
       // Desistimiento: si viene planificado (fecha futura), se muestra como vencimiento.
@@ -142,6 +144,56 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
       if (desist && desist >= today) {
         add('desistimiento', 'Desistimiento', desist);
       }
+    }
+
+    // Audiencias reales: vienen desde etapas con audiencia_tipo y fecha_programada, no inventadas.
+    const stagesQuery = supabase
+      .from('case_stages')
+      .select(
+        [
+          'id',
+          'etapa',
+          'estado',
+          'fecha_programada',
+          'audiencia_tipo',
+          'es_publica',
+          'case:cases(id, caratulado, materia, prioridad, workflow_state, estado)',
+        ].join(','),
+      )
+      .in('estado', ['pendiente', 'en_proceso'])
+      .not('fecha_programada', 'is', null)
+      .not('audiencia_tipo', 'is', null);
+
+    if (profile.role === 'cliente') {
+      stagesQuery.eq('es_publica', true);
+    }
+
+    const stagesRes = await stagesQuery;
+    if (stagesRes.error) throw stagesRes.error;
+
+    for (const row of (stagesRes.data ?? []) as any[]) {
+      const linkedCase = row.case;
+      if (!linkedCase?.id) continue;
+      const estadoCaso = String(linkedCase.estado ?? '').trim();
+      if (['archivado', 'terminado', 'terminado_desistido_demandante'].includes(estadoCaso)) continue;
+
+      const dateOnly = normalizeDateOnly(row.fecha_programada);
+      if (!dateOnly) continue;
+
+      const caseId = String(linkedCase.id);
+      deadlineItems.push({
+        stage_id: `${caseId}:audiencia:${String(row.id)}`,
+        etapa: String(row.etapa ?? 'Audiencia'),
+        fecha_programada: dateOnly,
+        requiere_pago: false,
+        estado_pago: 'pendiente',
+        enlace_pago: null,
+        case_id: caseId,
+        caratulado: String(linkedCase.caratulado ?? 'Caso'),
+        materia: (linkedCase.materia as string | null) ?? null,
+        prioridad: (linkedCase.prioridad as string | null) ?? null,
+        workflow_state: (linkedCase.workflow_state as string | null) ?? null,
+      });
     }
 
     const overdueDeadlines = deadlineItems
