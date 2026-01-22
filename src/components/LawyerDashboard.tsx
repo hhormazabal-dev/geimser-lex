@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DashboardStats } from '@/lib/actions/analytics';
 import type { Case, CaseStage, LegalTemplate, Profile, QuickLink } from '@/lib/supabase/types';
 import { formatRoleLabel } from '@/lib/navigation/role-label';
@@ -47,6 +48,41 @@ const STATUS_LABELS: Record<string, string> = {
   terminado: 'Terminado',
   terminado_desistido_demandante: 'Terminada (Desistida)',
 };
+
+const CASE_STATUS_FILTERS = [
+  {
+    key: 'activo',
+    label: 'Activos',
+    help: 'Expedientes en curso y con seguimiento activo.',
+  },
+  {
+    key: 'terminado',
+    label: 'Terminados',
+    help: 'Expedientes finalizados (incluye casos con sentencia dictada).',
+  },
+  {
+    key: 'terminado_apelacion',
+    label: 'Terminado apelación',
+    help: 'Expedientes finalizados con recursos/apelación en curso.',
+  },
+  {
+    key: 'suspendido',
+    label: 'Suspendidos',
+    help: 'Expedientes pausados temporalmente (sin avance procesal activo).',
+  },
+  {
+    key: 'archivado',
+    label: 'Archivados',
+    help: 'Expedientes cerrados sin seguimiento activo.',
+  },
+  {
+    key: 'terminado_desistido_demandante',
+    label: 'Desistidos',
+    help: 'Expedientes terminados por desistimiento del demandante.',
+  },
+] as const;
+
+type CaseStatusFilterKey = (typeof CASE_STATUS_FILTERS)[number]['key'];
 
 const PRIORITY_CHIPS: Record<string, string> = {
   baja: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
@@ -85,6 +121,7 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const [selectedDeadline, setSelectedDeadline] = useState<any | null>(null);
   const [casePage, setCasePage] = useState(1);
   const [casesPerPage, setCasesPerPage] = useState(5);
+  const [caseStatusFilter, setCaseStatusFilter] = useState<CaseStatusFilterKey | 'all'>('all');
   const [moreColumn, setMoreColumn] = useState<CalendarKey | null>(null);
   const allDeadlines = (data.upcomingDeadlines || []) as any[];
   const caseById = useMemo(() => new Map(cases.map((caseItem) => [caseItem.id, caseItem])), [cases]);
@@ -224,7 +261,20 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
     const status = effectiveCaseStatus(c);
     return status === 'activo' || status === 'terminado_apelacion';
   });
-  const sortedCases = [...cases].sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''));
+
+  useEffect(() => {
+    setCasePage(1);
+  }, [caseStatusFilter]);
+
+  const filteredCases = useMemo(() => {
+    if (caseStatusFilter === 'all') return cases;
+    return cases.filter((c: any) => effectiveCaseStatus(c) === caseStatusFilter);
+  }, [caseStatusFilter, cases]);
+
+  const sortedCases = useMemo(
+    () => [...filteredCases].sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || '')),
+    [filteredCases],
+  );
   const totalCasePages = Math.max(1, Math.ceil(sortedCases.length / casesPerPage));
   const clampedCasePage = Math.min(casePage, totalCasePages);
   const caseStart = (clampedCasePage - 1) * casesPerPage;
@@ -551,30 +601,54 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
                 <CardTitle className='text-base font-semibold text-slate-900'>Casos bajo tu responsabilidad</CardTitle>
                 <p className='text-xs text-slate-500'>Mantenlos al día para asegurar continuidad con tus clientes.</p>
                 {casesByStatusDisplay.length > 0 && (
-                  <div className='mt-2.5 flex flex-wrap gap-2'>
-                    {[
-                      { key: 'activo', label: 'Activos' },
-                      { key: 'terminado', label: 'Terminados' },
-                      { key: 'terminado_apelacion', label: 'Terminado apelación' },
-                      { key: 'suspendido', label: 'Suspendidos' },
-                      { key: 'archivado', label: 'Archivados' },
-                      { key: 'terminado_desistido_demandante', label: 'Desistidos' },
-                    ].map((item) => {
-                      const count = casesByStatusDisplay.find((row) => row.status === item.key)?.count ?? 0;
-                      return (
-                        <span
-                          key={item.key}
-                          className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-700'
-                        >
-                          <span className='text-slate-500'>{item.label}</span>
-                          <span className='font-semibold text-slate-900'>{count}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
+                  <TooltipProvider delayDuration={200}>
+                    <div className='mt-2.5 flex flex-wrap gap-2'>
+                      {CASE_STATUS_FILTERS.map((item) => {
+                        const count = casesByStatusDisplay.find((row) => row.status === item.key)?.count ?? 0;
+                        const isActive = caseStatusFilter === item.key;
+                        return (
+                          <Tooltip key={item.key}>
+                            <TooltipTrigger asChild>
+                              <button
+                                type='button'
+                                onClick={() => setCaseStatusFilter((prev) => (prev === item.key ? 'all' : item.key))}
+                                aria-pressed={isActive}
+                                className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition ${
+                                  isActive
+                                    ? 'border-sky-200 bg-sky-50 text-sky-800'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                                }`}
+                              >
+                                <span className={isActive ? 'text-sky-700' : 'text-slate-500'}>{item.label}</span>
+                                <span className={isActive ? 'font-semibold text-sky-900' : 'font-semibold text-slate-900'}>
+                                  {count}
+                                </span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side='bottom' align='start'>
+                              <p className='font-semibold'>{item.label}</p>
+                              <p className='mt-0.5 text-white/80'>{item.help}</p>
+                              <p className='mt-2 text-white/70'>
+                                Click para {isActive ? 'volver a ver todos' : `ver solo ${item.label.toLowerCase()}`}.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  </TooltipProvider>
+                )}
+                {caseStatusFilter !== 'all' && (
+                  <p className='mt-2 text-[11px] text-slate-500'>
+                    Mostrando <span className='font-semibold text-slate-700'>{sortedCases.length}</span> caso(s) ·{' '}
+                    <span className='font-semibold text-slate-700'>
+                      {CASE_STATUS_FILTERS.find((f) => f.key === caseStatusFilter)?.label ?? 'Filtro'}
+                    </span>
+                    {sortedCases.length > casesPerPage ? ` · página ${clampedCasePage}/${totalCasePages}` : ''}
+                  </p>
                 )}
                 <p className='mt-2 text-[11px] text-slate-500'>
-                  Archivado: expediente cerrado sin seguimiento activo (no genera vencimientos).
+                  Tip: pasa el mouse por cada categoría para ver su definición. Click filtra la tabla.
                 </p>
               </div>
               <Link href='/cases' className='text-[12px] font-medium text-sky-600 hover:text-sky-700'>
