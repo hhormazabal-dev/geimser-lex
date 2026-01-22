@@ -80,12 +80,14 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
 
   const overdueHint = (stageId: string) => {
     const kind = kindFromStageId(stageId);
-    if (kind === 'audiencia') return { label: 'Audiencia vencida', tone: 'danger' as const };
-    if (kind === 'notificacion') return { label: 'Notificación vencida', tone: 'danger' as const };
-    if (kind === 'sentencia') return { label: 'Seguimiento sentencia', tone: 'warning' as const };
+    // Nota: la fecha puede haber pasado sin que sea una acción requerida del abogado.
+    // Mantenemos "warning" solo para tareas explícitamente manuales/accionables.
+    if (kind === 'audiencia') return { label: 'Audiencia (fecha pasada)', tone: 'info' as const };
+    if (kind === 'notificacion') return { label: 'Notificación (fecha pasada)', tone: 'info' as const };
+    if (kind === 'sentencia') return { label: 'Sentencia (fecha pasada)', tone: 'info' as const };
     if (kind === 'next_action') return { label: 'Acción pendiente', tone: 'warning' as const };
-    if (kind === 'desistimiento') return { label: 'Revisar desistimiento', tone: 'warning' as const };
-    return { label: 'Revisar pendiente', tone: 'warning' as const };
+    if (kind === 'desistimiento') return { label: 'Desistimiento (fecha pasada)', tone: 'info' as const };
+    return { label: 'Fecha pasada', tone: 'info' as const };
   };
 
   const deadlines: NormalizedItem[] = [
@@ -97,7 +99,7 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
       case_id: s.case_id,
       title: s.caratulado,
       subtitle: s.etapa,
-      dateLabel: `Vencida · ${formatDate(s.fecha_programada)}`,
+      dateLabel: `Fecha pasada · ${formatDate(s.fecha_programada)}`,
       dateIso: safeISO(s.fecha_programada),
       chips: [
         ...(s.prioridad ? [{ label: s.prioridad, variant: 'outline' as const }] : []),
@@ -115,7 +117,7 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
       case_id: s.case_id,
       title: s.caratulado,
       subtitle: s.etapa,
-      dateLabel: `Próxima · ${formatDate(s.fecha_programada)}`,
+      dateLabel: `Próxima fecha · ${formatDate(s.fecha_programada)}`,
       dateIso: safeISO(s.fecha_programada),
       chips: [
         ...(s.prioridad ? [{ label: s.prioridad, variant: 'outline' as const }] : []),
@@ -140,11 +142,11 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
       dateLabel: r.fecha_limite ? `Límite · ${formatDate(r.fecha_limite)}` : 'Sin fecha límite',
       dateIso: safeISO(r.fecha_limite),
       chips: [
-        { label: r.estado, variant: isOverdue ? ('destructive' as const) : ('outline' as const) },
+        { label: r.estado, variant: isOverdue ? ('warning' as const) : ('outline' as const) },
         ...(r.prioridad ? [{ label: r.prioridad, variant: 'outline' as const }] : []),
         ...(r.tipo ? [{ label: r.tipo, variant: 'outline' as const }] : []),
       ],
-      hint: isOverdue ? { label: 'Solicitud vencida', tone: 'danger' as const } : undefined,
+      hint: isOverdue ? { label: 'Límite superado', tone: 'warning' as const } : undefined,
       href: `/cases/${r.case_id}#requests`,
     };
   });
@@ -160,7 +162,7 @@ function normalizeWorkQueue(data: WorkQueueData): NormalizedItem[] {
 
 function viewLabel(view: ViewKey) {
   if (view === 'all') return 'Todo';
-  if (view === 'overdue') return 'Vencidos';
+  if (view === 'overdue') return 'Fechas pasadas';
   if (view === 'due') return 'Próximos 7 días';
   return 'Solicitudes';
 }
@@ -222,8 +224,8 @@ export function InboxConsole({
       },
       {
         key: 'overdue' as const,
-        label: 'Vencidos',
-        description: 'Vencimientos vencidos',
+        label: 'Fechas pasadas',
+        description: 'Hitos con fecha pasada',
         count: data.stats.overdueStages,
         icon: <Timer className="h-4 w-4" />,
       },
@@ -294,7 +296,7 @@ export function InboxConsole({
   };
 
   const saveCurrentView = () => {
-    const name = window.prompt('Nombre de la vista (ej: "Mis vencidos")')?.trim();
+    const name = window.prompt('Nombre de la vista (ej: "Mis fechas")')?.trim();
     if (!name) return;
     const view = selectedView;
     const q = search.trim();
@@ -568,7 +570,7 @@ export function InboxConsole({
             <CardContent className="space-y-2 text-sm text-foreground/60">
               <p>Atajos: <span className="font-semibold text-foreground">/</span> buscar · <span className="font-semibold text-foreground">1–5</span> vistas · <span className="font-semibold text-foreground">Esc</span> limpiar.</p>
               <p>
-                Empieza por <span className="font-semibold text-foreground">Vencidos</span> y{' '}
+                Empieza por <span className="font-semibold text-foreground">Fechas pasadas</span> y{' '}
                 <span className="font-semibold text-foreground">Solicitudes</span> para destrabar el flujo.
               </p>
             </CardContent>

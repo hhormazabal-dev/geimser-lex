@@ -27,7 +27,7 @@ function buildNotification(lead: LeadRecord) {
   if (status === 'listo') return 'Listo para crear caso';
   if (status === 'seguimiento') {
     if (followUp && followUp <= new Date()) {
-      return followUpLabel ? `Seguimiento vencido (${followUpLabel})` : 'Seguimiento vencido';
+      return followUpLabel ? `Seguimiento atrasado (${followUpLabel})` : 'Seguimiento atrasado';
     }
     return followUpLabel ? `Seguimiento agendado (${followUpLabel})` : 'Seguimiento pendiente';
   }

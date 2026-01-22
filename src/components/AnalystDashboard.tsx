@@ -59,7 +59,7 @@ export function AnalystDashboard({
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: 'Vencimientos vencidos', value: workQueue.stats.overdueStages, icon: Timer, tone: 'text-red-600', href: '/inbox' },
+            { label: 'Fechas pasadas', value: workQueue.stats.overdueStages, icon: Timer, tone: 'text-foreground/70', href: '/inbox' },
             { label: 'Próximos 7 días', value: workQueue.stats.dueNext7Days, icon: Calendar, tone: 'text-sky-600', href: '/inbox' },
             { label: 'Solicitudes', value: workQueue.stats.pendingRequests, icon: ClipboardList, tone: 'text-violet-600', href: '/inbox' },
           ].map((item) => {
@@ -177,7 +177,7 @@ export function AnalystDashboard({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">{item.caratulado}</p>
                     <p className="mt-1 truncate text-xs text-foreground/55">
-                      <span className="font-semibold text-red-600">Vencida</span> · {item.etapa}
+                      <span className="font-semibold text-foreground/70">Fecha pasada</span> · {item.etapa}
                       {item.fecha_programada ? ` · ${formatDate(item.fecha_programada)}` : ''}
                     </p>
                   </div>
@@ -185,7 +185,7 @@ export function AnalystDashboard({
                 </Link>
               ))}
               {workQueue.overdueStages.length === 0 && (
-                <p className="text-sm text-foreground/60">No hay etapas vencidas.</p>
+                <p className="text-sm text-foreground/60">No hay hitos con fecha pasada.</p>
               )}
             </CardContent>
           </Card>

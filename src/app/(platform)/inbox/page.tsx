@@ -12,21 +12,21 @@ function resolveInboxCopy(role: string) {
     return {
       title: 'Inbox de la firma',
       description:
-        'Prioriza vencimientos legales (sentencia, notificación, acciones) y solicitudes pendientes de clientes.',
+        'Prioriza hitos con fecha (sentencia, notificación, acciones) y solicitudes pendientes de clientes.',
     };
   }
   if (role === 'analista') {
     return {
       title: 'Inbox de validación',
       description:
-        'Prioriza vencimientos legales y solicitudes por resolver.',
+        'Prioriza hitos con fecha y solicitudes por resolver.',
     };
   }
   if (role === 'abogado') {
     return {
       title: 'Mi Inbox',
       description:
-        'Tu cola de trabajo: vencimientos legales y solicitudes pendientes.',
+        'Tu cola de trabajo: hitos con fecha y solicitudes pendientes.',
     };
   }
   return {

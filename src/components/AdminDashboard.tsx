@@ -124,9 +124,9 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
     if (data.workQueue.stats.overdueStages > 0) {
       items.push({
         id: 'overdue-stages',
-        title: 'Riesgo operativo: etapas vencidas',
-        description: `${data.workQueue.stats.overdueStages} etapa(s) superaron su fecha. Prioriza para evitar quiebres en el servicio.`,
-        severity: 'critical',
+        title: 'Fechas pasadas en hitos',
+        description: `${data.workQueue.stats.overdueStages} hito(s) con fecha pasada. Útil para seguimiento (no siempre requiere acción).`,
+        severity: 'info',
         href: '/inbox',
         cta: 'Ir a Inbox',
         icon: Timer,
@@ -297,10 +297,10 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
                 {
-                  label: 'Vencimientos vencidos',
+                  label: 'Fechas pasadas',
                   value: data.workQueue.stats.overdueStages,
                   icon: Timer,
-                  tone: 'text-red-600',
+                  tone: 'text-foreground/70',
                   href: '/inbox',
                 },
                 {
@@ -688,7 +688,7 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">{item.caratulado}</p>
                     <p className="mt-1 truncate text-xs text-foreground/55">
-                      <span className="font-semibold text-red-600">Vencida</span> · {item.etapa}
+                      <span className="font-semibold text-foreground/70">Fecha pasada</span> · {item.etapa}
                       {item.fecha_programada ? ` · ${formatDate(item.fecha_programada)}` : ''}
                     </p>
                   </div>

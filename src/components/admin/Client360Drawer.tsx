@@ -184,7 +184,7 @@ export function Client360Drawer({
                         {data?.stats?.inReviewCases ?? 0} en revisión
                       </Badge>
                       <Badge variant='outline' className='border-slate-200 text-slate-600'>
-                        {data?.stats?.overdueStages ?? 0} vencidas
+                        {data?.stats?.overdueStages ?? 0} fechas pasadas
                       </Badge>
                     </div>
                   </div>
@@ -405,4 +405,3 @@ export function Client360Drawer({
     </Dialog.Root>
   );
 }
-

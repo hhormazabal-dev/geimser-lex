@@ -1335,6 +1335,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                     caseMateria={caseData.materia ?? 'General'}
                     initialStages={stageCatalog}
                     autoLoadStages={false}
+                    showUndatedStages
                     canManageStages={canManageStages}
                     showPrivateStages={showPrivateContent}
                     clientContext={{
@@ -1397,6 +1398,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                   caseMateria={caseData.materia ?? 'General'}
                   initialStages={stageCatalog}
                   autoLoadStages={false}
+                  showUndatedStages
                   canManageStages={canManageStages}
                   showPrivateStages={showPrivateContent}
                   clientContext={{

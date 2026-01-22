@@ -188,10 +188,10 @@ export function NotificationManager({ canManage = false }: NotificationManagerPr
     const labels: Record<string, string> = {
       magic_link: 'Enlace de Acceso',
       case_update: 'Actualización de Caso',
-      deadline_reminder: 'Recordatorio de Vencimiento',
+      deadline_reminder: 'Recordatorio de fecha',
       info_request_response: 'Respuesta a Solicitud',
       weekly_summary: 'Resumen Semanal',
-      overdue_stages_alert: 'Alerta de Etapas Vencidas',
+      overdue_stages_alert: 'Resumen de fechas pasadas',
     };
     return labels[template] || template;
   };

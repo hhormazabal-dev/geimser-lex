@@ -6,10 +6,10 @@ import { cn, formatDate, formatRelativeTime } from '@/lib/utils';
 import type { CaseMilestone } from '@/lib/cases/milestones';
 import { Calendar, Clock } from 'lucide-react';
 
-function statusFor(dateIso: string): { label: string; tone: 'danger' | 'info' } {
+function statusFor(dateIso: string): { label: string; tone: 'past' | 'upcoming' } {
   const today = new Date().toISOString().slice(0, 10);
-  if (dateIso < today) return { label: 'Vencida', tone: 'danger' };
-  return { label: 'Próxima', tone: 'info' };
+  if (dateIso < today) return { label: 'Ocurrió', tone: 'past' };
+  return { label: 'Próxima', tone: 'upcoming' };
 }
 
 export function CaseMilestonesTimeline({
@@ -57,8 +57,8 @@ export function CaseMilestonesTimeline({
                     variant="outline"
                     className={cn(
                       'w-fit',
-                      status.tone === 'danger'
-                        ? 'border-rose-200 bg-rose-50 text-rose-700'
+                      status.tone === 'past'
+                        ? 'border-slate-200 bg-slate-50 text-slate-700'
                         : 'border-sky-200 bg-sky-50 text-sky-700',
                     )}
                   >
@@ -73,4 +73,3 @@ export function CaseMilestonesTimeline({
     </Card>
   );
 }
-

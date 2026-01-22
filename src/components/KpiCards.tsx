@@ -54,7 +54,7 @@ export function KpiCards({ stats, highlights }: KpiCardsProps) {
       key: 'pending' as const,
       title: 'Pendientes',
       value: stats.pendingRequests,
-      description: `${stats.overdueStages} vencidos`,
+      description: `${stats.overdueStages} fechas pasadas`,
       icon: AlertTriangle,
       iconClass: 'text-amber-600 bg-amber-50 border border-amber-100',
       cardBorder: 'border-amber-100',
@@ -167,7 +167,7 @@ export function KpiCards({ stats, highlights }: KpiCardsProps) {
             <header className='flex items-center justify-between'>
               <h3 className='text-xl font-semibold text-slate-900'>Alertas y pendientes</h3>
               <Badge variant='outline' className='border-slate-200 text-slate-600'>
-                {stats.pendingRequests} solicitudes • {stats.overdueStages} etapas vencidas
+                {stats.pendingRequests} solicitudes • {stats.overdueStages} fechas pasadas
               </Badge>
             </header>
             <div className='grid gap-3'>

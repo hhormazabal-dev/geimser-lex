@@ -137,7 +137,7 @@ export function WorkQueueDashboard({
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[
-            { label: 'Etapas vencidas', value: data.stats.overdueStages, icon: <AlertTriangle className='h-4 w-4' /> },
+            { label: 'Fechas pasadas', value: data.stats.overdueStages, icon: <AlertTriangle className='h-4 w-4' /> },
             { label: 'Próximos 7 días', value: data.stats.dueNext7Days, icon: <Calendar className='h-4 w-4' /> },
             { label: 'Solicitudes', value: data.stats.pendingRequests, icon: <FileText className='h-4 w-4' /> },
           ].map((item) => (
@@ -159,10 +159,10 @@ export function WorkQueueDashboard({
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <StageList
-            title='Etapas vencidas'
-            icon={<AlertTriangle className="h-5 w-5 text-red-600" />}
+            title='Fechas pasadas'
+            icon={<AlertTriangle className="h-5 w-5 text-foreground/60" />}
             items={data.overdueStages}
-            emptyText='No hay etapas vencidas. Buen trabajo.'
+            emptyText='No hay hitos con fecha pasada.'
           />
           <StageList
             title='Próximos 7 días'
