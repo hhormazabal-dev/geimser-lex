@@ -56,9 +56,9 @@ const PRIORITY_CHIPS: Record<string, string> = {
 };
 
 const CALENDAR_COLUMNS = [
+  { key: 'preparatorias', label: 'Preparatorias', helper: 'Previas a juicio' },
   { key: 'audiencias', label: 'Audiencias', helper: 'Salas y citaciones' },
   { key: 'juicios', label: 'Juicios', helper: 'Hitos críticos' },
-  { key: 'preparatorias', label: 'Preparatorias', helper: 'Previas a juicio' },
   { key: 'gestiones', label: 'Gestiones', helper: 'Escritos y otros' },
 ] as const;
 
