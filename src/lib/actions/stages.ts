@@ -474,9 +474,6 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
     if (profile.role === 'abogado' && existingStage.responsable_id !== profile.id) {
       throw new Error('Solo puedes completar etapas de las que eres responsable');
     }
-    if (existingStage.requiere_pago && existingStage.estado_pago !== 'pagado') {
-      throw new Error('Debes registrar el pago de esta etapa antes de completarla');
-    }
 
     const defaultDate = new Date().toISOString().split('T')[0]!;
     const rawCompletion = (validatedInput['fecha_completada'] as string | undefined)?.trim();
