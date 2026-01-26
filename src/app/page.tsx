@@ -1,579 +1,313 @@
-// src/app/page.tsx
 import Link from 'next/link';
-import { Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
+import { Playfair_Display, Inter } from 'next/font/google';
 import { createServerClient } from '@/lib/supabase/server';
 import { Navbar } from '@/components/landing/Navbar';
 import { Reveal } from '@/components/landing/Reveal';
 
-const display = Space_Grotesk({
+const serif = Playfair_Display({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '600', '700'],
+  variable: '--font-serif',
 });
 
-const body = Plus_Jakarta_Sans({
+const sans = Inter({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-sans',
 });
 
-const heroSignals = [
+const features = [
   {
-    title: 'Control visible',
-    description: 'El estudio sabe qué ocurre, quién decide y cómo avanza cada expediente.',
-  },
-  {
-    title: 'Método sostenido',
-    description: 'La operación replica estándares sin desviaciones entre equipos y sedes.',
-  },
-  {
-    title: 'Confianza demostrable',
-    description: 'Toda acción queda respaldada con registros claros y acceso controlado.',
-  },
-] as const;
-
-const logoCloud = ['Orion Legal', 'Círculo & Asociados', 'Atlas Corporate', 'Rocca Partners', 'Valora', 'Norte & Sur'];
-
-const productSections = [
-  {
-    eyebrow: 'Producto · Operación jurídica',
-    title: 'Casos y línea de tiempo con orden quirúrgico.',
-    description:
-      'Cada expediente reúne datos críticos, etapas procesales y responsabilidades claras. El equipo trabaja en sincronía con visibilidad total de lo que sigue.',
-    points: [
-      'Gestión integral de casos',
-      'Línea de tiempo procesal por materia',
-      'Documentos con versiones ordenadas',
-      'Notas internas y colaboración',
-    ],
-    visual: (
-      <svg viewBox="0 0 360 260" className="h-full w-full" fill="none" aria-hidden="true">
-        <rect x="20" y="24" width="320" height="212" rx="16" fill="#0b0b0b" stroke="#1f2937" strokeWidth="1.2" />
-        <rect x="44" y="52" width="120" height="18" rx="9" fill="#a3e635" />
-        <rect x="44" y="88" width="90" height="8" rx="4" fill="#334155" />
-        <rect x="44" y="110" width="160" height="8" rx="4" fill="#1f2937" />
-        <rect x="44" y="132" width="200" height="8" rx="4" fill="#1f2937" />
-        <rect x="44" y="154" width="130" height="8" rx="4" fill="#1f2937" />
-        <circle cx="258" cy="110" r="40" fill="#111827" />
-        <path d="M258 76v34l22 16" stroke="#a3e635" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="258" cy="110" r="28" stroke="#1f2937" strokeWidth="1.5" />
+    title: 'Gestión de Casos',
+    description: 'Control absoluto del expediente. Trazabilidad completa y sincronización en tiempo real con el Poder Judicial.',
+    icon: (
+      <svg className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
       </svg>
     ),
   },
   {
-    eyebrow: 'Producto · Relación con clientes',
-    title: 'Un portal privado que eleva la percepción del estudio.',
-    description:
-      'Clientes informados sin perder control. Solicitudes, mensajes y documentos se ordenan en un entorno sobrio y seguro.',
-    points: [
-      'Portal privado para clientes',
-      'Solicitudes de información trazables',
-      'Notificaciones automáticas',
-      'Comunicación centralizada',
-    ],
-    visual: (
-      <svg viewBox="0 0 360 260" className="h-full w-full" fill="none" aria-hidden="true">
-        <rect x="24" y="28" width="312" height="204" rx="18" fill="#0b0b0b" stroke="#1f2937" strokeWidth="1.2" />
-        <rect x="48" y="54" width="100" height="12" rx="6" fill="#a3e635" />
-        <rect x="48" y="78" width="200" height="8" rx="4" fill="#1f2937" />
-        <rect x="48" y="100" width="180" height="8" rx="4" fill="#1f2937" />
-        <rect x="48" y="122" width="140" height="8" rx="4" fill="#1f2937" />
-        <rect x="48" y="152" width="120" height="48" rx="12" fill="#111827" stroke="#1f2937" strokeWidth="1" />
-        <rect x="186" y="152" width="120" height="48" rx="12" fill="#111827" stroke="#1f2937" strokeWidth="1" />
-        <path d="M86 176h44" stroke="#a3e635" strokeWidth="2" strokeLinecap="round" />
-        <path d="M224 176h44" stroke="#a3e635" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="290" cy="78" r="22" fill="#111827" stroke="#1f2937" strokeWidth="1.2" />
-        <path d="M284 78l6 6 10-12" stroke="#a3e635" strokeWidth="2" strokeLinecap="round" />
+    title: 'Compliance Corporativo',
+    description: 'Blindaje total. Matrices de riesgo y auditoría continua para operar con el estándar más exigente del mercado.',
+    icon: (
+      <svg className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
     ),
   },
   {
-    eyebrow: 'Producto · Gobierno corporativo',
-    title: 'Dirección con control y auditoría completa.',
-    description:
-      'Indicadores ejecutivos, carga operativa y decisiones críticas respaldadas. La firma opera con seguridad avanzada y trazabilidad total.',
-    points: [
-      'Panel ejecutivo de dirección',
-      'Auditoría íntegra',
-      'Accesos por rol',
-      'Firmas separadas',
-      'Seguridad avanzada',
-    ],
-    visual: (
-      <svg viewBox="0 0 360 260" className="h-full w-full" fill="none" aria-hidden="true">
-        <rect x="26" y="30" width="308" height="200" rx="20" fill="#0b0b0b" stroke="#1f2937" strokeWidth="1.2" />
-        <rect x="52" y="56" width="120" height="10" rx="5" fill="#a3e635" />
-        <rect x="52" y="78" width="80" height="8" rx="4" fill="#1f2937" />
-        <rect x="52" y="120" width="80" height="60" rx="12" fill="#111827" stroke="#1f2937" strokeWidth="1" />
-        <rect x="148" y="120" width="80" height="60" rx="12" fill="#111827" stroke="#1f2937" strokeWidth="1" />
-        <rect x="244" y="120" width="80" height="60" rx="12" fill="#111827" stroke="#1f2937" strokeWidth="1" />
-        <path d="M72 160v-18M88 160v-28M104 160v-12" stroke="#a3e635" strokeWidth="2" strokeLinecap="round" />
-        <path d="M168 160l16-20 16 20" stroke="#a3e635" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="284" cy="146" r="16" stroke="#a3e635" strokeWidth="2" />
-        <path d="M284 138v12" stroke="#a3e635" strokeWidth="2" strokeLinecap="round" />
+    title: 'Inteligencia Financiera',
+    description: 'Rentabilidad visible. Análisis detallado de facturación, horas hombre y rendimiento por unidad de negocio.',
+    icon: (
+      <svg className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
-] as const;
-
-const testimonials = [
-  {
-    quote:
-      '“La percepción del cliente cambió por completo. Hoy ve claridad, método y liderazgo en cada interacción.”',
-    name: 'Marcela Torres',
-    role: 'Socia directora · Estudio Atlas',
-    image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    quote:
-      '“Xel nos dio gobierno operativo sin fricción. El equipo se alineó y la dirección recuperó control.”',
-    name: 'Rafael Ibáñez',
-    role: 'CEO · Roca & Partners',
-    image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    quote:
-      '“La comunicación con clientes ahora es ordenada y premium. El estudio luce como una firma global.”',
-    name: 'Camila Figueroa',
-    role: 'Gerente legal · Orion',
-    image: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?auto=format&fit=crop&w=400&q=80',
-  },
-] as const;
-
-const faqs = [
-  {
-    question: '¿Xel funciona para firmas con varias sedes?',
-    answer:
-      'Sí. Las firmas separadas permiten operar múltiples sedes con datos aislados y controlados.',
-  },
-  {
-    question: '¿Cómo se mantiene el control sobre la información sensible?',
-    answer:
-      'El sistema define accesos por rol, con trazabilidad completa para cada acción crítica.',
-  },
-  {
-    question: '¿Se puede acompañar al cliente sin perder orden?',
-    answer:
-      'El portal privado y las solicitudes trazables permiten informar al cliente sin salir del entorno controlado.',
-  },
-  {
-    question: '¿Qué asegura el liderazgo ejecutivo?',
-    answer:
-      'Paneles ejecutivos con indicadores claros, auditoría total y notificaciones automáticas en cada hito.',
-  },
-] as const;
-
-const footerColumns = [
-  {
-    title: 'Productos',
-    links: ['Gestión de casos', 'Documentos', 'Línea de tiempo', 'Portal cliente'],
-  },
-  {
-    title: 'Soluciones',
-    links: ['Estudios corporativos', 'Multi-sede', 'Compliance', 'Dirección ejecutiva'],
-  },
-  {
-    title: 'Recursos',
-    links: ['Metodología Xel', 'Guías', 'Blog'],
-  },
-  {
-    title: 'Nosotros',
-    links: ['Equipo', 'Cultura', 'Seguridad'],
-  },
-  {
-    title: 'Legal',
-    links: ['Privacidad', 'Términos', 'Cookies'],
-  },
-] as const;
+];
 
 export default async function Home() {
   const supabase = await createServerClient();
   const { data } = await supabase.auth.getSession();
   const isAuthenticated = Boolean(data.session);
-
   const primaryCtaHref = isAuthenticated ? '/dashboard' : '/login';
 
   return (
-    <main className={`${body.className} bg-white text-slate-900`}>
+    <main className={`${serif.variable} ${sans.variable} font-sans bg-white text-slate-900 selection:bg-blue-900 selection:text-white`}>
       <Navbar ctaHref={primaryCtaHref} />
 
-      <section className="relative overflow-hidden bg-black pb-16 pt-28 text-white">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="hero-glow absolute -left-40 top-20 h-80 w-80 rounded-full bg-lime-300/20 blur-[120px]" />
-          <div className="hero-glow absolute right-0 top-16 h-96 w-96 rounded-full bg-white/10 blur-[150px]" />
-          <div className="hero-grid absolute inset-0 opacity-20" />
-          <div className="hero-orbit absolute left-1/3 top-10 h-40 w-40 rounded-full border border-lime-300/40" />
-        </div>
-
-        <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 sm:px-8 lg:px-10">
-          <Reveal className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-7">
-              <div className="inline-flex items-center gap-3 rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.32em] text-white/70">
-                <span className="h-2 w-2 rounded-full bg-lime-300" />
-                Xel Chile · Suite corporativa
-              </div>
-              <h1 className={`${display.className} text-4xl font-semibold leading-tight text-white sm:text-5xl`}>
-                Una operación jurídica que se siente moderna, segura y bajo control.
+      {/* Hero Tipográfico - Limpio y Autorizado */}
+      <section className="relative pt-40 pb-32 overflow-hidden bg-slate-50 border-b border-slate-200">
+        <div className="container mx-auto px-6 lg:px-12 max-w-7xl relative z-10">
+          <Reveal>
+            <div className="max-w-5xl mx-auto text-center">
+              <span className="inline-block py-1.5 px-5 mb-8 text-xs font-bold tracking-[0.2em] uppercase text-blue-800 bg-blue-50 border border-blue-100 rounded-full shadow-sm">
+                Software Jurídico de Elite
+              </span>
+              <h1 className="font-serif text-6xl sm:text-7xl lg:text-9xl text-slate-900 leading-[0.95] mb-12 font-medium tracking-tight">
+                Control Total. <br />
+                <span className="text-blue-900">Sin Fisuras.</span>
               </h1>
-              <p className="max-w-2xl text-lg text-white/70">
-                Xel centraliza casos, documentos, comunicaciones y decisiones en un entorno privado con lenguaje ejecutivo
-                y estándares corporativos.
+              <p className="text-xl sm:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-light mb-12">
+                Centralización. Seguridad. Precisión. <br />
+                La infraestructura digital para firmas que no admiten errores.
               </p>
-              <div className="flex flex-wrap items-center gap-4">
+
+              <div className="flex flex-col sm:flex-row justify-center gap-6">
                 <Link
                   href={primaryCtaHref}
-                  className="rounded-lg bg-lime-300 px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-black transition duration-300 hover:scale-105 hover:bg-lime-200"
+                  className="inline-flex items-center justify-center px-12 py-6 bg-blue-900 text-white text-sm font-bold tracking-widest uppercase hover:bg-blue-800 transition-all duration-300 rounded-lg shadow-xl"
                 >
-                  Agenda una demo
+                  Solicitar Acceso
                 </Link>
                 <Link
-                  href="#metodo"
-                  className="rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-white/80 transition duration-300 hover:scale-105 hover:border-lime-300/70 hover:text-lime-200"
+                  href="#inteligencia"
+                  className="inline-flex items-center justify-center px-12 py-6 bg-transparent border border-slate-300 text-slate-900 text-sm font-bold tracking-widest uppercase hover:border-blue-900 hover:text-blue-900 transition-all duration-300 rounded-lg"
                 >
-                  Ver metodología
+                  Ver Inteligencia Financiera
                 </Link>
               </div>
-              <div className="grid gap-6 border-t border-white/10 pt-6 sm:grid-cols-3">
-                {heroSignals.map((signal) => (
-                  <div key={signal.title} className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.3em] text-white/50">{signal.title}</p>
-                    <p className="text-sm text-white/70">{signal.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-[0_30px_70px_rgba(0,0,0,0.45)]">
-                <div className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                  <div className="hero-motion absolute inset-0" />
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/60" />
-                  <div className="absolute bottom-5 left-5 right-5 space-y-2">
-                    <p className="text-xs uppercase tracking-[0.3em] text-white/60">Sala de control</p>
-                    <p className={`${display.className} text-2xl text-white`}>
-                      Dirección ejecutiva en tiempo real.
-                    </p>
-                    <p className="text-sm text-white/70">
-                      Métricas, plazos y comunicación reunidos en un solo lugar.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {['Casos activos', 'Clientes informados', 'Decisiones trazables'].map((label) => (
-                    <div
-                      key={label}
-                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-xs uppercase tracking-[0.2em] text-white/60 transition duration-300 hover:-translate-y-1 hover:border-lime-300/60"
-                    >
-                      {label}
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </Reveal>
         </div>
       </section>
 
-      <section className="bg-white py-16">
-        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
-          <Reveal className="space-y-6">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Confían en estructuras sólidas</p>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {logoCloud.map((name) => (
-                <div
-                  key={name}
-                  className="group flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold uppercase tracking-[0.2em] text-slate-400 grayscale transition duration-300 hover:-translate-y-1 hover:border-lime-300 hover:text-lime-500 hover:grayscale-0"
-                >
-                  <span>{name}</span>
-                  <svg viewBox="0 0 48 48" className="h-6 w-6 transition duration-300 group-hover:rotate-6" fill="none" aria-hidden="true">
-                    <circle cx="24" cy="24" r="12" stroke="currentColor" strokeWidth="1.6" />
-                    <path d="M20 24l4 4 6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                </div>
-              ))}
+      {/* Sección Impacto Humano / Equipo (Mantenida) */}
+      <section className="py-0 relative">
+        <div className="grid lg:grid-cols-2 min-h-[700px]">
+          {/* Imagen Cinematográfica Izquierda */}
+          <div className="relative h-[500px] lg:h-auto overflow-hidden group">
+            <img
+              src="/team-meeting.png"
+              alt="Equipo legal en reunión estratégica"
+              className="absolute inset-0 w-full h-full object-cover grayscale transition-all duration-[10s] group-hover:scale-110 group-hover:grayscale-0"
+            />
+            <div className="absolute inset-0 bg-blue-900/40 mix-blend-multiply"></div>
+
+            <div className="absolute bottom-10 left-10 lg:bottom-20 lg:left-20 text-white max-w-md">
+              <p className="font-serif text-3xl mb-4 leading-tight">"Xel transformó nuestra firma. Dejamos de ser reactivos para ser 100% estratégicos."</p>
+              <p className="text-sm font-bold uppercase tracking-widest text-blue-200">Socio Director · Firma Corporativa Global</p>
             </div>
-          </Reveal>
+          </div>
+
+          {/* Contenido Derecha */}
+          <div className="bg-slate-900 text-white flex flex-col justify-center p-12 lg:p-24">
+            <Reveal>
+              <div className="inline-flex items-center gap-2 text-blue-400 font-bold uppercase tracking-widest text-xs mb-8">
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                Ecosistema Operativo
+              </div>
+              <h2 className="font-serif text-4xl lg:text-5xl mb-8 leading-tight text-white">
+                Diseñado para la <span className="text-blue-500">Alta Dirección</span>.
+              </h2>
+              <p className="text-slate-400 text-lg leading-relaxed mb-12">
+                Las firmas líderes no pueden permitirse la improvisación. Xel estructura cada proceso crítico: desde la captura de horas hasta el reporte al directorio.
+              </p>
+
+              <div className="space-y-8">
+                <div className="flex gap-6">
+                  <div className="h-12 w-12 shrink-0 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                    <span className="font-serif font-bold text-xl">1</span>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-2">Centralización Absoluta</h3>
+                    <p className="text-slate-400">Toda la inteligencia de la firma en un solo "Single Source of Truth".</p>
+                  </div>
+                </div>
+                <div className="flex gap-6">
+                  <div className="h-12 w-12 shrink-0 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                    <span className="font-serif font-bold text-xl">2</span>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-2">Visibilidad Ejecutiva</h3>
+                    <p className="text-slate-400">Dashboards en tiempo real para socios. Tome decisiones basadas en data, no intuición.</p>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
         </div>
       </section>
 
-      <section id="productos" className="bg-white py-16">
-        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
-          <Reveal className="space-y-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Nuestros productos</p>
-            <h2 className={`${display.className} text-3xl font-semibold text-slate-900`}>
-              Jerarquía, método y control en cada frente operativo.
-            </h2>
-            <p className="max-w-3xl text-slate-600">
-              Un diseño pensado para estudios corporativos que necesitan precisión, orden y una experiencia premium para
-              sus clientes.
-            </p>
-          </Reveal>
-
-          <div className="mt-12 space-y-14">
-            {productSections.map((section, index) => (
-              <Reveal key={section.title}>
-                <div className="grid items-center gap-10 lg:grid-cols-2">
-                  <div className={index % 2 === 1 ? 'lg:order-2' : ''}>
-                    <div className="space-y-5">
-                      <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-4 py-1 text-xs uppercase tracking-[0.3em] text-slate-500">
-                        {section.eyebrow}
+      {/* Nueva Sección: Inteligencia Financiera */}
+      <section id="inteligencia" className="py-24 bg-white overflow-hidden">
+        <div className="container mx-auto px-6 lg:px-12 max-w-7xl">
+          <Reveal>
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <div className="order-2 lg:order-1">
+                <div className="relative rounded-xl shadow-2xl bg-white border border-slate-100 p-2 transform -rotate-1 hover:rotate-0 transition-transform duration-700">
+                  <img
+                    src="/financial-dashboard.png"
+                    alt="Dashboard Financiero Xel"
+                    className="w-full h-auto rounded-lg shadow-inner"
+                  />
+                </div>
+              </div>
+              <div className="order-1 lg:order-2">
+                <h2 className="font-serif text-4xl lg:text-5xl text-slate-900 mb-6">Rentabilidad Visible.</h2>
+                <p className="text-xl text-slate-600 mb-8 leading-relaxed">
+                  ¿Cuál es su área de práctica más rentable? ¿Quién es su socio más eficiente? <br />
+                  Xel responde estas preguntas en tiempo real.
+                </p>
+                <ul className="space-y-6">
+                  {[
+                    'Control de facturación y horas no facturables.',
+                    'Métricas de desempeño por abogado.',
+                    'Proyección de ingresos trimestral.',
+                    'Alertas de desviación de presupuesto.'
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-4 text-slate-800 text-lg">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                       </span>
-                      <h3 className={`${display.className} text-2xl font-semibold text-slate-900`}>
-                        {section.title}
-                      </h3>
-                      <p className="text-slate-600">{section.description}</p>
-                      <ul className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
-                        {section.points.map((point) => (
-                          <li key={point} className="flex items-start gap-2">
-                            <span className="mt-1 h-2 w-2 rounded-full bg-lime-400" />
-                            <span>{point}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                  <div className={index % 2 === 1 ? 'lg:order-1' : ''}>
-                    <div className="group overflow-hidden rounded-xl border border-slate-200 bg-black/95 p-6 transition duration-300 hover:-translate-y-2 hover:border-lime-300 hover:shadow-[0_30px_60px_rgba(17,24,39,0.2)]">
-                      <div className="aspect-[4/3] overflow-hidden rounded-lg bg-black">
-                        <div className="h-full w-full transition duration-300 group-hover:scale-105">
-                          {section.visual}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ROI & Resultados (Clean White) */}
+      <section className="py-24 bg-slate-50 border-t border-slate-200">
+        <div className="container mx-auto px-6 lg:px-12 max-w-7xl text-center">
+          <Reveal>
+            <h2 className="font-serif text-3xl text-slate-900 mb-16">Resultados medibles</h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="p-8 border border-white bg-white shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
+                <p className="text-6xl font-serif text-blue-900 mb-4">40%</p>
+                <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Más Eficiencia</p>
+              </div>
+              <div className="p-8 border border-white bg-white shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
+                <p className="text-6xl font-serif text-blue-900 mb-4">Zero</p>
+                <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Pérdida de Información</p>
+              </div>
+              <div className="p-8 border border-white bg-white shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
+                <p className="text-6xl font-serif text-blue-900 mb-4">ISO</p>
+                <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Seguridad 27001</p>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Feature Deep Dive (Parallax-ish) */}
+      <section id="metodologia" className="py-24 bg-white border-t border-slate-200">
+        <div className="container mx-auto px-6 lg:px-12 max-w-7xl">
+          <Reveal>
+            <div className="text-center max-w-3xl mx-auto mb-20">
+              <h2 className="font-serif text-4xl text-slate-900 mb-6">Metodología Xel</h2>
+              <p className="text-lg text-slate-600">
+                Más que un software, es una forma de trabajar. Estructura, orden y profesionalismo en cada interacción.
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="space-y-32">
+            {/* Bloque 1 - Gestión */}
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <Reveal>
+                <div className="order-2 lg:order-1 relative p-2 bg-slate-50 rounded-2xl shadow-lg border border-slate-100">
+                  <img src="/dashboard-straight.png" className="rounded-xl w-full" alt="Gestión de Casos" />
                 </div>
               </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="casos-exito" className="relative overflow-hidden bg-black py-16 text-white">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="hero-glow absolute -right-20 top-10 h-72 w-72 rounded-full bg-lime-300/10 blur-[140px]" />
-        </div>
-        <div className="relative mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
-          <Reveal className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-5">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/60">Casos de éxito</p>
-              <h2 className={`${display.className} text-3xl font-semibold text-white`}>
-                Resultados visibles en equipos que necesitan control total.
-              </h2>
-              <p className="text-white/70">
-                Estudios corporativos adoptan Xel para estandarizar su operación, elevar su percepción y asegurar cada
-                decisión con trazabilidad.
-              </p>
-              <div className="flex flex-wrap gap-4">
-                {['+42% eficiencia operativa', '98% clientes informados', '24/7 control ejecutivo'].map((metric) => (
-                  <div
-                    key={metric}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs uppercase tracking-[0.2em] text-white/70"
-                  >
-                    {metric}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-6">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/60">Caso destacado</p>
-              <p className={`${display.className} text-2xl text-white`}>
-                “Hoy nuestra firma opera como un solo equipo, con control absoluto del expediente.”
-              </p>
-              <p className="text-sm text-white/60">Socio director · Estudio corporativo internacional</p>
-              <Link
-                href="#contacto"
-                className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-lime-200 transition hover:text-lime-300"
-              >
-                Conocer más
-                <span>→</span>
-              </Link>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <section id="metodo" className="bg-white py-16">
-        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
-          <Reveal className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
-            <div className="space-y-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Método Xel</p>
-              <h2 className={`${display.className} text-3xl font-semibold text-slate-900`}>
-                Una ruta clara que ordena equipos, tiempos y comunicación.
-              </h2>
-              <p className="text-slate-600">
-                Desde la admisión hasta el cierre, todo ocurre dentro de un entorno controlado que proyecta liderazgo.
-              </p>
-            </div>
-            <div className="space-y-8 border-l border-slate-200 pl-8">
-              {[
-                {
-                  step: '01',
-                  title: 'Admisión con criterio',
-                  description: 'Estructuras claras para definir expectativas, plazos y responsables.',
-                },
-                {
-                  step: '02',
-                  title: 'Ejecución con control',
-                  description: 'Comunicación, documentos y solicitudes dentro del mismo entorno.',
-                },
-                {
-                  step: '03',
-                  title: 'Cierre con respaldo',
-                  description: 'Resultados entregados con registro total y narrativa impecable.',
-                },
-              ].map((item) => (
-                <div key={item.step} className="relative space-y-2">
-                  <div className="absolute -left-[38px] top-1 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-600">
-                    {item.step}
-                  </div>
-                  <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                  <p className="text-sm text-slate-600">{item.description}</p>
-                </div>
-              ))}
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <section className="bg-white py-16">
-        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
-          <Reveal className="space-y-8">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Testimonios</p>
-            <div className="grid gap-6 lg:grid-cols-3">
-              {testimonials.map((item) => (
-                <div
-                  key={item.name}
-                  className="group rounded-xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-2 hover:border-lime-300 hover:shadow-[0_20px_40px_rgba(15,23,42,0.12)]"
-                >
-                  <div className="overflow-hidden rounded-lg">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-48 w-full object-cover transition duration-300 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                  </div>
-                  <p className="mt-5 text-sm text-slate-600 transition duration-300 group-hover:translate-y-1">
-                    {item.quote}
+              <Reveal delay={0.2} className="order-1 lg:order-2">
+                <div className="pl-0 lg:pl-10">
+                  <h3 className="font-serif text-3xl text-slate-900 mb-6">1. Control de Expedientes</h3>
+                  <p className="text-slate-600 leading-relaxed mb-6">
+                    Cada caso tiene un ciclo de vida definido. Nada queda en el aire. El sistema fuerza el orden mediante hitos obligatorios y recordatorios inteligentes sincronizados con el tribunal.
                   </p>
-                  <div className="mt-4 space-y-1">
-                    <p className="text-sm font-semibold text-slate-900">{item.name}</p>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{item.role}</p>
-                  </div>
+                  <Link href="#" className="text-blue-800 font-bold uppercase tracking-widest text-xs border-b border-blue-800 pb-1 hover:text-blue-600 hover:border-blue-600 transition-colors">
+                    Explorar módulo de casos
+                  </Link>
                 </div>
-              ))}
+              </Reveal>
             </div>
-          </Reveal>
-        </div>
-      </section>
 
-      <section className="bg-white py-16">
-        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
-          <Reveal className="grid gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-start">
-            <div className="space-y-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Preguntas frecuentes</p>
-              <h2 className={`${display.className} text-3xl font-semibold text-slate-900`}>
-                Respuestas claras para decisiones rápidas.
-              </h2>
-              <p className="text-slate-600">
-                Xel está diseñado para firmas que necesitan rigor operativo con una experiencia premium.
-              </p>
-            </div>
-            <div className="space-y-4">
-              {faqs.map((faq) => (
-                <details
-                  key={faq.question}
-                  className="group rounded-xl border border-slate-200 bg-white p-5 transition duration-300 hover:border-lime-300"
-                >
-                  <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-900">
-                    {faq.question}
-                    <span className="relative h-5 w-5 text-lime-400">
-                      <span className="faq-horizontal absolute left-0 top-1/2 h-[2px] w-5 -translate-y-1/2 bg-current transition duration-300" />
-                      <span className="faq-vertical absolute left-1/2 top-0 h-5 w-[2px] -translate-x-1/2 bg-current transition duration-300" />
-                    </span>
-                  </summary>
-                  <p className="mt-3 text-sm text-slate-600">{faq.answer}</p>
-                </details>
-              ))}
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <section id="contacto" className="bg-black py-16 text-white">
-        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
-          <Reveal className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-5">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/60">Agenda una demo</p>
-              <h2 className={`${display.className} text-3xl font-semibold text-white`}>
-                Una operación corporativa que se siente impecable desde el día uno.
-              </h2>
-              <p className="text-white/70">
-                Coordina una demostración privada y descubre cómo Xel ordena la relación con tus clientes y fortalece la
-                dirección del estudio.
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-6">
-              <div className="space-y-4">
-                <div className="rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-white/70">
-                  contacto@xelchile.com
+            {/* Bloque 2 - Enfoque */}
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <Reveal delay={0.2} className="order-1">
+                <div className="pr-0 lg:pr-10">
+                  <h3 className="font-serif text-3xl text-slate-900 mb-6">2. Foco en la Estrategia</h3>
+                  <p className="text-slate-600 leading-relaxed mb-6">
+                    Mientras Xel automatiza el seguimiento y el papeleo, sus abogados senior pueden dedicarse a lo que mejor saben hacer: ganar casos.
+                  </p>
+                  <Link href="#" className="text-blue-800 font-bold uppercase tracking-widest text-xs border-b border-blue-800 pb-1 hover:text-blue-600 hover:border-blue-600 transition-colors">
+                    Ver herramientas de productividad
+                  </Link>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-white/70">
-                  +56 2 2345 6789
+              </Reveal>
+              <Reveal>
+                <div className="order-2 relative p-2 bg-slate-50 rounded-2xl shadow-lg border border-slate-100">
+                  <img src="/lawyer-focus.png" className="rounded-xl w-full" alt="Abogado enfocado" />
                 </div>
-                <Link
-                  href={primaryCtaHref}
-                  className="flex items-center justify-center rounded-lg bg-lime-300 px-6 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-black transition duration-300 hover:scale-105 hover:bg-lime-200"
-                >
-                  Agendar ahora
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <footer className="bg-white py-12">
-        <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-10">
-          <div className="grid gap-10 border-t border-slate-200 pt-10 lg:grid-cols-[1.2fr_2fr]">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.3em] text-slate-700">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-lime-500">
-                  <svg viewBox="0 0 48 48" className="h-5 w-5" fill="none" aria-hidden="true">
-                    <path d="M12 24h24M24 12v24" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <circle cx="24" cy="24" r="10" stroke="currentColor" strokeWidth="1.6" />
-                  </svg>
-                </span>
-                Xel Chile
-              </div>
-              <p className="text-sm text-slate-600">
-                Plataforma corporativa para estudios jurídicos que requieren orden, seguridad y una experiencia premium.
-              </p>
-              <div className="flex items-center gap-3 text-sm text-slate-500">
-                <span className="h-2 w-2 rounded-full bg-lime-400" />
-                LinkedIn · Vimeo · YouTube
-              </div>
-            </div>
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
-              {footerColumns.map((column) => (
-                <div key={column.title} className="space-y-3 text-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">{column.title}</p>
-                  <div className="space-y-2 text-slate-600">
-                    {column.links.map((link) => (
-                      <p key={link} className="transition hover:text-slate-900">
-                        {link}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              </Reveal>
             </div>
           </div>
-          <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-6 text-xs text-slate-500">
-            <span>© 2025 Xel Chile. Todos los derechos reservados.</span>
-            <span>Privacidad · Términos · Compliance</span>
+        </div>
+      </section>
+
+      {/* Final Premium Call to Action */}
+      <section className="py-32 bg-blue-900 text-white text-center relative overflow-hidden">
+        {/* Background Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-500/20 blur-[150px] rounded-full pointer-events-none"></div>
+
+        <div className="container mx-auto px-6 max-w-4xl relative z-10">
+          <Reveal>
+            <h2 className="font-serif text-5xl lg:text-6xl mb-8 leading-tight">
+              Eleve el estándar de su firma hoy.
+            </h2>
+            <p className="text-xl text-blue-200 mb-12 max-w-2xl mx-auto">
+              La diferencia entre un estudio tradicional y una firma corporativa moderna es Xel.
+            </p>
+            <Link
+              href={primaryCtaHref}
+              className="inline-flex items-center justify-center px-12 py-6 bg-white text-blue-900 text-lg font-bold tracking-widest uppercase hover:bg-blue-50 transition-all duration-300 rounded-lg shadow-2xl hover:-translate-y-1"
+            >
+              Agendar Reunión Privada
+            </Link>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Footer minimalista */}
+      <footer className="bg-white py-16 border-t border-slate-200">
+        <div className="container mx-auto px-6 lg:px-12 max-w-7xl flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="text-center md:text-left">
+            <h4 className="font-serif text-2xl font-bold text-slate-900 flex items-center gap-3">
+              <span className="w-4 h-4 bg-blue-900 rounded-sm"></span>
+              Xel Chile
+            </h4>
+            <p className="text-xs text-slate-400 mt-2 uppercase tracking-wider">Sistema Operativo Legal Corporativo</p>
+          </div>
+          <div className="flex gap-8 text-sm text-slate-500 font-medium">
+            <Link href="/login" className="hover:text-blue-900 transition-colors">Portal de Clientes</Link>
+            <Link href="#" className="hover:text-blue-900 transition-colors">Privacidad y Seguridad</Link>
+            <Link href="#" className="hover:text-blue-900 transition-colors">Contacto Comercial</Link>
           </div>
         </div>
       </footer>
-
     </main>
   );
 }

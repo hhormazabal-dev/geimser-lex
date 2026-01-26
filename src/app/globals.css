@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 220 33% 97%;
+    --background: 210 40% 98%;
     --foreground: 222 47% 12%;
     --surface: 0 0% 100%;
     --surface-foreground: 222 47% 12%;
@@ -17,51 +17,22 @@
     --glass: rgba(255, 255, 255, 0.72);
     --glass-border: rgba(148, 163, 184, 0.2);
     --glass-hover: rgba(255, 255, 255, 0.85);
-    --primary: 215 98% 53%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 224 64% 33%;
+    /* Royal Blue 900 */
+    --primary-foreground: 210 40% 98%;
     --secondary: 212 30% 91%;
     --secondary-foreground: 222 47% 20%;
-    --muted: 213 28% 92%;
-    --muted-foreground: 223 22% 45%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
     --destructive: 2 88% 62%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 72% 45%;
     --warning: 38 92% 50%;
     --info: 199 89% 48%;
-    --border: 215 25% 88%;
+    --border: 214 32% 91%;
     --input: 215 25% 88%;
     --ring: 215 98% 53%;
     --radius: 1rem;
-  }
-
-  .dark {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --surface: 222 47% 9%;
-    --surface-foreground: 210 40% 98%;
-    --surface-2: 222 47% 11%;
-    --surface-3: 222 47% 8%;
-    --card: var(--surface);
-    --card-foreground: var(--surface-foreground);
-    --popover: var(--surface);
-    --popover-foreground: var(--surface-foreground);
-    --glass: rgba(15, 23, 42, 0.6);
-    --glass-border: rgba(148, 163, 184, 0.3);
-    --glass-hover: rgba(15, 23, 42, 0.75);
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 221 39% 11%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 221 39% 16%;
-    --muted-foreground: 215 20% 70%;
-    --destructive: 2 77% 45%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 72% 50%;
-    --warning: 38 92% 55%;
-    --info: 199 89% 55%;
-    --border: 220 22% 16%;
-    --input: 220 22% 16%;
-    --ring: 217 91% 60%;
   }
 
   * {
@@ -69,26 +40,10 @@
   }
 
   body {
-    @apply bg-background text-foreground min-h-screen antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased;
     font-family: var(--font-sans), 'Inter', 'Segoe UI', system-ui, -apple-system,
       sans-serif;
-    background-image: radial-gradient(
-        circle at 10% 20%,
-        rgba(147, 197, 253, 0.35),
-        transparent 55%
-      ),
-      radial-gradient(
-        circle at 90% 10%,
-        rgba(191, 219, 254, 0.4),
-        transparent 40%
-      ),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.98) 100%);
-    background-attachment: fixed;
-  }
-
-  ::selection {
-    background-color: rgba(59, 130, 246, 0.25);
-    color: hsl(var(--foreground));
+    font-feature-settings: "cv02", "cv03", "cv04", "ss01";
   }
 
   html {
@@ -167,6 +122,10 @@
   .glass-border {
     border: 1px solid var(--glass-border);
   }
+
+  .text-balance {
+    text-wrap: balance;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -186,50 +145,12 @@
   background: rgba(148, 163, 184, 0.6);
 }
 
-.hero-grid {
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
-  background-size: 80px 80px;
+.bg-grid-white {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(255 255 255 / 0.05)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e");
 }
 
-.hero-motion {
-  background: radial-gradient(circle at 20% 20%, rgba(163, 230, 53, 0.25), transparent 55%),
-    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.18), transparent 60%),
-    linear-gradient(120deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.6));
-  animation: hero-drift 12s ease-in-out infinite;
-}
-
-.hero-orbit {
-  animation: hero-orbit 14s linear infinite;
-}
-
-details[open] summary .faq-vertical {
-  opacity: 0;
-  transform: scaleY(0);
-}
-
-summary::-webkit-details-marker {
-  display: none;
-}
-
-@keyframes hero-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(-12px, 10px, 0) scale(1.05);
-  }
-}
-
-@keyframes hero-orbit {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(18px, 12px, 0);
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
+.text-gradient-corporate {
+  background: linear-gradient(to right, #ffffff, #86efac);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
