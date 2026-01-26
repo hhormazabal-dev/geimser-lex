@@ -406,9 +406,9 @@ export async function createCaseFromBrief(input: CreateCaseFromBriefInput) {
       abogado_responsable: profile.id,
     };
 
-  const caseData: CreateCaseInput = {
-    ...base,
-    ...overrides,
+    const caseData: CreateCaseInput = {
+      ...base,
+      ...overrides,
 
       // mantener literal seguro
       workflow_state: parseWorkflow((overrides as any)?.workflow_state ?? base.workflow_state),
@@ -1069,11 +1069,20 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
         .from('case_clients')
         .select('case_id')
         .eq('client_profile_id', profile.id);
-      const caseIds = clientCases?.map((cc: { case_id: string }) => cc.case_id) ?? [];
-      if (caseIds.length === 0) {
+      const joinIds = clientCases?.map((cc: { case_id: string }) => cc.case_id) ?? [];
+
+      const { data: directCases } = await supabase
+        .from('cases')
+        .select('id')
+        .eq('cliente_principal_id', profile.id);
+      const directIds = directCases?.map((c: { id: string }) => c.id) ?? [];
+
+      const allIds = Array.from(new Set([...joinIds, ...directIds]));
+
+      if (allIds.length === 0) {
         return { success: true, cases: [], total: 0, page: validatedFilters.page, limit: validatedFilters.limit };
       }
-      query = query.in('id', caseIds);
+      query = query.in('id', allIds);
     }
 
     if (validatedFilters.estado) query = query.eq('estado', validatedFilters.estado);
@@ -1140,7 +1149,10 @@ export async function getCaseById(caseId: string) {
         .eq('case_id', caseId)
         .eq('client_profile_id', profile.id)
         .maybeSingle();
-      if (!clientCase) throw new Error('Sin permisos para ver este caso');
+
+      const isDirectClient = caseRow.cliente_principal_id === profile.id;
+
+      if (!clientCase && !isDirectClient) throw new Error('Sin permisos para ver este caso');
     }
     if (profile.role === 'abogado' && caseRow.abogado_responsable && caseRow.abogado_responsable !== profile.id) {
       const { data: collaborator } = await supabase
@@ -1206,12 +1218,12 @@ export async function getCaseById(caseId: string) {
       abogado_responsable_id: caseRow.abogado_responsable,
       abogado_responsable: lawyerProfile
         ? {
-            id: lawyerProfile.id,
-            nombre: lawyerProfile.nombre,
-            telefono: lawyerProfile.telefono,
-            rut: lawyerProfile.rut,
-            email: (lawyerProfile as any).email ?? null,
-          }
+          id: lawyerProfile.id,
+          nombre: lawyerProfile.nombre,
+          telefono: lawyerProfile.telefono,
+          rut: lawyerProfile.rut,
+          email: (lawyerProfile as any).email ?? null,
+        }
         : null,
       case_stages: stagesRes?.data ?? [],
       notes: notesRes?.data ?? [],
@@ -1219,7 +1231,7 @@ export async function getCaseById(caseId: string) {
       info_requests: reqsRes?.data ?? [],
       counterparties: counterpartiesRes?.data ?? [],
       clients:
-      clientsRes?.data
+        clientsRes?.data
           ?.map((item: { is_primary?: boolean | null; client: { id: string; nombre: string; email: string; telefono: string | null; rut?: string | null } | null }) =>
             item.client ? { ...item.client, is_primary: Boolean(item.is_primary) } : null,
           )
