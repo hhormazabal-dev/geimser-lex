@@ -173,7 +173,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
 
     const supabase = await createServerClient();
 
-    let caseQuery = supabase.from('cases').select('*');
+    const caseQuery = supabase.from('cases').select('*');
     // Para abogado/admin/analista confiamos en RLS (has_case_access) para traer
     // todos los casos accesibles en la empresa activa, incluyendo colaboraciones.
     // caseQuery = caseQuery.is('deleted_at', null);
