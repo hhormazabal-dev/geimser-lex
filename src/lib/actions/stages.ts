@@ -635,7 +635,7 @@ export async function getStages(filters?: Partial<StageFiltersInput>) {
         .from('cases')
         .select('id')
         .eq('abogado_responsable', profile.id)
-        // @ts-expect-error
+        // @ts-expect-error: deleted_at missing in types
         .is('deleted_at', null);
       const caseIds = abogadoCases?.map((c: { id: string }) => c.id) || [];
       if (caseIds.length === 0) {
