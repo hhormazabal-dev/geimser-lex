@@ -332,7 +332,7 @@ export async function getCasesByStatus(): Promise<{ success: boolean; data?: Cas
 
     const supabase = await createServerClient();
 
-
+    const query = supabase.from('cases').select('estado, sentencia_estado').is('deleted_at', null);
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -375,7 +375,7 @@ export async function getCasesByMateria(): Promise<{ success: boolean; data?: Ca
 
     const supabase = await createServerClient();
 
-
+    const query = supabase.from('cases').select('materia').is('deleted_at', null);
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -416,7 +416,7 @@ export async function getCasesByPriority(): Promise<{ success: boolean; data?: C
 
     const supabase = await createServerClient();
 
-
+    const query = supabase.from('cases').select('prioridad').is('deleted_at', null);
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -461,7 +461,7 @@ export async function getCasesByWorkflowState(): Promise<{
 
     const supabase = await createServerClient();
 
-
+    const query = supabase.from('cases').select('workflow_state').is('deleted_at', null);
     const { data: casesData, error } = await query;
     if (error) throw error;
 
