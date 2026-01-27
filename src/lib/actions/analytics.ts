@@ -176,7 +176,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
     let caseQuery = supabase.from('cases').select('*');
     // Para abogado/admin/analista confiamos en RLS (has_case_access) para traer
     // todos los casos accesibles en la empresa activa, incluyendo colaboraciones.
-    caseQuery = caseQuery.is('deleted_at', null);
+    // caseQuery = caseQuery.is('deleted_at', null);
 
     const { data: caseRows, error: casesError } = await caseQuery;
     if (casesError) throw casesError;
@@ -332,7 +332,7 @@ export async function getCasesByStatus(): Promise<{ success: boolean; data?: Cas
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('estado, sentencia_estado').is('deleted_at', null);
+    const query = supabase.from('cases').select('estado, sentencia_estado'); // .is('deleted_at', null);
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -375,7 +375,7 @@ export async function getCasesByMateria(): Promise<{ success: boolean; data?: Ca
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('materia').is('deleted_at', null);
+    const query = supabase.from('cases').select('materia'); // .is('deleted_at', null);
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -416,7 +416,7 @@ export async function getCasesByPriority(): Promise<{ success: boolean; data?: C
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('prioridad').is('deleted_at', null);
+    const query = supabase.from('cases').select('prioridad'); // .is('deleted_at', null);
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -461,7 +461,7 @@ export async function getCasesByWorkflowState(): Promise<{
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('workflow_state').is('deleted_at', null);
+    const query = supabase.from('cases').select('workflow_state'); // .is('deleted_at', null);
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -521,13 +521,13 @@ export async function getMonthlyStats(): Promise<{ success: boolean; data?: Mont
     const newCasesQuery = supabase
       .from('cases')
       .select('fecha_inicio, valor_estimado')
-      .is('deleted_at', null)
+      // .is('deleted_at', null)
       .gte('fecha_inicio', startDate.toISOString());
 
     const completedCasesQuery = supabase
       .from('cases')
       .select('updated_at, valor_estimado')
-      .is('deleted_at', null)
+      // .is('deleted_at', null)
       .in('estado', ['terminado', 'terminado_desistido_demandante'])
       .gte('updated_at', startDate.toISOString());
 
@@ -688,7 +688,7 @@ export async function getLawyerDetail(abogadoId: string): Promise<{ success: boo
       .from('cases')
       .select('id, caratulado, estado, etapa_actual, prioridad, valor_estimado, fecha_inicio, workflow_state, nombre_cliente, updated_at')
       .eq('abogado_responsable', abogadoId)
-      .is('deleted_at', null)
+      // .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (casesError) throw casesError;
