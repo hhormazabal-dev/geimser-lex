@@ -852,6 +852,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   return (
     <div className="space-y-8 pb-12">
       <PageHeader
+        className="sticky top-14 z-30 -mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 bg-slate-50/90 backdrop-blur-md transition-all duration-200 border-b border-white/20 shadow-sm"
         eyebrow="Expediente"
         title={caseData.caratulado}
         description={
