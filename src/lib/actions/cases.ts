@@ -1034,6 +1034,7 @@ export async function deleteCase(caseId: string) {
 
     revalidatePath('/cases');
     revalidatePath('/dashboard');
+    revalidatePath('/inbox');
     return { success: true };
   } catch (error) {
     console.error('Error in deleteCase:', error);

@@ -73,7 +73,7 @@ export function DataTable({
   sortState,
 }: DataTableProps) {
   const [searchTerm, setSearchTerm] = useState(() => initialSearchTerm ?? '');
-  const [showFilters, setShowFilters] = useState(false);
+  // const [showFilters, setShowFilters] = useState(false); // Removed as per request (always show)
   const [filterValues, setFilterValues] = useState<{
     estado: string;
     prioridad: string;
@@ -197,15 +197,7 @@ export function DataTable({
             </form>
 
             <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
-              <Button
-                variant='outline'
-                onClick={() => setShowFilters((prev) => !prev)}
-                className='flex items-center gap-2 rounded-xl border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50'
-              >
-                <Filter className='h-4 w-4' />
-                Filtros {activeFilters > 0 && <span className='rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white'>{activeFilters}</span>}
-              </Button>
-
+              {/* Filters toggle removed */}
               {canCreate && (
                 <Button asChild className='rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800'>
                   <Link href='/cases/new'>
@@ -218,90 +210,88 @@ export function DataTable({
           </div>
         </div>
 
-        {showFilters && (
-          <div className='border-t border-slate-200 bg-slate-50/60 px-5 py-4'>
-            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-5'>
-              <div>
-                <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Estado</label>
-                <select
-                  value={filterValues.estado}
-                  onChange={handleFilterChange('estado')}
-                  className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
-                >
-                  <option value=''>Todos</option>
-                  <option value='activo'>Activo</option>
-                  <option value='suspendido'>Suspendido</option>
-                  <option value='archivado'>Archivado</option>
-                  <option value='terminado_apelacion'>Terminado – Apelación</option>
-                  <option value='terminado'>Terminado</option>
-                  <option value='terminado_desistido_demandante'>Terminada - Desistida por Demandante</option>
-                </select>
-              </div>
+        <div className='border-t border-slate-200 bg-slate-50/60 px-5 py-4'>
+          <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-5'>
+            <div>
+              <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Estado</label>
+              <select
+                value={filterValues.estado}
+                onChange={handleFilterChange('estado')}
+                className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
+              >
+                <option value=''>Todos</option>
+                <option value='activo'>Activo</option>
+                <option value='suspendido'>Suspendido</option>
+                <option value='archivado'>Archivado</option>
+                <option value='terminado_apelacion'>Terminado – Apelación</option>
+                <option value='terminado'>Terminado</option>
+                <option value='terminado_desistido_demandante'>Terminada - Desistida por Demandante</option>
+              </select>
+            </div>
 
-              <div>
-                <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Prioridad</label>
-                <select
-                  value={filterValues.prioridad}
-                  onChange={handleFilterChange('prioridad')}
-                  className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
-                >
-                  <option value=''>Todas</option>
-                  <option value='baja'>Baja</option>
-                  <option value='media'>Media</option>
-                  <option value='alta'>Alta</option>
-                  <option value='urgente'>Urgente</option>
-                </select>
-              </div>
+            <div>
+              <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Prioridad</label>
+              <select
+                value={filterValues.prioridad}
+                onChange={handleFilterChange('prioridad')}
+                className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
+              >
+                <option value=''>Todas</option>
+                <option value='baja'>Baja</option>
+                <option value='media'>Media</option>
+                <option value='alta'>Alta</option>
+                <option value='urgente'>Urgente</option>
+              </select>
+            </div>
 
-              <div>
-                <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Workflow</label>
-                <select
-                  value={filterValues.workflow_state}
-                  onChange={handleFilterChange('workflow_state')}
-                  className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
-                >
-                  <option value=''>Todos</option>
-                  <option value='preparacion'>Preparación</option>
-                  <option value='en_revision'>En revisión</option>
-                  <option value='activo'>Activo</option>
-                  <option value='cerrado'>Cerrado</option>
-                </select>
-              </div>
+            <div>
+              <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Workflow</label>
+              <select
+                value={filterValues.workflow_state}
+                onChange={handleFilterChange('workflow_state')}
+                className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
+              >
+                <option value=''>Todos</option>
+                <option value='preparacion'>Preparación</option>
+                <option value='en_revision'>En revisión</option>
+                <option value='activo'>Activo</option>
+                <option value='cerrado'>Cerrado</option>
+              </select>
+            </div>
 
-              <div>
-                <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Materia</label>
-                <select
-                  value={filterValues.materia}
-                  onChange={handleFilterChange('materia')}
-                  className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
-                >
-                  <option value=''>Todas</option>
-                  <option value='Laboral'>Laboral</option>
-                  <option value='Civil'>Civil</option>
-                  <option value='Comercial'>Comercial</option>
-                  <option value='Penal'>Penal</option>
-                </select>
-              </div>
+            <div>
+              <label className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>Materia</label>
+              <select
+                value={filterValues.materia}
+                onChange={handleFilterChange('materia')}
+                className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
+              >
+                <option value=''>Todas</option>
+                <option value='Laboral'>Laboral</option>
+                <option value='Civil'>Civil</option>
+                <option value='Comercial'>Comercial</option>
+                <option value='Penal'>Penal</option>
+              </select>
+            </div>
 
-              <div className='flex items-end gap-2'>
-                <Button onClick={applyFilters} className='w-full rounded-xl bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800'>
-                  Aplicar filtros
+            <div className='flex items-end gap-2'>
+              <Button onClick={applyFilters} className='w-full rounded-xl bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800'>
+                Aplicar filtros
+              </Button>
+              {activeFilters > 0 && (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  onClick={resetFilters}
+                  className='h-10 w-10 rounded-xl border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-white'
+                >
+                  <X className='h-4 w-4' />
                 </Button>
-                {activeFilters > 0 && (
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    onClick={resetFilters}
-                    className='h-10 w-10 rounded-xl border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-white'
-                  >
-                    <X className='h-4 w-4' />
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
           </div>
-        )}
-      </Card>
+        </div>
+      </Card >
 
       <Card className='overflow-hidden border border-slate-200 bg-white/95 shadow-sm'>
         <div className='overflow-x-auto'>
@@ -458,47 +448,49 @@ export function DataTable({
         )}
       </Card>
 
-      {totalPages > 1 && (
-        <div className='flex flex-wrap items-center justify-center gap-3'>
-          <Button
-            variant='outline'
-            className='rounded-xl px-4'
-            onClick={() => onPageChange(page - 1)}
-            disabled={page <= 1}
-          >
-            Anterior
-          </Button>
-          <div className='flex items-center gap-2'>
-            {(() => {
-              const pagesToShow = Math.min(5, totalPages);
-              const startPage = Math.max(1, Math.min(page - Math.floor(pagesToShow / 2), totalPages - pagesToShow + 1));
+      {
+        totalPages > 1 && (
+          <div className='flex flex-wrap items-center justify-center gap-3'>
+            <Button
+              variant='outline'
+              className='rounded-xl px-4'
+              onClick={() => onPageChange(page - 1)}
+              disabled={page <= 1}
+            >
+              Anterior
+            </Button>
+            <div className='flex items-center gap-2'>
+              {(() => {
+                const pagesToShow = Math.min(5, totalPages);
+                const startPage = Math.max(1, Math.min(page - Math.floor(pagesToShow / 2), totalPages - pagesToShow + 1));
 
-              return Array.from({ length: pagesToShow }, (_, index) => {
-                const pageNum = startPage + index;
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={pageNum === page ? 'default' : 'outline'}
-                    className={`rounded-xl px-3 ${pageNum === page ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border-slate-200'}`}
-                    size='sm'
-                    onClick={() => onPageChange(pageNum)}
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              });
-            })()}
+                return Array.from({ length: pagesToShow }, (_, index) => {
+                  const pageNum = startPage + index;
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={pageNum === page ? 'default' : 'outline'}
+                      className={`rounded-xl px-3 ${pageNum === page ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border-slate-200'}`}
+                      size='sm'
+                      onClick={() => onPageChange(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                });
+              })()}
+            </div>
+            <Button
+              variant='outline'
+              className='rounded-xl px-4'
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= totalPages}
+            >
+              Siguiente
+            </Button>
           </div>
-          <Button
-            variant='outline'
-            className='rounded-xl px-4'
-            onClick={() => onPageChange(page + 1)}
-            disabled={page >= totalPages}
-          >
-            Siguiente
-          </Button>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

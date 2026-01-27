@@ -1275,7 +1275,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
       </Card>
 
       {/* Tabs de navegación */}
-      <div className="sticky top-16 z-40 -mx-4 border-y border-white/20 bg-white/65 py-3 backdrop-blur-2xl sm:-mx-6 lg:-mx-8">
+      <div className="sticky top-[57px] z-40 -mx-4 border-y border-white/20 bg-white/65 py-3 backdrop-blur-2xl sm:-mx-6 lg:-mx-8">
         <nav className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           {/* Extended Sticky Header Content */}
           <div className="hidden lg:flex flex-col flex-1 min-w-0 mr-4">
@@ -1299,8 +1299,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
                   className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${activeTab === tab.id
-                      ? 'bg-foreground text-white shadow-md'
-                      : 'border border-white/20 bg-white/40 text-foreground/60 hover:bg-white/70 hover:text-foreground'
+                    ? 'bg-foreground text-white shadow-md'
+                    : 'border border-white/20 bg-white/40 text-foreground/60 hover:bg-white/70 hover:text-foreground'
                     }`}
                 >
                   <Icon className="h-4 w-4" />
