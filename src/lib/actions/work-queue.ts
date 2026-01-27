@@ -111,7 +111,6 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
         ].join(','),
       )
       // Inbox: solo casos activos / en seguimiento. No alertar casos finalizados.
-      // @ts-expect-error: deleted_at missing in types
       .is('deleted_at', null)
       .not('estado', 'in', '("archivado","terminado","terminado_desistido_demandante")');
     if (casesError) throw casesError;
@@ -181,7 +180,6 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
           'case:cases!inner(id, caratulado, materia, prioridad, workflow_state, estado, deleted_at)',
         ].join(','),
       )
-      // @ts-expect-error: deleted_at missing in types
       .is('case.deleted_at', null)
       .in('estado', ['pendiente', 'en_proceso'])
       .not('fecha_programada', 'is', null)
@@ -198,7 +196,6 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
       const linkedCase = row.case;
       if (!linkedCase?.id) continue;
       // Failsafe: asegurar que no procesamos casos eliminados si el filtro SQL falló
-      // @ts-expect-error: deleted_at missing in types
       if (linkedCase.deleted_at) continue;
 
       const estadoCaso = String(linkedCase.estado ?? '').trim();

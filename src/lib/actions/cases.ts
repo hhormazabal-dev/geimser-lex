@@ -1025,7 +1025,6 @@ export async function deleteCase(caseId: string) {
     // Soft delete: update deleted_at
     const { error } = await supabase
       .from('cases')
-      // @ts-expect-error: deleted_at missing in types: deleted_at column exists in DB but not in types yet
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', caseId);
 
@@ -1090,7 +1089,6 @@ export async function restoreCase(caseId: string) {
 
     const { error } = await supabase
       .from('cases')
-      // @ts-expect-error: deleted_at missing in types: deleted_at column exists in DB but not in types yet
       .update({ deleted_at: null })
       .eq('id', caseId);
 
