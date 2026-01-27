@@ -241,7 +241,7 @@ export async function canAccessCase(_caseId: string): Promise<boolean> {
       .from('cases')
       .select('id')
       .eq('id', caseId)
-      // @ts-ignore
+      // @ts-expect-error
       .is('deleted_at', null)
       .maybeSingle();
     if (error) return false;
