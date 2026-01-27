@@ -25,11 +25,10 @@ export const metadata: Metadata = {
   description: 'Panel de control para la firma',
 };
 
-export default async function AdminDashboardPage({
-  searchParams,
-}: {
-  searchParams: { period?: string };
+export default async function AdminDashboardPage(props: {
+  searchParams: Promise<{ period?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const profile = await getCurrentProfile();
 
   if (!profile) {
