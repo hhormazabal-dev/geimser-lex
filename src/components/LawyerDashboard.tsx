@@ -3,11 +3,14 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowRight, Briefcase, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Target } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Briefcase, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Target, Plus } from 'lucide-react';
 
 import { QuickLinksPanel } from '@/components/QuickLinksPanel';
 import { TemplateLibrary } from '@/components/TemplateLibrary';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { CalendarSyncPanel } from '@/components/lawyer/CalendarSyncPanel';
+import { ActuacionQuickForm } from '@/components/lawyer/ActuacionQuickForm';
+import { QuickActionFAB } from '@/components/QuickActionFAB';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -123,6 +126,8 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
   const [casesPerPage, setCasesPerPage] = useState(5);
   const [caseStatusFilter, setCaseStatusFilter] = useState<CaseStatusFilterKey | 'all'>('all');
   const [moreColumn, setMoreColumn] = useState<CalendarKey | null>(null);
+  const [actuacionFormOpen, setActuacionFormOpen] = useState(false);
+  const [selectedCaseForActuacion, setSelectedCaseForActuacion] = useState<{ id: string; name: string } | null>(null);
   const allDeadlines = (data.upcomingDeadlines || []) as any[];
   const caseById = useMemo(() => new Map(cases.map((caseItem) => [caseItem.id, caseItem])), [cases]);
   const calendarBuckets = useMemo<Record<CalendarKey, any[]>>(() => {
@@ -360,9 +365,8 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
 
   const heroDescription =
     stats.activeCases > 0
-      ? `Gestiona ${stats.activeCases} caso${stats.activeCases === 1 ? '' : 's'} activo${
-          stats.activeCases === 1 ? '' : 's'
-        } y mantén tus próximos compromisos bajo control.`
+      ? `Gestiona ${stats.activeCases} caso${stats.activeCases === 1 ? '' : 's'} activo${stats.activeCases === 1 ? '' : 's'
+      } y mantén tus próximos compromisos bajo control.`
       : 'Activa tus primeros casos y configura recordatorios para no perder hitos clave.';
 
   const metricCards = [
@@ -405,676 +409,726 @@ export function LawyerDashboard({ profile, data, cases, quickLinks, templates }:
         }
       />
 
-        <section className='grid gap-3 lg:grid-cols-[2fr_1.1fr]'>
-          <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
-            <CardContent className='space-y-4 p-4'>
-              <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-                <div className='flex-1 space-y-2'>
-                  <p className='text-[10px] uppercase tracking-[0.25em] text-slate-400'>Panel de gestión</p>
-                  <h2 className='text-xl font-semibold tracking-tight'>Estado de tu cartera</h2>
-                  <p className='max-w-xl text-xs leading-relaxed text-slate-600'>{heroDescription}</p>
-                </div>
-                <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
-                  <div className='flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2'>
-                    <div
-                      className='flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-[13px] font-semibold text-slate-700 shadow-inner'
-                      style={{
-                        background: `linear-gradient(135deg, ${stringToColor(profile.nombre)} 0%, rgba(255,255,255,0.92) 100%)`,
-                      }}
-                    >
-                      {getInitials(profile.nombre)}
-                    </div>
-                    <div>
-                      <p className='text-[13px] font-medium text-slate-900'>{profile.nombre}</p>
-                      <p className='text-[11px] text-slate-500'>{formatRoleLabel(profile.role)}</p>
-                    </div>
+      <section className='grid gap-3 lg:grid-cols-[2fr_1.1fr]'>
+        <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+          <CardContent className='space-y-4 p-4'>
+            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+              <div className='flex-1 space-y-2'>
+                <p className='text-[10px] uppercase tracking-[0.25em] text-slate-400'>Panel de gestión</p>
+                <h2 className='text-xl font-semibold tracking-tight'>Estado de tu cartera</h2>
+                <p className='max-w-xl text-xs leading-relaxed text-slate-600'>{heroDescription}</p>
+              </div>
+              <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
+                <div className='flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2'>
+                  <div
+                    className='flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-[13px] font-semibold text-slate-700 shadow-inner'
+                    style={{
+                      background: `linear-gradient(135deg, ${stringToColor(profile.nombre)} 0%, rgba(255,255,255,0.92) 100%)`,
+                    }}
+                  >
+                    {getInitials(profile.nombre)}
+                  </div>
+                  <div>
+                    <p className='text-[13px] font-medium text-slate-900'>{profile.nombre}</p>
+                    <p className='text-[11px] text-slate-500'>{formatRoleLabel(profile.role)}</p>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className='rounded-xl border border-slate-200/80 bg-slate-50/70 p-3'>
-                <div className='flex flex-wrap items-center justify-between gap-2'>
-                  <div>
-                    <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Agenda por actuación</p>
-                    <p className='text-[12px] text-slate-600'>Próximas fechas ordenadas por tipo de gestión.</p>
-                  </div>
-                  <span className='text-[11px] text-slate-500'>
-                    {allDeadlines.length} actuación{allDeadlines.length === 1 ? '' : 'es'} en 90 días
-                  </span>
+            <div className='rounded-xl border border-slate-200/80 bg-slate-50/70 p-3'>
+              <div className='flex flex-wrap items-center justify-between gap-2'>
+                <div>
+                  <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Agenda por actuación</p>
+                  <p className='text-[12px] text-slate-600'>Próximas fechas ordenadas por tipo de gestión.</p>
                 </div>
+                <span className='text-[11px] text-slate-500'>
+                  {allDeadlines.length} actuación{allDeadlines.length === 1 ? '' : 'es'} en 90 días
+                </span>
+              </div>
 
-                <div className='mt-3 grid gap-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
-                  {CALENDAR_COLUMNS.map((column) => {
-                    const items = calendarBuckets[column.key] ?? [];
-                    const previewItems = items.slice(0, 2);
+              <div className='mt-3 grid gap-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
+                {CALENDAR_COLUMNS.map((column) => {
+                  const items = calendarBuckets[column.key] ?? [];
+                  const previewItems = items.slice(0, 2);
 
-                    return (
-                      <div key={column.key} className='rounded-lg border border-slate-200 bg-white/90 p-2 shadow-sm'>
-                        <div className='flex items-start justify-between gap-2'>
-                          <div>
-                            <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>{column.label}</p>
-                            <p className='text-[11px] text-slate-500'>{column.helper}</p>
+                  return (
+                    <div key={column.key} className='rounded-lg border border-slate-200 bg-white/90 p-2 shadow-sm'>
+                      <div className='flex items-start justify-between gap-2'>
+                        <div>
+                          <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>{column.label}</p>
+                          <p className='text-[11px] text-slate-500'>{column.helper}</p>
+                        </div>
+                        <span className='text-[11px] font-semibold text-slate-700'>{items.length}</span>
+                      </div>
+
+                      <div className='mt-2 space-y-1.5'>
+                        {previewItems.length === 0 ? (
+                          <div className='rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-2.5 py-3'>
+                            <p className='text-[11px] text-slate-400 mb-2'>Sin actuaciones registradas</p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full text-xs"
+                              onClick={() => {
+                                const firstActiveCase = activeCases[0];
+                                if (firstActiveCase) {
+                                  setSelectedCaseForActuacion({
+                                    id: firstActiveCase.id,
+                                    name: firstActiveCase.caratulado
+                                  });
+                                  setActuacionFormOpen(true);
+                                } else {
+                                  router.push('/cases/new');
+                                }
+                              }}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Registrar {column.label.toLowerCase()}
+                            </Button>
                           </div>
-                          <span className='text-[11px] font-semibold text-slate-700'>{items.length}</span>
-                        </div>
-
-                        <div className='mt-2 space-y-1.5'>
-                          {previewItems.length === 0 ? (
-                            <div className='rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-2.5 py-3 text-[11px] text-slate-400'>
-                              Sin actuaciones registradas
-                            </div>
-                          ) : (
-                            previewItems.map((deadline: any) => (
-                              <button
-                                key={deadline.id}
-                                type='button'
-                                onClick={() => setSelectedDeadline(deadline)}
-                                className='group w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
-                              >
-                                <div className='min-w-0 space-y-1'>
-                                  <div className='flex items-center justify-between gap-2 text-[9px] text-slate-500'>
-                                    <span className='truncate'>
-                                      {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
+                        ) : (
+                          previewItems.map((deadline: any) => (
+                            <button
+                              key={deadline.id}
+                              type='button'
+                              onClick={() => setSelectedDeadline(deadline)}
+                              className='group w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
+                            >
+                              <div className='min-w-0 space-y-1'>
+                                <div className='flex items-center justify-between gap-2 text-[9px] text-slate-500'>
+                                  <span className='truncate'>
+                                    {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
+                                  </span>
+                                  {deadline.fecha_programada && (
+                                    <span className='inline-flex items-center gap-1 text-sky-600'>
+                                      <Clock className='h-2.5 w-2.5' />
+                                      <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
                                     </span>
-                                    {deadline.fecha_programada && (
-                                      <span className='inline-flex items-center gap-1 text-sky-600'>
-                                        <Clock className='h-2.5 w-2.5' />
-                                        <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className='truncate text-[12px] font-semibold text-slate-900'>
-                                    {deadline.etapa || 'Actuación pendiente'}
-                                  </p>
-                                  <p className='truncate text-[11px] text-slate-600'>{resolveCaseTitle(deadline)}</p>
-                                  <p className='truncate text-[10px] text-slate-500'>{resolveCaseClient(deadline)}</p>
+                                  )}
                                 </div>
-                              </button>
-                            ))
-                          )}
-                        </div>
-
-                        {items.length > previewItems.length && (
-                          <button
-                            type='button'
-                            onClick={() => setMoreColumn(column.key)}
-                            className='mt-2 text-[10px] font-medium text-sky-600 hover:text-sky-700'
-                          >
-                            +{items.length - previewItems.length} más
-                          </button>
+                                <p className='truncate text-[12px] font-semibold text-slate-900'>
+                                  {deadline.etapa || 'Actuación pendiente'}
+                                </p>
+                                <p className='truncate text-[11px] text-slate-600'>{resolveCaseTitle(deadline)}</p>
+                                <p className='truncate text-[10px] text-slate-500'>{resolveCaseClient(deadline)}</p>
+                              </div>
+                            </button>
+                          ))
                         )}
                       </div>
-                    );
-                  })}
+
+                      {items.length > previewItems.length && (
+                        <button
+                          type='button'
+                          onClick={() => setMoreColumn(column.key)}
+                          className='mt-2 text-[10px] font-medium text-sky-600 hover:text-sky-700'
+                        >
+                          +{items.length - previewItems.length} más
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+          <CardHeader className='p-4 pb-2'>
+            <CardTitle className='flex items-center gap-2 text-xs font-semibold text-slate-800'>
+              <Calendar className='h-3.5 w-3.5 text-sky-500' />
+              Próxima acción
+            </CardTitle>
+          </CardHeader>
+          <CardContent className='space-y-3 px-4 pb-4 pt-0'>
+            {deadlines.length > 0 ? (
+              <div className='space-y-2'>
+                {deadlines.slice(0, 3).map((deadline: any) => (
+                  <button
+                    key={deadline.id}
+                    type='button'
+                    onClick={() => setSelectedDeadline(deadline)}
+                    className='w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-[12px] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
+                  >
+                    <div className='flex items-center justify-between gap-2'>
+                      <p className='min-w-0 truncate text-[12px] font-semibold text-slate-900'>
+                        {resolveCaseTitle(deadline)}
+                      </p>
+                      <span className='shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                        {resolveCaseRole(deadline)}
+                      </span>
+                    </div>
+                    <p className='mt-1 truncate text-[11px] text-slate-500'>{resolveCaseClient(deadline)}</p>
+                    <p className='truncate text-[11px] text-slate-600'>{deadline.etapa || 'Actuación pendiente'}</p>
+                    <div className='mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-500'>
+                      <span className='truncate'>
+                        {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
+                      </span>
+                      {deadline.fecha_programada && (
+                        <span className='inline-flex items-center gap-1 text-sky-600'>
+                          <Clock className='h-3 w-3' />
+                          <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+                {deadlines.length > 3 && (
+                  <Link
+                    href="/cases"
+                    className='inline-flex items-center gap-1 text-[11px] font-medium text-sky-600 hover:text-sky-700'
+                  >
+                    Ver más próximas
+                    <ArrowRight className='h-3 w-3' />
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <p className='text-[12px] text-slate-500'>Aún no tienes etapas programadas. Revisa tu cartera y agenda los próximos hitos.</p>
+            )}
+
+            <div className='grid grid-cols-2 gap-2.5 text-[11px] text-slate-500'>
+              <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                <p className='text-[10px] uppercase tracking-[0.18em]'>Pendientes</p>
+                <p className='mt-2 text-lg font-semibold text-slate-900'>{stats.pendingRequests}</p>
+              </div>
+              <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                <p className='text-[10px] uppercase tracking-[0.18em]'>Hoy</p>
+                <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.today}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className='grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4'>
+        {metricCards.map((item) => (
+          <Card key={item.label} className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+            <CardContent className='space-y-2.5 p-4'>
+              <div className='flex items-center justify-between'>
+                <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>{item.label}</p>
+                <item.icon className='h-3.5 w-3.5 text-slate-400' />
+              </div>
+              <p className='text-xl font-semibold text-slate-900'>{item.value}</p>
+              <p className='text-[11px] text-slate-500'>{item.caption}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <section className='grid gap-4 lg:grid-cols-[2fr_1fr]'>
+        <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+          <CardHeader className='flex flex-col gap-2 p-4 pb-3 sm:flex-row sm:items-center sm:justify-between'>
+            <div>
+              <CardTitle className='text-base font-semibold text-slate-900'>Casos bajo tu responsabilidad</CardTitle>
+              <p className='text-xs text-slate-500'>Mantenlos al día para asegurar continuidad con tus clientes.</p>
+              {casesByStatusDisplay.length > 0 && (
+                <TooltipProvider delayDuration={200}>
+                  <div className='mt-2.5 flex flex-wrap gap-2'>
+                    {CASE_STATUS_FILTERS.map((item) => {
+                      const count = casesByStatusDisplay.find((row) => row.status === item.key)?.count ?? 0;
+                      const isActive = caseStatusFilter === item.key;
+                      return (
+                        <Tooltip key={item.key}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type='button'
+                              onClick={() => setCaseStatusFilter((prev) => (prev === item.key ? 'all' : item.key))}
+                              aria-pressed={isActive}
+                              className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition ${isActive
+                                ? 'border-sky-200 bg-sky-50 text-sky-800'
+                                : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                                }`}
+                            >
+                              <span className={isActive ? 'text-sky-700' : 'text-slate-500'}>{item.label}</span>
+                              <span className={isActive ? 'font-semibold text-sky-900' : 'font-semibold text-slate-900'}>
+                                {count}
+                              </span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side='bottom' align='start'>
+                            <p className='font-semibold'>{item.label}</p>
+                            <p className='mt-0.5 text-white/80'>{item.help}</p>
+                            <p className='mt-2 text-white/70'>
+                              Click para {isActive ? 'volver a ver todos' : `ver solo ${item.label.toLowerCase()}`}.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                </TooltipProvider>
+              )}
+              {caseStatusFilter !== 'all' && (
+                <p className='mt-2 text-[11px] text-slate-500'>
+                  Mostrando <span className='font-semibold text-slate-700'>{sortedCases.length}</span> caso(s) ·{' '}
+                  <span className='font-semibold text-slate-700'>
+                    {CASE_STATUS_FILTERS.find((f) => f.key === caseStatusFilter)?.label ?? 'Filtro'}
+                  </span>
+                  {sortedCases.length > casesPerPage ? ` · página ${clampedCasePage}/${totalCasePages}` : ''}
+                </p>
+              )}
+              <p className='mt-2 text-[11px] text-slate-500'>
+                Tip: pasa el mouse por cada categoría para ver su definición. Click filtra la tabla.
+              </p>
+            </div>
+            <Link href='/cases' className='text-[12px] font-medium text-sky-600 hover:text-sky-700'>
+              Ver todos
+            </Link>
+          </CardHeader>
+          <CardContent className='p-0'>
+            {paginatedCases.length === 0 ? (
+              <div className='px-4 py-10 text-[12px] text-slate-500'>
+                {profile.role === 'abogado'
+                  ? 'Aún no tienes casos asignados. El administrador debe derivarte un expediente.'
+                  : 'No hay casos disponibles para mostrar en este momento.'}
+              </div>
+            ) : (
+              <div className='overflow-x-auto'>
+                <table className='min-w-full divide-y divide-slate-100 text-[13px]'>
+                  <thead className='bg-slate-50/80 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                    <tr>
+                      <th scope='col' className='px-4 py-2.5 text-left'>Caso</th>
+                      <th scope='col' className='px-4 py-2.5 text-left'>Cliente</th>
+                      <th scope='col' className='px-4 py-2.5 text-left'>Estado</th>
+                      <th scope='col' className='px-4 py-2.5 text-left'>Próxima etapa</th>
+                      <th scope='col' className='px-4 py-2.5 text-left'>Valor</th>
+                      <th scope='col' className='px-4 py-2.5 text-right'>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className='divide-y divide-slate-100 text-slate-700'>
+                    {paginatedCases.map((caseItem) => {
+                      const effectiveStatus = effectiveCaseStatus(caseItem) ?? caseItem.estado ?? '';
+                      const phase = activePhaseLabel(caseItem);
+                      const upcoming = nextMilestone(caseItem);
+
+                      return (
+                        <tr key={caseItem.id} className='transition hover:bg-slate-50/70'>
+                          <td className='px-4 py-3 align-top'>
+                            <div className='space-y-1'>
+                              <p className='font-semibold text-slate-900'>{caseItem.caratulado}</p>
+                              {caseItem.numero_causa && (
+                                <p className='text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400'>
+                                  {caseItem.numero_causa}
+                                </p>
+                              )}
+                              {caseItem.materia && (
+                                <Badge variant='outline' className='border-slate-200 bg-slate-50 text-[10px] font-medium text-slate-600'>
+                                  {caseItem.materia}
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className='px-4 py-3 align-top'>
+                            <div className='space-y-1'>
+                              <p className='font-medium text-slate-800'>{caseItem.nombre_cliente}</p>
+                              {caseItem.rut_cliente && <p className='text-[11px] text-slate-500'>{caseItem.rut_cliente}</p>}
+                            </div>
+                          </td>
+                          <td className='px-4 py-3 align-top'>
+                            <div className='space-y-2'>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${STATUS_CHIPS[effectiveStatus] ?? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  }`}
+                              >
+                                {STATUS_LABELS[effectiveStatus] ?? (effectiveStatus || 'Sin estado')}
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${PRIORITY_CHIPS[caseItem.prioridad || 'media'] ??
+                                  'bg-slate-100 text-slate-600 border border-slate-200'
+                                  }`}
+                              >
+                                {caseItem.prioridad || 'media'}
+                              </span>
+                              {phase && (
+                                <span className='inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700'>
+                                  {phase}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className='px-4 py-3 align-top'>
+                            {upcoming ? (
+                              <div className='space-y-1'>
+                                <p className='text-[12px] font-medium text-slate-900'>{upcoming.label}</p>
+                                <p className='text-[11px] text-slate-500'>
+                                  {formatDate(upcoming.date)} · {formatRelativeTime(upcoming.date)}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className='text-[11px] text-slate-400'>Sin hitos con fecha</span>
+                            )}
+                          </td>
+                          <td className='px-4 py-3 align-top font-semibold text-slate-900'>
+                            {caseItem.valor_estimado ? formatCurrency(caseItem.valor_estimado) : <span className='font-normal text-slate-400'>-</span>}
+                          </td>
+                          <td className='px-4 py-3 align-top'>
+                            <div className='flex items-center justify-end'>
+                              <Link
+                                href={`/cases/${caseItem.id}`}
+                                className='inline-flex items-center gap-1 text-[12px] font-medium text-sky-600 hover:text-sky-700'
+                              >
+                                Ver detalle
+                                <ArrowRight className='h-3.5 w-3.5' />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {sortedCases.length > 0 && (
+              <div className='flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500'>
+                <span>
+                  Mostrando {sortedCases.length === 0 ? 0 : caseStart + 1}–{Math.min(caseEnd, sortedCases.length)} de{' '}
+                  {sortedCases.length}
+                </span>
+                <div className='flex items-center gap-2'>
+                  <label className='flex items-center gap-2'>
+                    <span className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>Por página</span>
+                    <select
+                      className='rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700'
+                      value={casesPerPage}
+                      onChange={(event) => {
+                        const nextValue = Number(event.target.value);
+                        setCasesPerPage(nextValue);
+                        setCasePage(1);
+                      }}
+                    >
+                      {[5, 10, 20, 30].map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className='flex items-center gap-1'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      className='h-7 px-2'
+                      onClick={() => setCasePage((prev) => Math.max(1, prev - 1))}
+                      disabled={clampedCasePage <= 1}
+                    >
+                      <ChevronLeft className='h-3.5 w-3.5' />
+                    </Button>
+                    <span className='min-w-[36px] text-center text-[11px] font-medium text-slate-700'>
+                      {clampedCasePage}/{totalCasePages}
+                    </span>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      className='h-7 px-2'
+                      onClick={() => setCasePage((prev) => Math.min(totalCasePages, prev + 1))}
+                      disabled={clampedCasePage >= totalCasePages}
+                    >
+                      <ChevronRight className='h-3.5 w-3.5' />
+                    </Button>
+                  </div>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className='space-y-4'>
+          <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
+            <CardHeader className='p-4 pb-3'>
+              <CardTitle className='text-xs font-semibold text-slate-800'>Panorama de tus casos</CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-3 px-4 pb-4 pt-0'>
+              {casesByStatusDisplay.length === 0 ? (
+                <p className='text-[12px] text-slate-500'>Aún no hay suficientes datos para mostrar tu distribución.</p>
+              ) : (
+                casesByStatusDisplay.map((item) => (
+                  <div key={item.status}>
+                    <div className='flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-500'>
+                      <span>{STATUS_LABELS[item.status] ?? item.status.replace(/_/g, ' ')}</span>
+                      <span className='font-medium text-slate-700'>{item.count}</span>
+                    </div>
+                    <div className='mt-2 h-2 rounded-full bg-slate-100'>
+                      <div
+                        className='h-2 rounded-full bg-sky-400'
+                        style={{ width: totalStatus === 0 ? '0%' : `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {casesByPriorityDisplay.length > 0 && (
+                <div className='mt-4 border-t border-slate-100 pt-3'>
+                  <p className='text-[10px] uppercase tracking-wide text-slate-500'>Prioridad</p>
+                  <div className='mt-3 grid grid-cols-2 gap-2.5'>
+                    {casesByPriorityDisplay.map((item) => (
+                      <div key={item.priority} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px]'>
+                        <p className='uppercase tracking-wide text-slate-500'>{item.priority}</p>
+                        <p className='mt-1 text-base font-semibold text-slate-900'>{item.count}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
-            <CardHeader className='p-4 pb-2'>
+            <CardHeader className='flex flex-row items-center justify-between p-4 pb-3'>
               <CardTitle className='flex items-center gap-2 text-xs font-semibold text-slate-800'>
                 <Calendar className='h-3.5 w-3.5 text-sky-500' />
-                Próxima acción
+                Próximas etapas
               </CardTitle>
+              {deadlines.length > 0 && (
+                <p className='text-[11px] text-slate-400'>{deadlines.length} registro{deadlines.length === 1 ? '' : 's'}</p>
+              )}
             </CardHeader>
-            <CardContent className='space-y-3 px-4 pb-4 pt-0'>
-              {deadlines.length > 0 ? (
-                <div className='space-y-2'>
-                  {deadlines.slice(0, 3).map((deadline: any) => (
-                    <button
-                      key={deadline.id}
-                      type='button'
-                      onClick={() => setSelectedDeadline(deadline)}
-                      className='w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-[12px] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm'
-                    >
-                      <div className='flex items-center justify-between gap-2'>
-                        <p className='min-w-0 truncate text-[12px] font-semibold text-slate-900'>
-                          {resolveCaseTitle(deadline)}
-                        </p>
-                        <span className='shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500'>
-                          {resolveCaseRole(deadline)}
-                        </span>
-                      </div>
-                      <p className='mt-1 truncate text-[11px] text-slate-500'>{resolveCaseClient(deadline)}</p>
-                      <p className='truncate text-[11px] text-slate-600'>{deadline.etapa || 'Actuación pendiente'}</p>
-                      <div className='mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-500'>
-                        <span className='truncate'>
-                          {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
-                        </span>
+            <CardContent className='space-y-2.5 px-4 pb-4 pt-0'>
+              {deadlines.length === 0 ? (
+                <p className='text-[12px] text-slate-500'>No hay etapas agendadas en los próximos 90 días.</p>
+              ) : (
+                deadlines.map((deadline: any) => {
+                  const caseId = deadline.case?.id;
+                  const content = (
+                    <>
+                      <p className='font-medium text-slate-900'>{deadline.case?.caratulado || 'Caso sin título'}</p>
+                      <p className='text-[11px] text-slate-500'>Etapa: {deadline.etapa}</p>
+                      <div className='mt-2 flex items-center justify-between text-[11px] text-slate-500'>
+                        <span>{deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}</span>
                         {deadline.fecha_programada && (
                           <span className='inline-flex items-center gap-1 text-sky-600'>
                             <Clock className='h-3 w-3' />
-                            <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
+                            {formatRelativeTime(deadline.fecha_programada)}
                           </span>
                         )}
                       </div>
-                    </button>
-                  ))}
-                  {deadlines.length > 3 && (
-                    <Link
-                      href="/cases"
-                      className='inline-flex items-center gap-1 text-[11px] font-medium text-sky-600 hover:text-sky-700'
-                    >
-                      Ver más próximas
-                      <ArrowRight className='h-3 w-3' />
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <p className='text-[12px] text-slate-500'>Aún no tienes etapas programadas. Revisa tu cartera y agenda los próximos hitos.</p>
-              )}
+                    </>
+                  );
 
-              <div className='grid grid-cols-2 gap-2.5 text-[11px] text-slate-500'>
-                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
-                  <p className='text-[10px] uppercase tracking-[0.18em]'>Pendientes</p>
-                  <p className='mt-2 text-lg font-semibold text-slate-900'>{stats.pendingRequests}</p>
-                </div>
-                <div className='rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
-                  <p className='text-[10px] uppercase tracking-[0.18em]'>Hoy</p>
-                  <p className='mt-2 text-lg font-semibold text-slate-900'>{bucketCounts.today}</p>
-                </div>
-              </div>
+                  if (caseId) {
+                    return (
+                      <Link
+                        key={deadline.id}
+                        href={`/cases/${caseId}`}
+                        className='block rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[12px] transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm'
+                      >
+                        {content}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <div key={deadline.id} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[12px]'>
+                      {content}
+                    </div>
+                  );
+                })
+              )}
             </CardContent>
           </Card>
-        </section>
 
-        <section className='grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4'>
-          {metricCards.map((item) => (
-            <Card key={item.label} className='rounded-xl border border-slate-200 bg-white shadow-sm'>
-              <CardContent className='space-y-2.5 p-4'>
-                <div className='flex items-center justify-between'>
-                  <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>{item.label}</p>
-                  <item.icon className='h-3.5 w-3.5 text-slate-400' />
-                </div>
-                <p className='text-xl font-semibold text-slate-900'>{item.value}</p>
-                <p className='text-[11px] text-slate-500'>{item.caption}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
+          {/* Calendar Sync Panel */}
+          <CalendarSyncPanel
+            events={allDeadlines.map((deadline: any) => ({
+              id: deadline.id,
+              title: `${deadline.etapa || 'Actuación'} - ${resolveCaseTitle(deadline)}`,
+              start: deadline.fecha_programada || new Date().toISOString(),
+              end: deadline.fecha_programada || new Date().toISOString(),
+              description: `Cliente: ${resolveCaseClient(deadline)}`,
+              location: deadline.ubicacion || '',
+            }))}
+            userEmail={profile.email}
+          />
 
-        <section className='grid gap-4 lg:grid-cols-[2fr_1fr]'>
-          <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
-            <CardHeader className='flex flex-col gap-2 p-4 pb-3 sm:flex-row sm:items-center sm:justify-between'>
-              <div>
-                <CardTitle className='text-base font-semibold text-slate-900'>Casos bajo tu responsabilidad</CardTitle>
-                <p className='text-xs text-slate-500'>Mantenlos al día para asegurar continuidad con tus clientes.</p>
-                {casesByStatusDisplay.length > 0 && (
-                  <TooltipProvider delayDuration={200}>
-                    <div className='mt-2.5 flex flex-wrap gap-2'>
-                      {CASE_STATUS_FILTERS.map((item) => {
-                        const count = casesByStatusDisplay.find((row) => row.status === item.key)?.count ?? 0;
-                        const isActive = caseStatusFilter === item.key;
-                        return (
-                          <Tooltip key={item.key}>
-                            <TooltipTrigger asChild>
-                              <button
-                                type='button'
-                                onClick={() => setCaseStatusFilter((prev) => (prev === item.key ? 'all' : item.key))}
-                                aria-pressed={isActive}
-                                className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition ${
-                                  isActive
-                                    ? 'border-sky-200 bg-sky-50 text-sky-800'
-                                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                                }`}
-                              >
-                                <span className={isActive ? 'text-sky-700' : 'text-slate-500'}>{item.label}</span>
-                                <span className={isActive ? 'font-semibold text-sky-900' : 'font-semibold text-slate-900'}>
-                                  {count}
-                                </span>
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side='bottom' align='start'>
-                              <p className='font-semibold'>{item.label}</p>
-                              <p className='mt-0.5 text-white/80'>{item.help}</p>
-                              <p className='mt-2 text-white/70'>
-                                Click para {isActive ? 'volver a ver todos' : `ver solo ${item.label.toLowerCase()}`}.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })}
-                    </div>
-                  </TooltipProvider>
-                )}
-                {caseStatusFilter !== 'all' && (
-                  <p className='mt-2 text-[11px] text-slate-500'>
-                    Mostrando <span className='font-semibold text-slate-700'>{sortedCases.length}</span> caso(s) ·{' '}
-                    <span className='font-semibold text-slate-700'>
-                      {CASE_STATUS_FILTERS.find((f) => f.key === caseStatusFilter)?.label ?? 'Filtro'}
-                    </span>
-                    {sortedCases.length > casesPerPage ? ` · página ${clampedCasePage}/${totalCasePages}` : ''}
-                  </p>
-                )}
-                <p className='mt-2 text-[11px] text-slate-500'>
-                  Tip: pasa el mouse por cada categoría para ver su definición. Click filtra la tabla.
+        </div>
+      </section>
+
+      <section className='space-y-4'>
+        <h2 className='text-sm font-semibold text-slate-800'>Herramientas rápidas</h2>
+        <div className='grid gap-4 lg:grid-cols-2'>
+          <QuickLinksPanel links={quickLinks} />
+          <TemplateLibrary templates={templates} />
+        </div>
+      </section>
+
+      <Dialog
+        open={Boolean(selectedDeadline)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedDeadline(null);
+        }}
+      >
+        <DialogContent className='max-w-xl'>
+          <DialogHeader className='space-y-2'>
+            <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Vista previa</p>
+            <DialogTitle className='text-xl'>
+              {selectedDeadline?.etapa || 'Actuación pendiente'}
+            </DialogTitle>
+            <DialogDescription className='text-[12px]'>
+              {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
+              {selectedDeadline ? ` · ${resolveCaseClient(selectedDeadline)}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='grid gap-4'>
+            <div className='flex flex-wrap items-center gap-2 text-[11px] text-slate-500'>
+              <span className='rounded-full border border-slate-200 bg-slate-50 px-2 py-1'>
+                {selectedDeadline?.fecha_programada ? formatDate(selectedDeadline.fecha_programada) : 'Sin fecha'}
+              </span>
+              {selectedDeadline?.fecha_programada && (
+                <span className='inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-sky-600'>
+                  <Clock className='h-3 w-3' />
+                  {formatRelativeTime(selectedDeadline.fecha_programada)}
+                </span>
+              )}
+              {previewCase?.numero_causa && (
+                <span className='rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-600'>
+                  N° {previewCase.numero_causa}
+                </span>
+              )}
+            </div>
+
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
+                <p className='uppercase tracking-[0.18em] text-slate-400'>Caso</p>
+                <p className='mt-2 text-[12px] font-semibold text-slate-900'>
+                  {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
                 </p>
               </div>
-              <Link href='/cases' className='text-[12px] font-medium text-sky-600 hover:text-sky-700'>
-                Ver todos
-              </Link>
-            </CardHeader>
-            <CardContent className='p-0'>
-              {paginatedCases.length === 0 ? (
-                <div className='px-4 py-10 text-[12px] text-slate-500'>
-                  {profile.role === 'abogado'
-                    ? 'Aún no tienes casos asignados. El administrador debe derivarte un expediente.'
-                    : 'No hay casos disponibles para mostrar en este momento.'}
-                </div>
-              ) : (
-                <div className='overflow-x-auto'>
-                  <table className='min-w-full divide-y divide-slate-100 text-[13px]'>
-                    <thead className='bg-slate-50/80 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500'>
-                      <tr>
-                        <th scope='col' className='px-4 py-2.5 text-left'>Caso</th>
-                        <th scope='col' className='px-4 py-2.5 text-left'>Cliente</th>
-                        <th scope='col' className='px-4 py-2.5 text-left'>Estado</th>
-                        <th scope='col' className='px-4 py-2.5 text-left'>Próxima etapa</th>
-                        <th scope='col' className='px-4 py-2.5 text-left'>Valor</th>
-                        <th scope='col' className='px-4 py-2.5 text-right'>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className='divide-y divide-slate-100 text-slate-700'>
-                      {paginatedCases.map((caseItem) => {
-                        const effectiveStatus = effectiveCaseStatus(caseItem) ?? caseItem.estado ?? '';
-                        const phase = activePhaseLabel(caseItem);
-                        const upcoming = nextMilestone(caseItem);
-
-                        return (
-                          <tr key={caseItem.id} className='transition hover:bg-slate-50/70'>
-                            <td className='px-4 py-3 align-top'>
-                              <div className='space-y-1'>
-                                <p className='font-semibold text-slate-900'>{caseItem.caratulado}</p>
-                                {caseItem.numero_causa && (
-                                  <p className='text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400'>
-                                    {caseItem.numero_causa}
-                                  </p>
-                                )}
-                                {caseItem.materia && (
-                                  <Badge variant='outline' className='border-slate-200 bg-slate-50 text-[10px] font-medium text-slate-600'>
-                                    {caseItem.materia}
-                                  </Badge>
-                                )}
-                              </div>
-                            </td>
-                            <td className='px-4 py-3 align-top'>
-                              <div className='space-y-1'>
-                                <p className='font-medium text-slate-800'>{caseItem.nombre_cliente}</p>
-                                {caseItem.rut_cliente && <p className='text-[11px] text-slate-500'>{caseItem.rut_cliente}</p>}
-                              </div>
-                            </td>
-                            <td className='px-4 py-3 align-top'>
-                              <div className='space-y-2'>
-                                <span
-                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${
-                                    STATUS_CHIPS[effectiveStatus] ?? 'bg-slate-100 text-slate-600 border border-slate-200'
-                                  }`}
-                                >
-                                  {STATUS_LABELS[effectiveStatus] ?? (effectiveStatus || 'Sin estado')}
-                                </span>
-                                <span
-                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                                    PRIORITY_CHIPS[caseItem.prioridad || 'media'] ??
-                                    'bg-slate-100 text-slate-600 border border-slate-200'
-                                  }`}
-                                >
-                                  {caseItem.prioridad || 'media'}
-                                </span>
-                                {phase && (
-                                  <span className='inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700'>
-                                    {phase}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className='px-4 py-3 align-top'>
-                              {upcoming ? (
-                                <div className='space-y-1'>
-                                  <p className='text-[12px] font-medium text-slate-900'>{upcoming.label}</p>
-                                  <p className='text-[11px] text-slate-500'>
-                                    {formatDate(upcoming.date)} · {formatRelativeTime(upcoming.date)}
-                                  </p>
-                                </div>
-                              ) : (
-                                <span className='text-[11px] text-slate-400'>Sin hitos con fecha</span>
-                              )}
-                            </td>
-                            <td className='px-4 py-3 align-top font-semibold text-slate-900'>
-                              {caseItem.valor_estimado ? formatCurrency(caseItem.valor_estimado) : <span className='font-normal text-slate-400'>-</span>}
-                            </td>
-                            <td className='px-4 py-3 align-top'>
-                              <div className='flex items-center justify-end'>
-                                <Link
-                                  href={`/cases/${caseItem.id}`}
-                                  className='inline-flex items-center gap-1 text-[12px] font-medium text-sky-600 hover:text-sky-700'
-                                >
-                                  Ver detalle
-                                  <ArrowRight className='h-3.5 w-3.5' />
-                                </Link>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {sortedCases.length > 0 && (
-                <div className='flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500'>
-                  <span>
-                    Mostrando {sortedCases.length === 0 ? 0 : caseStart + 1}–{Math.min(caseEnd, sortedCases.length)} de{' '}
-                    {sortedCases.length}
-                  </span>
-                  <div className='flex items-center gap-2'>
-                    <label className='flex items-center gap-2'>
-                      <span className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>Por página</span>
-                      <select
-                        className='rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700'
-                        value={casesPerPage}
-                        onChange={(event) => {
-                          const nextValue = Number(event.target.value);
-                          setCasesPerPage(nextValue);
-                          setCasePage(1);
-                        }}
-                      >
-                        {[5, 10, 20, 30].map((value) => (
-                          <option key={value} value={value}>
-                            {value}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className='flex items-center gap-1'>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='h-7 px-2'
-                        onClick={() => setCasePage((prev) => Math.max(1, prev - 1))}
-                        disabled={clampedCasePage <= 1}
-                      >
-                        <ChevronLeft className='h-3.5 w-3.5' />
-                      </Button>
-                      <span className='min-w-[36px] text-center text-[11px] font-medium text-slate-700'>
-                        {clampedCasePage}/{totalCasePages}
-                      </span>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='h-7 px-2'
-                        onClick={() => setCasePage((prev) => Math.min(totalCasePages, prev + 1))}
-                        disabled={clampedCasePage >= totalCasePages}
-                      >
-                        <ChevronRight className='h-3.5 w-3.5' />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className='space-y-4'>
-            <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
-              <CardHeader className='p-4 pb-3'>
-                <CardTitle className='text-xs font-semibold text-slate-800'>Panorama de tus casos</CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-3 px-4 pb-4 pt-0'>
-                {casesByStatusDisplay.length === 0 ? (
-                  <p className='text-[12px] text-slate-500'>Aún no hay suficientes datos para mostrar tu distribución.</p>
-                ) : (
-                  casesByStatusDisplay.map((item) => (
-                    <div key={item.status}>
-                      <div className='flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-500'>
-                        <span>{STATUS_LABELS[item.status] ?? item.status.replace(/_/g, ' ')}</span>
-                        <span className='font-medium text-slate-700'>{item.count}</span>
-                      </div>
-                      <div className='mt-2 h-2 rounded-full bg-slate-100'>
-                        <div
-                          className='h-2 rounded-full bg-sky-400'
-                          style={{ width: totalStatus === 0 ? '0%' : `${item.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                )}
-
-                {casesByPriorityDisplay.length > 0 && (
-                  <div className='mt-4 border-t border-slate-100 pt-3'>
-                    <p className='text-[10px] uppercase tracking-wide text-slate-500'>Prioridad</p>
-                    <div className='mt-3 grid grid-cols-2 gap-2.5'>
-                      {casesByPriorityDisplay.map((item) => (
-                        <div key={item.priority} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px]'>
-                          <p className='uppercase tracking-wide text-slate-500'>{item.priority}</p>
-                          <p className='mt-1 text-base font-semibold text-slate-900'>{item.count}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className='rounded-xl border border-slate-200 bg-white shadow-sm'>
-              <CardHeader className='flex flex-row items-center justify-between p-4 pb-3'>
-                <CardTitle className='flex items-center gap-2 text-xs font-semibold text-slate-800'>
-                  <Calendar className='h-3.5 w-3.5 text-sky-500' />
-                  Próximas etapas
-                </CardTitle>
-                {deadlines.length > 0 && (
-                  <p className='text-[11px] text-slate-400'>{deadlines.length} registro{deadlines.length === 1 ? '' : 's'}</p>
-                )}
-              </CardHeader>
-              <CardContent className='space-y-2.5 px-4 pb-4 pt-0'>
-                {deadlines.length === 0 ? (
-                  <p className='text-[12px] text-slate-500'>No hay etapas agendadas en los próximos 90 días.</p>
-                ) : (
-                  deadlines.map((deadline: any) => {
-                    const caseId = deadline.case?.id;
-                    const content = (
-                      <>
-                        <p className='font-medium text-slate-900'>{deadline.case?.caratulado || 'Caso sin título'}</p>
-                        <p className='text-[11px] text-slate-500'>Etapa: {deadline.etapa}</p>
-                        <div className='mt-2 flex items-center justify-between text-[11px] text-slate-500'>
-                          <span>{deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}</span>
-                          {deadline.fecha_programada && (
-                            <span className='inline-flex items-center gap-1 text-sky-600'>
-                              <Clock className='h-3 w-3' />
-                              {formatRelativeTime(deadline.fecha_programada)}
-                            </span>
-                          )}
-                        </div>
-                      </>
-                    );
-
-                    if (caseId) {
-                      return (
-                        <Link
-                          key={deadline.id}
-                          href={`/cases/${caseId}`}
-                          className='block rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[12px] transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm'
-                        >
-                          {content}
-                        </Link>
-                      );
-                    }
-
-                    return (
-                      <div key={deadline.id} className='rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[12px]'>
-                        {content}
-                      </div>
-                    );
-                  })
-                )}
-              </CardContent>
-            </Card>
-
-          </div>
-        </section>
-
-        <section className='space-y-4'>
-          <h2 className='text-sm font-semibold text-slate-800'>Herramientas rápidas</h2>
-          <div className='grid gap-4 lg:grid-cols-2'>
-            <QuickLinksPanel links={quickLinks} />
-            <TemplateLibrary templates={templates} />
-          </div>
-        </section>
-
-        <Dialog
-          open={Boolean(selectedDeadline)}
-          onOpenChange={(open) => {
-            if (!open) setSelectedDeadline(null);
-          }}
-        >
-          <DialogContent className='max-w-xl'>
-            <DialogHeader className='space-y-2'>
-              <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Vista previa</p>
-              <DialogTitle className='text-xl'>
-                {selectedDeadline?.etapa || 'Actuación pendiente'}
-              </DialogTitle>
-              <DialogDescription className='text-[12px]'>
-                {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
-                {selectedDeadline ? ` · ${resolveCaseClient(selectedDeadline)}` : ''}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className='grid gap-4'>
-              <div className='flex flex-wrap items-center gap-2 text-[11px] text-slate-500'>
-                <span className='rounded-full border border-slate-200 bg-slate-50 px-2 py-1'>
-                  {selectedDeadline?.fecha_programada ? formatDate(selectedDeadline.fecha_programada) : 'Sin fecha'}
-                </span>
-                {selectedDeadline?.fecha_programada && (
-                  <span className='inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-sky-600'>
-                    <Clock className='h-3 w-3' />
-                    {formatRelativeTime(selectedDeadline.fecha_programada)}
-                  </span>
-                )}
-                {previewCase?.numero_causa && (
-                  <span className='rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-600'>
-                    N° {previewCase.numero_causa}
-                  </span>
+              <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
+                <p className='uppercase tracking-[0.18em] text-slate-400'>Cliente</p>
+                <p className='mt-2 text-[12px] font-semibold text-slate-900'>
+                  {selectedDeadline ? resolveCaseClient(selectedDeadline) : 'Cliente sin registro'}
+                </p>
+                {previewCase?.rut_cliente && (
+                  <p className='mt-1 text-[10px] text-slate-500'>RUT {previewCase.rut_cliente}</p>
                 )}
               </div>
+              <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
+                <p className='uppercase tracking-[0.18em] text-slate-400'>Estado</p>
+                <p className='mt-2 text-[12px] font-semibold text-slate-900'>
+                  {previewStatus ? STATUS_LABELS[previewStatus] ?? previewStatus : 'Sin estado'}
+                </p>
+              </div>
+              <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
+                <p className='uppercase tracking-[0.18em] text-slate-400'>Prioridad</p>
+                <p className='mt-2 text-[12px] font-semibold text-slate-900'>
+                  {previewCase?.prioridad ?? 'media'}
+                </p>
+              </div>
+              <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
+                <p className='uppercase tracking-[0.18em] text-slate-400'>Materia</p>
+                <p className='mt-2 text-[12px] font-semibold text-slate-900'>
+                  {previewCase?.materia ?? 'Sin materia'}
+                </p>
+              </div>
+              <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
+                <p className='uppercase tracking-[0.18em] text-slate-400'>Valor estimado</p>
+                <p className='mt-2 text-[12px] font-semibold text-slate-900'>
+                  {previewCase?.valor_estimado ? formatCurrency(previewCase.valor_estimado) : '-'}
+                </p>
+              </div>
+            </div>
 
-              <div className='grid gap-3 sm:grid-cols-2'>
-                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
-                  <p className='uppercase tracking-[0.18em] text-slate-400'>Caso</p>
-                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
-                    {selectedDeadline ? resolveCaseTitle(selectedDeadline) : 'Caso sin título'}
-                  </p>
-                </div>
-                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
-                  <p className='uppercase tracking-[0.18em] text-slate-400'>Cliente</p>
-                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
-                    {selectedDeadline ? resolveCaseClient(selectedDeadline) : 'Cliente sin registro'}
-                  </p>
-                  {previewCase?.rut_cliente && (
-                    <p className='mt-1 text-[10px] text-slate-500'>RUT {previewCase.rut_cliente}</p>
+            {selectedDeadline?.descripcion && (
+              <div className='rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600'>
+                <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>Detalle</p>
+                <p className='mt-2 leading-relaxed text-slate-700'>{selectedDeadline.descripcion}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className='gap-2'>
+            <DialogClose asChild>
+              <Button variant='outline' size='sm'>Cerrar</Button>
+            </DialogClose>
+            {selectedDeadline?.case?.id && (
+              <Button asChild size='sm'>
+                <Link href={`/cases/${selectedDeadline.case.id}`}>Ver caso completo</Link>
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(moreColumn)}
+        onOpenChange={(open) => {
+          if (!open) setMoreColumn(null);
+        }}
+      >
+        <DialogContent className='max-w-lg'>
+          <DialogHeader className='space-y-2'>
+            <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Agenda completa</p>
+            <DialogTitle className='text-lg'>
+              {moreColumn ? CALENDAR_COLUMNS.find((col) => col.key === moreColumn)?.label : 'Actuaciones'}
+            </DialogTitle>
+            <DialogDescription className='text-[12px]'>
+              {moreColumn ? (calendarBuckets[moreColumn]?.length ?? 0) : 0} actuaciones registradas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='max-h-[320px] space-y-2 overflow-y-auto pr-1'>
+            {(moreColumn ? calendarBuckets[moreColumn] ?? [] : []).map((deadline) => (
+              <button
+                key={deadline.id}
+                type='button'
+                onClick={() => {
+                  setMoreColumn(null);
+                  setSelectedDeadline(deadline);
+                }}
+                className='w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-[12px] transition hover:border-slate-300 hover:bg-slate-50'
+              >
+                <div className='flex items-center justify-between gap-2 text-[10px] text-slate-500'>
+                  <span className='truncate'>
+                    {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
+                  </span>
+                  {deadline.fecha_programada && (
+                    <span className='inline-flex items-center gap-1 text-sky-600'>
+                      <Clock className='h-3 w-3' />
+                      <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
+                    </span>
                   )}
                 </div>
-                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
-                  <p className='uppercase tracking-[0.18em] text-slate-400'>Estado</p>
-                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
-                    {previewStatus ? STATUS_LABELS[previewStatus] ?? previewStatus : 'Sin estado'}
-                  </p>
-                </div>
-                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
-                  <p className='uppercase tracking-[0.18em] text-slate-400'>Prioridad</p>
-                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
-                    {previewCase?.prioridad ?? 'media'}
-                  </p>
-                </div>
-                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
-                  <p className='uppercase tracking-[0.18em] text-slate-400'>Materia</p>
-                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
-                    {previewCase?.materia ?? 'Sin materia'}
-                  </p>
-                </div>
-                <div className='rounded-lg border border-slate-200 bg-white p-2.5 text-[11px]'>
-                  <p className='uppercase tracking-[0.18em] text-slate-400'>Valor estimado</p>
-                  <p className='mt-2 text-[12px] font-semibold text-slate-900'>
-                    {previewCase?.valor_estimado ? formatCurrency(previewCase.valor_estimado) : '-'}
-                  </p>
-                </div>
-              </div>
+                <p className='mt-1 truncate font-semibold text-slate-900'>
+                  {deadline.etapa || 'Actuación pendiente'}
+                </p>
+                <p className='truncate text-[11px] text-slate-600'>{resolveCaseTitle(deadline)}</p>
+                <p className='truncate text-[10px] text-slate-500'>{resolveCaseClient(deadline)}</p>
+              </button>
+            ))}
+          </div>
 
-              {selectedDeadline?.descripcion && (
-                <div className='rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600'>
-                  <p className='text-[10px] uppercase tracking-[0.18em] text-slate-400'>Detalle</p>
-                  <p className='mt-2 leading-relaxed text-slate-700'>{selectedDeadline.descripcion}</p>
-                </div>
-              )}
-            </div>
+          <DialogFooter className='gap-2'>
+            <DialogClose asChild>
+              <Button variant='outline' size='sm'>Cerrar</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-            <DialogFooter className='gap-2'>
-              <DialogClose asChild>
-                <Button variant='outline' size='sm'>Cerrar</Button>
-              </DialogClose>
-              {selectedDeadline?.case?.id && (
-                <Button asChild size='sm'>
-                  <Link href={`/cases/${selectedDeadline.case.id}`}>Ver caso completo</Link>
-                </Button>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
-          open={Boolean(moreColumn)}
-          onOpenChange={(open) => {
-            if (!open) setMoreColumn(null);
+      {/* Actuacion Quick Form */}
+      {selectedCaseForActuacion && (
+        <ActuacionQuickForm
+          caseId={selectedCaseForActuacion.id}
+          caseName={selectedCaseForActuacion.name}
+          type="audiencia"
+          isOpen={actuacionFormOpen}
+          onClose={() => {
+            setActuacionFormOpen(false);
+            setSelectedCaseForActuacion(null);
           }}
-        >
-          <DialogContent className='max-w-lg'>
-            <DialogHeader className='space-y-2'>
-              <p className='text-[10px] uppercase tracking-[0.22em] text-slate-400'>Agenda completa</p>
-              <DialogTitle className='text-lg'>
-                {moreColumn ? CALENDAR_COLUMNS.find((col) => col.key === moreColumn)?.label : 'Actuaciones'}
-              </DialogTitle>
-              <DialogDescription className='text-[12px]'>
-                {moreColumn ? (calendarBuckets[moreColumn]?.length ?? 0) : 0} actuaciones registradas.
-              </DialogDescription>
-            </DialogHeader>
+          onSuccess={() => {
+            router.refresh();
+          }}
+        />
+      )}
 
-            <div className='max-h-[320px] space-y-2 overflow-y-auto pr-1'>
-              {(moreColumn ? calendarBuckets[moreColumn] ?? [] : []).map((deadline) => (
-                <button
-                  key={deadline.id}
-                  type='button'
-                  onClick={() => {
-                    setMoreColumn(null);
-                    setSelectedDeadline(deadline);
-                  }}
-                  className='w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-[12px] transition hover:border-slate-300 hover:bg-slate-50'
-                >
-                  <div className='flex items-center justify-between gap-2 text-[10px] text-slate-500'>
-                    <span className='truncate'>
-                      {deadline.fecha_programada ? formatDate(deadline.fecha_programada) : 'Sin fecha'}
-                    </span>
-                    {deadline.fecha_programada && (
-                      <span className='inline-flex items-center gap-1 text-sky-600'>
-                        <Clock className='h-3 w-3' />
-                        <span className='truncate'>{formatRelativeTime(deadline.fecha_programada)}</span>
-                      </span>
-                    )}
-                  </div>
-                  <p className='mt-1 truncate font-semibold text-slate-900'>
-                    {deadline.etapa || 'Actuación pendiente'}
-                  </p>
-                  <p className='truncate text-[11px] text-slate-600'>{resolveCaseTitle(deadline)}</p>
-                  <p className='truncate text-[10px] text-slate-500'>{resolveCaseClient(deadline)}</p>
-                </button>
-              ))}
-            </div>
-
-            <DialogFooter className='gap-2'>
-              <DialogClose asChild>
-                <Button variant='outline' size='sm'>Cerrar</Button>
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      {/* Quick Action FAB */}
+      <QuickActionFAB />
     </div>
   );
 }

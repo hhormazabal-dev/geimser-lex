@@ -19,7 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatRUT } from '@/lib/utils';
-import { FileText, Loader2, PlusCircle, Users } from 'lucide-react';
+import { FileText, Loader2, PlusCircle, Users, HelpCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ClientFormState {
   nombre: string;
@@ -261,9 +262,9 @@ export default function ClientsPage() {
     const lawyer = value?.abogado_responsable;
     const abogado = lawyer
       ? {
-          id: typeof lawyer === 'object' && lawyer !== null ? (lawyer.id as string) : (lawyer as string),
-          nombre: typeof lawyer === 'object' && lawyer !== null ? (lawyer.nombre ?? null) : null,
-        }
+        id: typeof lawyer === 'object' && lawyer !== null ? (lawyer.id as string) : (lawyer as string),
+        nombre: typeof lawyer === 'object' && lawyer !== null ? (lawyer.nombre ?? null) : null,
+      }
       : null;
 
     return {
@@ -448,17 +449,36 @@ export default function ClientsPage() {
                 </div>
               </div>
 
-              <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-700">
-                <input
-                  id="require_biometric"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  checked={form.require_biometric}
-                  onChange={handleChange('require_biometric')}
-                />
-                Requerir validación biométrica (Didit)
-              </label>
-
+              <div className='flex items-center gap-2'>
+                <TooltipProvider delayDuration={200}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type='checkbox'
+                      id="require_biometric"
+                      className='h-4 w-4 rounded border-slate-200 text-sky-600 focus:ring-2 focus:ring-sky-500'
+                      checked={form.require_biometric}
+                      onChange={handleChange('require_biometric')}
+                    />
+                    <Label htmlFor='require_biometric' className='text-sm text-slate-700'>
+                      Validación Biométrica (Didit)
+                    </Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-slate-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="font-semibold">Validación Biométrica con Didit</p>
+                        <p className="mt-1 text-xs text-white/80">
+                          Verifica la identidad del cliente mediante reconocimiento facial y validación de documentos oficiales (Cédula de Identidad, Pasaporte).
+                        </p>
+                        <p className="mt-2 text-xs text-white/70">
+                          Esta verificación aumenta la seguridad y cumplimiento normativo del proceso.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
+              </div>
               <Button type="submit" className="flex items-center gap-2" disabled={isCreating}>
                 {isCreating ? (
                   <>
@@ -656,13 +676,13 @@ export default function ClientsPage() {
                                         {alreadyLinked
                                           ? 'Ya asignado'
                                           : assignState.assigningCaseId === caseOption.id
-                                          ? (
-                                            <span className="flex items-center gap-2">
-                                              <Loader2 className="h-4 w-4 animate-spin" />
-                                              Asignando…
-                                            </span>
-                                          )
-                                          : 'Asignar'}
+                                            ? (
+                                              <span className="flex items-center gap-2">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                Asignando…
+                                              </span>
+                                            )
+                                            : 'Asignar'}
                                       </Button>
                                     </li>
                                   );

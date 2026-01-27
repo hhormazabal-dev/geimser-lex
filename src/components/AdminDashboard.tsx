@@ -32,6 +32,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn, formatCurrency, formatDate, formatRelativeTime, getInitials, stringToColor } from '@/lib/utils';
+import { CurrencyIndicator } from '@/components/CurrencyIndicator';
+import { QuickActionFAB } from '@/components/QuickActionFAB';
 
 import type { WorkQueueData } from '@/lib/actions/work-queue';
 import type {
@@ -252,22 +254,16 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
         description="Acción primero (Inbox + Insights), luego tendencias y pipeline. Drill‑down directo a listas operables."
         actions={
           <>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" size="default" className="shadow-sm">
               <Link href="/inbox" className="inline-flex items-center gap-2">
                 <Inbox className="h-4 w-4" />
-                Inbox
+                Abrir Inbox
               </Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link href="/cases" className="inline-flex items-center gap-2">
+            <Button asChild size="default" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg">
+              <Link href="/cases/new" className="inline-flex items-center gap-2">
                 <FolderOpen className="h-4 w-4" />
-                Casos
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/admin/clients" className="inline-flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Cartera
+                Nuevo Caso
               </Link>
             </Button>
           </>
@@ -808,6 +804,18 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
+          {/* Currency Indicators */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Indicadores económicos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <CurrencyIndicator type="UF" />
+              <CurrencyIndicator type="UTM" />
+              <CurrencyIndicator type="USD" />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Actividad reciente</CardTitle>
@@ -836,6 +844,9 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
           </Card>
         </aside>
       </div>
+
+      {/* Quick Action FAB */}
+      <QuickActionFAB />
     </div>
   );
 }

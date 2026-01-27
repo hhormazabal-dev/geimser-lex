@@ -165,22 +165,6 @@ export function buildSidebarItems(
         keywords: ['alertas', 'recordatorios'],
       },
       {
-        href: '/pjud',
-        label: 'PJUD',
-        description: 'Consulta causas por RUT',
-        icon: <Gavel className="h-4 w-4" />,
-        group: 'Herramientas',
-        keywords: ['poder judicial', 'rut', 'consulta'],
-      },
-      {
-        href: '/compliance',
-        label: 'Compliance',
-        description: 'Monitoreo 24/7 y fuentes',
-        icon: <ShieldCheck className="h-4 w-4" />,
-        group: 'Herramientas',
-        keywords: ['compliance', 'monitoreo', 'stakeholders', 'rut'],
-      },
-      {
         href: '/empresa/usuarios',
         label: 'Usuarios',
         description: 'Equipo de tu empresa',
@@ -270,22 +254,6 @@ export function buildSidebarItems(
         group: 'Comunicación',
         keywords: ['alertas'],
       },
-      {
-        href: '/pjud',
-        label: 'PJUD',
-        description: 'Consulta causas por RUT',
-        icon: <Gavel className="h-4 w-4" />,
-        group: 'Herramientas',
-        keywords: ['poder judicial', 'rut'],
-      },
-      {
-        href: '/compliance',
-        label: 'Compliance',
-        description: 'Monitoreo y sujetos por RUT',
-        icon: <ShieldCheck className="h-4 w-4" />,
-        group: 'Herramientas',
-        keywords: ['compliance', 'monitoreo', 'rut'],
-      },
     ];
 
     if (transitionItem) items.push(transitionItem);
@@ -342,22 +310,6 @@ export function buildSidebarItems(
         icon: <Bell className="h-4 w-4" />,
         group: 'Comunicación',
         keywords: ['alertas'],
-      },
-      {
-        href: '/pjud',
-        label: 'PJUD',
-        description: 'Consulta causas por RUT',
-        icon: <Gavel className="h-4 w-4" />,
-        group: 'Herramientas',
-        keywords: ['poder judicial', 'rut'],
-      },
-      {
-        href: '/compliance',
-        label: 'Compliance',
-        description: 'Monitoreo y fuentes',
-        icon: <ShieldCheck className="h-4 w-4" />,
-        group: 'Herramientas',
-        keywords: ['compliance', 'monitoreo'],
       },
       {
         href: '/admin/trash',
