@@ -516,7 +516,11 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
         .limit(1)
         .maybeSingle();
 
-      if (nextStage && (nextStage.etapa === 'Sentencia' || nextStage.etapa === 'Sentencia laboral')) {
+      if (
+        nextStage &&
+        nextStage.etapa.toLowerCase().includes('sentencia') &&
+        !nextStage.etapa.toLowerCase().includes('en espera')
+      ) {
         await supabase
           .from('case_stages')
           .update({ etapa: 'En espera de sentencia' })
