@@ -97,7 +97,7 @@ const PROCEDURE_STAGE_TEMPLATES: Record<
     { etapa: 'Contestación y reconvención', descripcion: 'Respuesta del demandado y eventuales reconvenciones.', diasEstimados: 20 },
     { etapa: 'Audiencia preparatoria', descripcion: 'Determinación de hechos a probar y medios de prueba.', diasEstimados: 25 },
     { etapa: 'Prueba y alegatos', descripcion: 'Producción de prueba documental, testimonial y alegatos finales.', diasEstimados: 40 },
-    { etapa: 'Sentencia', descripcion: 'Decisión del tribunal y notificación a las partes.', diasEstimados: 45 },
+    { etapa: 'En espera de sentencia', descripcion: 'Decisión del tribunal y notificación a las partes.', diasEstimados: 45 },
     { etapa: 'Ejecución o recursos', descripcion: 'Cumplimiento del fallo o tramitación de recursos.', diasEstimados: 30 },
   ],
   Laboral: [
@@ -105,7 +105,7 @@ const PROCEDURE_STAGE_TEMPLATES: Record<
     { etapa: 'Citaciones y notificación empleador', descripcion: 'Notificación de la demanda y citación a audiencia preparatoria.', diasEstimados: 10 },
     { etapa: 'Audiencia preparatoria', descripcion: 'Intento de conciliación y fijación de puntos controvertidos.', diasEstimados: 15 },
     { etapa: 'Audiencia de juicio', descripcion: 'Producción de prueba y alegatos finales.', diasEstimados: 20 },
-    { etapa: 'Sentencia laboral', descripcion: 'Pronunciamiento del tribunal y notificación a las partes.', diasEstimados: 15 },
+    { etapa: 'En espera de sentencia', descripcion: 'Pronunciamiento del tribunal y notificación a las partes.', diasEstimados: 15 },
     { etapa: 'Cumplimiento / Recurso de nulidad', descripcion: 'Tramitación de recursos o ejecución de la sentencia.', diasEstimados: 20 },
   ],
   Familia: [
@@ -113,7 +113,7 @@ const PROCEDURE_STAGE_TEMPLATES: Record<
     { etapa: 'Notificación y citación a audiencia', descripcion: 'Notificación a la contraparte y citación a audiencia preparatoria.', diasEstimados: 10 },
     { etapa: 'Audiencia preparatoria', descripcion: 'Determinación de puntos controvertidos y acumulación de prueba.', diasEstimados: 15 },
     { etapa: 'Audiencia de juicio', descripcion: 'Presentación de prueba, declaraciones y alegatos.', diasEstimados: 20 },
-    { etapa: 'Sentencia', descripcion: 'Redacción y comunicación del fallo.', diasEstimados: 20 },
+    { etapa: 'En espera de sentencia', descripcion: 'Redacción y comunicación del fallo.', diasEstimados: 20 },
     { etapa: 'Cumplimiento y seguimiento', descripcion: 'Ejecución de medidas decretadas y seguimiento del cumplimiento.', diasEstimados: 25 },
   ],
 };

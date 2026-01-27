@@ -504,6 +504,26 @@ export async function completeStage(stageId: string, input: CompleteStageInput =
 
     if (error) throw new Error('Error al completar la etapa');
 
+    // Auto-fix for legacy cases: If we finished "Audiencia de juicio", and next is "Sentencia", rename it to "En espera de sentencia".
+    if (existingStage.etapa?.toLowerCase().includes('audiencia de juicio')) {
+      const { data: nextStage } = await supabase
+        .from('case_stages')
+        .select('id, etapa')
+        .eq('case_id', existingStage.case_id)
+        .eq('estado', 'pendiente')
+        .gt('orden', existingStage.orden!)
+        .order('orden', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (nextStage && (nextStage.etapa === 'Sentencia' || nextStage.etapa === 'Sentencia laboral')) {
+        await supabase
+          .from('case_stages')
+          .update({ etapa: 'En espera de sentencia' })
+          .eq('id', nextStage.id);
+      }
+    }
+
     await updateCaseCurrentStage(existingStage.case_id);
 
     await logAuditAction({

@@ -58,8 +58,27 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
     const profile = await requireAuth();
     const supabase = await createServerClient();
 
-    const today = isoDateOnly(new Date());
-    const next7 = isoDateOnly(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    // Configurar fechas en zona horaria Santiago (Chile)
+    const now = new Date();
+    const chileFormatter = new Intl.DateTimeFormat('fr-CA', {
+      timeZone: 'America/Santiago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const today = chileFormatter.format(now);
+
+    // Hour in Chile (0-23)
+    const chileHour = Number(new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Santiago',
+      hour: 'numeric',
+      hour12: false,
+    }).format(now));
+
+    // Next 7 days based on Chile time
+    const next7Date = new Date(now);
+    next7Date.setDate(next7Date.getDate() + 7);
+    const next7 = chileFormatter.format(next7Date);
 
     const requestsQuery = supabase
       .from('info_requests')
@@ -196,12 +215,19 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
       });
     }
 
+    // REGLA 8 AM: Si es hoy y ya pasaron las 8 AM, se considera vencido/urgente (overdue).
+    const isOverdue = (dateStr: string) => {
+      if (dateStr < today) return true;
+      if (dateStr === today && chileHour >= 8) return true;
+      return false;
+    };
+
     const overdueDeadlines = deadlineItems
-      .filter((i) => i.fecha_programada < today)
+      .filter((i) => isOverdue(i.fecha_programada))
       .sort((a, b) => a.fecha_programada.localeCompare(b.fecha_programada));
 
     const dueNext7Days = deadlineItems
-      .filter((i) => i.fecha_programada >= today && i.fecha_programada <= next7)
+      .filter((i) => !isOverdue(i.fecha_programada) && i.fecha_programada >= today && i.fecha_programada <= next7)
       .sort((a, b) => a.fecha_programada.localeCompare(b.fecha_programada));
 
     const mapRequest = (row: any): WorkQueueRequest => ({
