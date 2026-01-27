@@ -1137,7 +1137,7 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
       `,
         { count: 'exact' }
       )
-    // .is('deleted_at', null); // Filter out soft-deleted cases
+      .is('deleted_at', null); // Filter out soft-deleted cases
 
     if (profile.role === 'cliente') {
       const { data: clientCases } = await supabase
