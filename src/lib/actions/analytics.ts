@@ -156,10 +156,15 @@ type DashboardStatsResponse = {
   error?: string;
 };
 
-export async function getDashboardStats(): Promise<DashboardStatsResponse> {
+export async function getDashboardStats(months: number = 12): Promise<DashboardStatsResponse> {
   try {
     const profile = await requireAuth();
     const role = normalizeRole(profile.role);
+
+    // Calculate start date based on months
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+    const startDateStr = startDate.toISOString();
 
     if (!canSeeStats(role)) {
       console.warn('⚠️ Rol sin permisos (getDashboardStats):', profile.role);
@@ -176,7 +181,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
     let caseQuery = supabase.from('cases').select('*');
     // Para abogado/admin/analista confiamos en RLS (has_case_access) para traer
     // todos los casos accesibles en la empresa activa, incluyendo colaboraciones.
-    caseQuery = caseQuery.is('deleted_at', null);
+    caseQuery = caseQuery.is('deleted_at', null).gte('created_at', startDateStr);
 
     const { data: caseRows, error: casesError } = await caseQuery;
     if (casesError) throw casesError;
@@ -320,10 +325,12 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
 /**
  * Obtiene distribución de casos por estado
  */
-export async function getCasesByStatus(): Promise<{ success: boolean; data?: CasesByStatus[]; error?: string }> {
+export async function getCasesByStatus(months: number = 12): Promise<{ success: boolean; data?: CasesByStatus[]; error?: string }> {
   try {
     const profile = await requireAuth();
     const role = normalizeRole(profile.role);
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
 
     if (!canSeeStats(role)) {
       console.warn('⚠️ Rol sin permisos (getCasesByStatus):', profile.role);
@@ -332,7 +339,7 @@ export async function getCasesByStatus(): Promise<{ success: boolean; data?: Cas
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('estado, sentencia_estado').is('deleted_at', null);
+    const query = supabase.from('cases').select('estado, sentencia_estado').is('deleted_at', null).gte('created_at', startDate.toISOString());
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -363,10 +370,12 @@ export async function getCasesByStatus(): Promise<{ success: boolean; data?: Cas
 /**
  * Obtiene distribución de casos por materia
  */
-export async function getCasesByMateria(): Promise<{ success: boolean; data?: CasesByMateria[]; error?: string }> {
+export async function getCasesByMateria(months: number = 12): Promise<{ success: boolean; data?: CasesByMateria[]; error?: string }> {
   try {
     const profile = await requireAuth();
     const role = normalizeRole(profile.role);
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
 
     if (!canSeeStats(role)) {
       console.warn('⚠️ Rol sin permisos (getCasesByMateria):', profile.role);
@@ -375,7 +384,7 @@ export async function getCasesByMateria(): Promise<{ success: boolean; data?: Ca
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('materia').is('deleted_at', null);
+    const query = supabase.from('cases').select('materia').is('deleted_at', null).gte('created_at', startDate.toISOString());
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -404,10 +413,12 @@ export async function getCasesByMateria(): Promise<{ success: boolean; data?: Ca
 /**
  * Obtiene distribución de casos por prioridad
  */
-export async function getCasesByPriority(): Promise<{ success: boolean; data?: CasesByPriority[]; error?: string }> {
+export async function getCasesByPriority(months: number = 12): Promise<{ success: boolean; data?: CasesByPriority[]; error?: string }> {
   try {
     const profile = await requireAuth();
     const role = normalizeRole(profile.role);
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
 
     if (!canSeeStats(role)) {
       console.warn('⚠️ Rol sin permisos (getCasesByPriority):', profile.role);
@@ -416,7 +427,7 @@ export async function getCasesByPriority(): Promise<{ success: boolean; data?: C
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('prioridad').is('deleted_at', null);
+    const query = supabase.from('cases').select('prioridad').is('deleted_at', null).gte('created_at', startDate.toISOString());
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -445,7 +456,7 @@ export async function getCasesByPriority(): Promise<{ success: boolean; data?: C
 /**
  * Obtiene distribución de casos por workflow_state
  */
-export async function getCasesByWorkflowState(): Promise<{
+export async function getCasesByWorkflowState(months: number = 12): Promise<{
   success: boolean;
   data?: CasesByWorkflowState[];
   error?: string;
@@ -453,6 +464,8 @@ export async function getCasesByWorkflowState(): Promise<{
   try {
     const profile = await requireAuth();
     const role = normalizeRole(profile.role);
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
 
     if (!canSeeStats(role)) {
       console.warn('⚠️ Rol sin permisos (getCasesByWorkflowState):', profile.role);
@@ -461,7 +474,7 @@ export async function getCasesByWorkflowState(): Promise<{
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('workflow_state').is('deleted_at', null);
+    const query = supabase.from('cases').select('workflow_state').is('deleted_at', null).gte('created_at', startDate.toISOString());
     const { data: casesData, error } = await query;
     if (error) throw error;
 
@@ -490,17 +503,17 @@ export async function getCasesByWorkflowState(): Promise<{
 /**
  * Obtiene estadísticas mensuales
  */
-export async function getMonthlyStats(): Promise<{ success: boolean; data?: MonthlyStats[]; error?: string }> {
+export async function getMonthlyStats(months: number = 12): Promise<{ success: boolean; data?: MonthlyStats[]; error?: string }> {
   try {
     const profile = await requireAuth();
     const role = normalizeRole(profile.role);
 
     if (!canSeeStats(role)) {
       console.warn('⚠️ Rol sin permisos (getMonthlyStats):', profile.role);
-      // Podemos devolver 12 meses “vacíos” para mantener el layout
-      const months: MonthlyStats[] = Array.from({ length: 12 }).map((_, i) => {
+      // Podemos devolver N meses “vacíos” para mantener el layout
+      const emptyMonths: MonthlyStats[] = Array.from({ length: months }).map((_, i) => {
         const d = new Date();
-        d.setMonth(d.getMonth() - (11 - i));
+        d.setMonth(d.getMonth() - ((months - 1) - i));
         return {
           month: d.toLocaleDateString('es-CL', { year: 'numeric', month: 'short' }),
           newCases: 0,
@@ -508,14 +521,14 @@ export async function getMonthlyStats(): Promise<{ success: boolean; data?: Mont
           revenue: 0,
         };
       });
-      return { success: true, data: months };
+      return { success: true, data: emptyMonths };
     }
 
     const supabase = await createServerClient();
 
-    // Últimos 12 meses
+    // Últimos N meses
     const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 11);
+    startDate.setMonth(startDate.getMonth() - (months - 1)); // -1 para incluir el mes actual
     startDate.setDate(1);
 
     const newCasesQuery = supabase
@@ -592,10 +605,12 @@ export async function getMonthlyStats(): Promise<{ success: boolean; data?: Mont
 /**
  * Obtiene carga de trabajo por abogado (solo para admin)
  */
-export async function getAbogadoWorkload(): Promise<{ success: boolean; data?: AbogadoWorkload[]; error?: string }> {
+export async function getAbogadoWorkload(months: number = 12): Promise<{ success: boolean; data?: AbogadoWorkload[]; error?: string }> {
   try {
     const profile = await requireAuth();
     const role = normalizeRole(profile.role);
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
 
     if (role !== 'admin_firma') {
       console.warn('⚠️ Rol sin permisos (getAbogadoWorkload):', profile.role);
@@ -622,12 +637,14 @@ export async function getAbogadoWorkload(): Promise<{ success: boolean; data?: A
           .select('valor_estimado')
           .eq('abogado_responsable', abogado.id)
           .is('deleted_at', null)
+          .gte('created_at', startDate.toISOString()) // Filter new cases by creation
           .in('estado', ['activo', 'terminado_apelacion']),
         supabase
           .from('cases')
           .select('valor_estimado')
           .eq('abogado_responsable', abogado.id)
           .is('deleted_at', null)
+          .gte('updated_at', startDate.toISOString()) // Filter completed cases by update time
           .in('estado', ['terminado', 'terminado_desistido_demandante']),
       ]);
 
@@ -821,10 +838,11 @@ export async function getUpcomingDeadlines(): Promise<{ success: boolean; data?:
       .select(
         `
         *,
-        case:cases(id, caratulado, abogado_responsable)
+        case:cases!inner(id, caratulado, abogado_responsable, deleted_at)
       `
       )
       .eq('estado', 'pendiente')
+      .is('case.deleted_at', null)
       .gte('fecha_programada', todayIso)
       .lte('fecha_programada', futureIso)
       .order('fecha_programada', { ascending: true });

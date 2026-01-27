@@ -676,6 +676,7 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           title: 'Caso reasignado',
           description: 'Actualizamos el abogado responsable sin afectar el historial del caso.',
         });
+        router.refresh();
       } else {
         toast({
           title: 'No se pudo reasignar',

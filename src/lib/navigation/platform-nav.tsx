@@ -29,59 +29,59 @@ export function buildSidebarItems(
   const isDeudaCero = isDeudaCeroOrgName(opts?.activeOrgName ?? null);
   const transitionItem: SidebarItem | null = canTransition
     ? {
-        href: '/transicion',
-        label: 'Transicion',
-        description: 'Reasigna casos entre empresas',
-        icon: <ArrowLeftRight className="h-4 w-4" />,
-        group: isSuperAdmin ? 'Super Admin' : 'Administración',
-        keywords: ['transicion', 'reasignar', 'casos', 'empresas'],
-      }
+      href: '/transicion',
+      label: 'Transicion',
+      description: 'Reasigna casos entre empresas',
+      icon: <ArrowLeftRight className="h-4 w-4" />,
+      group: isSuperAdmin ? 'Super Admin' : 'Administración',
+      keywords: ['transicion', 'reasignar', 'casos', 'empresas'],
+    }
     : null;
   const superAdminItems: SidebarItem[] = !isSuperAdmin
     ? []
     : [
-        {
-          href: '/admin-global',
-          label: 'Dashboard',
-          description: 'MRR, clientes y KPIs',
-          icon: <LayoutDashboard className="h-4 w-4" />,
-          group: 'Super Admin',
-          keywords: ['dashboard', 'kpis', 'mrr', 'saas'],
-        },
-        {
-          href: '/admin-global/organizations',
-          label: 'Empresas',
-          description: 'Setup, pricing y estado',
-          icon: <Crown className="h-4 w-4" />,
-          group: 'Super Admin',
-          keywords: ['empresas', 'organizaciones', 'tenants', 'billing'],
-        },
-        {
-          href: '/admin-global/transfers',
-          label: 'Transferencias',
-          description: 'Historial de traslados',
-          icon: <ListChecks className="h-4 w-4" />,
-          group: 'Super Admin',
-          keywords: ['transferencias', 'migración', 'auditoría'],
-        },
-        {
-          href: '/compliance',
-          label: 'Compliance',
-          description: 'Monitoreo y fuentes',
-          icon: <ShieldCheck className="h-4 w-4" />,
-          group: 'Super Admin',
-          keywords: ['compliance', 'monitoreo', 'pjud', 'fuentes'],
-        },
-        {
-          href: '/dashboard/admin/users',
-          label: 'Mantenedor de usuarios',
-          description: 'Cuentas, roles y accesos',
-          icon: <Users className="h-4 w-4" />,
-          group: 'Super Admin',
-          keywords: ['usuarios', 'roles', 'permisos', 'equipo'],
-        },
-        ...(transitionItem ? [transitionItem] : []),
-      ];
+      {
+        href: '/admin-global',
+        label: 'Dashboard',
+        description: 'MRR, clientes y KPIs',
+        icon: <LayoutDashboard className="h-4 w-4" />,
+        group: 'Super Admin',
+        keywords: ['dashboard', 'kpis', 'mrr', 'saas'],
+      },
+      {
+        href: '/admin-global/organizations',
+        label: 'Empresas',
+        description: 'Setup, pricing y estado',
+        icon: <Crown className="h-4 w-4" />,
+        group: 'Super Admin',
+        keywords: ['empresas', 'organizaciones', 'tenants', 'billing'],
+      },
+      {
+        href: '/admin-global/transfers',
+        label: 'Transferencias',
+        description: 'Historial de traslados',
+        icon: <ListChecks className="h-4 w-4" />,
+        group: 'Super Admin',
+        keywords: ['transferencias', 'migración', 'auditoría'],
+      },
+      {
+        href: '/compliance',
+        label: 'Compliance',
+        description: 'Monitoreo y fuentes',
+        icon: <ShieldCheck className="h-4 w-4" />,
+        group: 'Super Admin',
+        keywords: ['compliance', 'monitoreo', 'pjud', 'fuentes'],
+      },
+      {
+        href: '/dashboard/admin/users',
+        label: 'Mantenedor de usuarios',
+        description: 'Cuentas, roles y accesos',
+        icon: <Users className="h-4 w-4" />,
+        group: 'Super Admin',
+        keywords: ['usuarios', 'roles', 'permisos', 'equipo'],
+      },
+      ...(transitionItem ? [transitionItem] : []),
+    ];
 
   // Super admin: solo navegación de negocio (evita menús operativos).
   if (isSuperAdmin) return superAdminItems;
@@ -138,15 +138,15 @@ export function buildSidebarItems(
       },
       ...(isDeudaCero
         ? [
-            {
-              href: '/dashboard/admin/leads',
-              label: 'Leads Deuda Cero',
-              description: 'Seguimiento y conversión a casos',
-              icon: <UserPlus className="h-4 w-4" />,
-              group: 'CRM',
-              keywords: ['leads', 'intake', 'deuda cero'],
-            },
-          ]
+          {
+            href: '/dashboard/admin/leads',
+            label: 'Leads Deuda Cero',
+            description: 'Seguimiento y conversión a casos',
+            icon: <UserPlus className="h-4 w-4" />,
+            group: 'CRM',
+            keywords: ['leads', 'intake', 'deuda cero'],
+          },
+        ]
         : []),
       {
         href: '/dashboard/admin/clients',
@@ -212,6 +212,14 @@ export function buildSidebarItems(
         icon: <Settings className="h-4 w-4" />,
         group: 'Administración',
         keywords: ['preferencias', 'plantillas'],
+      },
+      {
+        href: '/admin/trash',
+        label: 'Papelera',
+        description: 'Casos eliminados',
+        icon: <ClipboardList className="h-4 w-4" />,
+        group: 'Administración',
+        keywords: ['papelera', 'trash', 'eliminados', 'restaurar'],
       },
     ];
 
@@ -350,6 +358,14 @@ export function buildSidebarItems(
         icon: <ShieldCheck className="h-4 w-4" />,
         group: 'Herramientas',
         keywords: ['compliance', 'monitoreo'],
+      },
+      {
+        href: '/admin/trash',
+        label: 'Papelera',
+        description: 'Casos eliminados',
+        icon: <ClipboardList className="h-4 w-4" />,
+        group: 'Herramientas',
+        keywords: ['papelera', 'trash', 'eliminados', 'restaurar'],
       },
     ];
 

@@ -2,6 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { createServerClient } from '@/lib/supabase/server';
 import { getCurrentProfile, requireAuth } from '@/lib/auth/roles';
 import { logAuditAction } from '@/lib/audit/log';
@@ -1038,13 +1039,14 @@ export async function deleteCase(caseId: string) {
     });
 
     revalidatePath('/cases');
+    revalidatePath('/cases');
     revalidatePath('/dashboard');
     revalidatePath('/inbox');
-    return { success: true };
   } catch (error) {
     console.error('Error in deleteCase:', error);
     return { success: false, error: (error as Error).message };
   }
+  redirect('/cases');
 }
 
 export async function getDeletedCases() {

@@ -25,7 +25,11 @@ export const metadata: Metadata = {
   description: 'Panel de control para la firma',
 };
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: { period?: string };
+}) {
   const profile = await getCurrentProfile();
 
   if (!profile) {
@@ -33,8 +37,17 @@ export default async function AdminDashboardPage() {
   }
 
   if (profile.role !== 'admin_firma') {
-    redirect( profile.role === 'analista' ? '/dashboard/analista' : '/dashboard/abogado' );
+    redirect(profile.role === 'analista' ? '/dashboard/analista' : '/dashboard/abogado');
   }
+
+  // Parse period from URL (default to 3 months/90d)
+  const periodKey = (searchParams.period as '30d' | '90d' | '12m') || '90d';
+  const periodMonthsMap: Record<string, number> = {
+    '30d': 1,
+    '90d': 3,
+    '12m': 12,
+  };
+  const months = periodMonthsMap[periodKey] ?? 3;
 
   const [
     statsResult,
@@ -48,16 +61,16 @@ export default async function AdminDashboardPage() {
     portfolioResult,
     workQueueResult,
   ] = await Promise.all([
-    getDashboardStats(),
-    getCasesByStatus(),
-    getCasesByMateria(),
-    getCasesByPriority(),
-    getCasesByWorkflowState(),
-    getMonthlyStats(),
-    getAbogadoWorkload(),
-    getUpcomingDeadlines(),
-    getClientPortfolio(30),
-    getWorkQueue(),
+    getDashboardStats(months),
+    getCasesByStatus(months),
+    getCasesByMateria(months),
+    getCasesByPriority(months),
+    getCasesByWorkflowState(months),
+    getMonthlyStats(months), // Trend chart needs history, but allow filter if desired? Usually Trend is always 12m. Let's pass months for consistency with user intent "Periodo".
+    getAbogadoWorkload(months),
+    getUpcomingDeadlines(), // Usually future-looking, ignoring filter
+    getClientPortfolio(30), // Portfolio usually is snapshot, kept as is.
+    getWorkQueue(), // Inbox is operational, ignoring filter
   ]);
 
   const dashboardData = {
@@ -74,12 +87,12 @@ export default async function AdminDashboardPage() {
       workQueueResult.success && workQueueResult.data
         ? workQueueResult.data
         : {
-            overdueStages: [],
-            dueNext7Days: [],
-            paymentBlocks: [],
-            pendingRequests: [],
-            stats: { overdueStages: 0, dueNext7Days: 0, paymentBlocks: 0, pendingRequests: 0 },
-          },
+          overdueStages: [],
+          dueNext7Days: [],
+          paymentBlocks: [],
+          pendingRequests: [],
+          stats: { overdueStages: 0, dueNext7Days: 0, paymentBlocks: 0, pendingRequests: 0 },
+        },
     highlights:
       statsResult.success && statsResult.highlights
         ? statsResult.highlights

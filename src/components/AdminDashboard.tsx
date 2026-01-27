@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { ResponsiveContainer, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { ResponsiveContainer, Line, LineChart, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
 import {
   ArrowUpRight,
   Calendar,
@@ -16,6 +17,7 @@ import {
   ListChecks,
   Timer,
   Users,
+  Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -23,6 +25,12 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn, formatCurrency, formatDate, formatRelativeTime, getInitials, stringToColor } from '@/lib/utils';
 
 import type { WorkQueueData } from '@/lib/actions/work-queue';
@@ -84,17 +92,43 @@ function severityVariant(severity: 'info' | 'warning' | 'critical'): BadgeProps[
   return 'info';
 }
 
+const PRIORITY_DEFINITIONS: Record<string, string> = {
+  baja: 'Casos sin plazos fatales próximos ni riesgo inmediato. Se gestionan según cola regular.',
+  media: 'Casos con hitos relevantes en el mediano plazo. Requieren seguimiento semanal.',
+  alta: 'Casos con plazos venciendo pronto o de clientes estratégicos. Prioridad en asignación.',
+  urgente: 'Atención inmediata requerida. Riesgo de preclusión o bloqueo crítico.',
+};
+
+const STATUS_DEFINITIONS: Record<string, string> = {
+  activo: 'El caso está en curso y requiere gestión. Puede tener hitos pendientes.',
+  terminado: 'Caso cerrado con sentencia o acuerdo final. No requiere gestión activa.',
+  archivado: 'Caso suspendido indefinidamente o retirado sin resolución final.',
+  terminado_apelacion: 'Sentencia dictada pero en proceso de apelación. Sigue activo judicialmente.',
+  terminado_desistido_demandante: 'El demandante desistió de la acción. Caso cerrado.',
+  suspendido: 'Caso detenido temporalmente por resolución judicial o acuerdo de partes.',
+};
+
 export function AdminDashboard({ profile, data }: AdminDashboardProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
   const stats = data.stats;
-  const [period, setPeriod] = useState<PeriodKey>('90d');
+  const currentPeriod = (searchParams.get('period') as PeriodKey) || '90d';
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
 
   const totalCases = stats?.totalCases ?? 0;
-  const periodMonths = PERIODS.find((p) => p.key === period)?.months ?? 3;
+  const periodMonths = PERIODS.find((p) => p.key === currentPeriod)?.months ?? 3;
   const trendData = useMemo(
     () => data.monthlyStats.slice(-Math.max(3, periodMonths)),
     [data.monthlyStats, periodMonths],
   );
+
+  const handlePeriodChange = (key: PeriodKey) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('period', key);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   const wfMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -264,10 +298,10 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
                 <button
                   key={p.key}
                   type="button"
-                  onClick={() => setPeriod(p.key)}
+                  onClick={() => handlePeriodChange(p.key)}
                   className={cn(
                     'rounded-2xl px-3 py-2 text-sm font-medium transition',
-                    period === p.key
+                    currentPeriod === p.key
                       ? 'bg-foreground text-white shadow-sm'
                       : 'text-foreground/65 hover:bg-white/70 hover:text-foreground',
                   )}
@@ -416,7 +450,7 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
                     <LineChart data={trendData}>
                       <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="rgba(15,23,42,0.35)" />
                       <YAxis tick={{ fontSize: 12 }} stroke="rgba(15,23,42,0.35)" />
-                      <Tooltip
+                      <RechartsTooltip
                         contentStyle={{
                           background: 'rgba(255,255,255,0.9)',
                           border: '1px solid rgba(148,163,184,0.25)',
@@ -628,51 +662,87 @@ export function AdminDashboard({ profile, data }: AdminDashboardProps) {
         </div>
 
         <aside className="space-y-6 lg:sticky lg:top-24">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Prioridades</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.casesByPriority
-                .slice()
-                .sort((a, b) => b.count - a.count)
-                .map((row) => (
-                  <Link
-                    key={row.priority}
-                    href={`/cases?prioridad=${encodeURIComponent(row.priority)}`}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-4 py-2.5 transition hover:bg-white/80"
-                  >
-                    <span className="text-sm font-semibold text-foreground capitalize">{row.priority}</span>
-                    <span className="text-sm text-foreground/60">
-                      {row.count} · {row.percentage}%
-                    </span>
-                  </Link>
-                ))}
-            </CardContent>
-          </Card>
+          <TooltipProvider delayDuration={0}>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Prioridades
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-foreground/40 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="max-w-xs">
+                      <p>Distribución de casos según su nivel de urgencia.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {data.casesByPriority
+                  .slice()
+                  .sort((a, b) => b.count - a.count)
+                  .map((row) => (
+                    <Tooltip key={row.priority}>
+                      <TooltipTrigger asChild>
+                        <Link
+                          href={`/cases?prioridad=${encodeURIComponent(row.priority)}`}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-4 py-2.5 transition hover:bg-white/80"
+                        >
+                          <span className="text-sm font-semibold text-foreground capitalize">{row.priority}</span>
+                          <span className="text-sm text-foreground/60">
+                            {row.count} · {row.percentage}%
+                          </span>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs">
+                        <p className="font-semibold capitalize mb-1">{row.priority}</p>
+                        <p className="text-xs opacity-90">{PRIORITY_DEFINITIONS[row.priority.toLowerCase()] ?? 'Sin descripción disponible.'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Estado</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.casesByStatus
-                .slice()
-                .sort((a, b) => b.count - a.count)
-                .map((row) => (
-                  <Link
-                    key={row.status}
-                    href={`/cases?estado=${encodeURIComponent(row.status)}`}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-4 py-2.5 transition hover:bg-white/80"
-                  >
-                    <span className="text-sm font-semibold text-foreground capitalize">{row.status}</span>
-                    <span className="text-sm text-foreground/60">
-                      {row.count} · {row.percentage}%
-                    </span>
-                  </Link>
-                ))}
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Estado
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-foreground/40 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="max-w-xs">
+                      <p>Estados procesales de los casos activos e históricos.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {data.casesByStatus
+                  .slice()
+                  .sort((a, b) => b.count - a.count)
+                  .map((row) => (
+                    <Tooltip key={row.status}>
+                      <TooltipTrigger asChild>
+                        <Link
+                          href={`/cases?estado=${encodeURIComponent(row.status)}`}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-4 py-2.5 transition hover:bg-white/80"
+                        >
+                          <span className="text-sm font-semibold text-foreground capitalize">{row.status}</span>
+                          <span className="text-sm text-foreground/60">
+                            {row.count} · {row.percentage}%
+                          </span>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs">
+                        <p className="font-semibold capitalize mb-1">{row.status}</p>
+                        <p className="text-xs opacity-90">{STATUS_DEFINITIONS[row.status.toLowerCase()] ?? 'Sin descripción disponible.'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+              </CardContent>
+            </Card>
+          </TooltipProvider>
 
           <Card>
             <CardHeader>

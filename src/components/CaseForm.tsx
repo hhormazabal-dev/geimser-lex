@@ -2477,7 +2477,7 @@ export function CaseForm({
                         const result = await deleteCase(existingCase.id);
                         if (result.success) {
                           toast({ title: 'Caso eliminado', description: 'El expediente ha sido eliminado correctamente.' });
-                          window.location.href = '/cases';
+                          // Redirección manejada por server action
                         } else {
                           toast({ title: 'Error', description: result.error ?? 'No se pudo eliminar el caso', variant: 'destructive' });
                         }
@@ -2507,7 +2507,11 @@ export function CaseForm({
                     Cancelar
                   </Button>
                 )}
-                <Button type='submit' disabled={isLoading || !canSubmit}>
+                <Button
+                  type='submit'
+                  disabled={isLoading || !canSubmit}
+                  className={existingCase ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                >
                   {isLoading ? (
                     <>
                       <Loader2 className='w-4 h-4 mr-2 animate-spin' />
