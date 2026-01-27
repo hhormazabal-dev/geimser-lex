@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Playfair_Display, Inter } from 'next/font/google';
 import { createServerClient } from '@/lib/supabase/server';
@@ -14,36 +15,6 @@ const sans = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
 });
-
-const features = [
-  {
-    title: 'Gestión de Casos',
-    description: 'Control absoluto del expediente. Trazabilidad completa y sincronización en tiempo real con el Poder Judicial.',
-    icon: (
-      <svg className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Compliance Corporativo',
-    description: 'Blindaje total. Matrices de riesgo y auditoría continua para operar con el estándar más exigente del mercado.',
-    icon: (
-      <svg className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Inteligencia Financiera',
-    description: 'Rentabilidad visible. Análisis detallado de facturación, horas hombre y rendimiento por unidad de negocio.',
-    icon: (
-      <svg className="h-6 w-6 text-blue-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-];
 
 export default async function Home() {
   const supabase = await createServerClient();
@@ -74,16 +45,16 @@ export default async function Home() {
 
               <div className="flex flex-col sm:flex-row justify-center gap-6">
                 <Link
-                  href={primaryCtaHref}
+                  href="https://calendar.app.google/HYTZd6X8eN4zFqYZA"
                   className="inline-flex items-center justify-center px-12 py-6 bg-blue-900 text-white text-sm font-bold tracking-widest uppercase hover:bg-blue-800 transition-all duration-300 rounded-lg shadow-xl"
                 >
-                  Solicitar Acceso
+                  Agendar Demo
                 </Link>
                 <Link
-                  href="#inteligencia"
+                  href="#metodologia"
                   className="inline-flex items-center justify-center px-12 py-6 bg-transparent border border-slate-300 text-slate-900 text-sm font-bold tracking-widest uppercase hover:border-blue-900 hover:text-blue-900 transition-all duration-300 rounded-lg"
                 >
-                  Ver Inteligencia Financiera
+                  Ver Metodología
                 </Link>
               </div>
             </div>
@@ -91,7 +62,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Sección Impacto Humano / Equipo (Mantenida) */}
+      {/* Sección Impacto Humano / Equipo */}
       <section className="py-0 relative">
         <div className="grid lg:grid-cols-2 min-h-[700px]">
           {/* Imagen Cinematográfica Izquierda */}
@@ -148,62 +119,21 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Nueva Sección: Inteligencia Financiera */}
-      <section id="inteligencia" className="py-24 bg-white overflow-hidden">
-        <div className="container mx-auto px-6 lg:px-12 max-w-7xl">
-          <Reveal>
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              <div className="order-2 lg:order-1">
-                <div className="relative rounded-xl shadow-2xl bg-white border border-slate-100 p-2 transform -rotate-1 hover:rotate-0 transition-transform duration-700">
-                  <img
-                    src="/financial-dashboard.png"
-                    alt="Dashboard Financiero Xel"
-                    className="w-full h-auto rounded-lg shadow-inner"
-                  />
-                </div>
-              </div>
-              <div className="order-1 lg:order-2">
-                <h2 className="font-serif text-4xl lg:text-5xl text-slate-900 mb-6">Rentabilidad Visible.</h2>
-                <p className="text-xl text-slate-600 mb-8 leading-relaxed">
-                  ¿Cuál es su área de práctica más rentable? ¿Quién es su socio más eficiente? <br />
-                  Xel responde estas preguntas en tiempo real.
-                </p>
-                <ul className="space-y-6">
-                  {[
-                    'Control de facturación y horas no facturables.',
-                    'Métricas de desempeño por abogado.',
-                    'Proyección de ingresos trimestral.',
-                    'Alertas de desviación de presupuesto.'
-                  ].map((item) => (
-                    <li key={item} className="flex items-center gap-4 text-slate-800 text-lg">
-                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                      </span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
       {/* ROI & Resultados (Clean White) */}
-      <section className="py-24 bg-slate-50 border-t border-slate-200">
+      <section className="py-24 bg-white">
         <div className="container mx-auto px-6 lg:px-12 max-w-7xl text-center">
           <Reveal>
             <h2 className="font-serif text-3xl text-slate-900 mb-16">Resultados medibles</h2>
             <div className="grid md:grid-cols-3 gap-8">
-              <div className="p-8 border border-white bg-white shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
+              <div className="p-8 border border-slate-100 bg-slate-50 shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
                 <p className="text-6xl font-serif text-blue-900 mb-4">40%</p>
                 <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Más Eficiencia</p>
               </div>
-              <div className="p-8 border border-white bg-white shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
+              <div className="p-8 border border-slate-100 bg-slate-50 shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
                 <p className="text-6xl font-serif text-blue-900 mb-4">Zero</p>
                 <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Pérdida de Información</p>
               </div>
-              <div className="p-8 border border-white bg-white shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
+              <div className="p-8 border border-slate-100 bg-slate-50 shadow-sm rounded-2xl hover:shadow-xl transition-all duration-300">
                 <p className="text-6xl font-serif text-blue-900 mb-4">ISO</p>
                 <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Seguridad 27001</p>
               </div>
@@ -213,7 +143,7 @@ export default async function Home() {
       </section>
 
       {/* Feature Deep Dive (Parallax-ish) */}
-      <section id="metodologia" className="py-24 bg-white border-t border-slate-200">
+      <section id="metodologia" className="py-24 bg-slate-50 border-t border-slate-200">
         <div className="container mx-auto px-6 lg:px-12 max-w-7xl">
           <Reveal>
             <div className="text-center max-w-3xl mx-auto mb-20">
@@ -228,7 +158,7 @@ export default async function Home() {
             {/* Bloque 1 - Gestión */}
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <Reveal>
-                <div className="order-2 lg:order-1 relative p-2 bg-slate-50 rounded-2xl shadow-lg border border-slate-100">
+                <div className="order-2 lg:order-1 relative p-2 bg-white rounded-2xl shadow-xl border border-slate-200 rotate-1 hover:rotate-0 transition-transform duration-500">
                   <img src="/dashboard-straight.png" className="rounded-xl w-full" alt="Gestión de Casos" />
                 </div>
               </Reveal>
@@ -259,7 +189,7 @@ export default async function Home() {
                 </div>
               </Reveal>
               <Reveal>
-                <div className="order-2 relative p-2 bg-slate-50 rounded-2xl shadow-lg border border-slate-100">
+                <div className="order-2 relative p-2 bg-white rounded-2xl shadow-xl border border-slate-200 -rotate-1 hover:rotate-0 transition-transform duration-500">
                   <img src="/lawyer-focus.png" className="rounded-xl w-full" alt="Abogado enfocado" />
                 </div>
               </Reveal>
@@ -282,7 +212,7 @@ export default async function Home() {
               La diferencia entre un estudio tradicional y una firma corporativa moderna es Xel.
             </p>
             <Link
-              href={primaryCtaHref}
+              href="https://calendar.app.google/HYTZd6X8eN4zFqYZA"
               className="inline-flex items-center justify-center px-12 py-6 bg-white text-blue-900 text-lg font-bold tracking-widest uppercase hover:bg-blue-50 transition-all duration-300 rounded-lg shadow-2xl hover:-translate-y-1"
             >
               Agendar Reunión Privada

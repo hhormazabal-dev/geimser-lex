@@ -36,6 +36,8 @@
     "postinstall": "husky install || true"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.9",
+    "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.3.2",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",
@@ -97,7 +99,6 @@
     "@vitest/coverage-v8": "^0.34.6",
     "@vitest/ui": "^0.34.6",
     "autoprefixer": "^10.4.16",
-    "baseline-browser-mapping": "2.9.14",
     "baseline-browser-mapping": "2.9.14",
     "cross-env": "^7.0.3",
     "dotenv": "^17.2.3",
