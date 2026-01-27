@@ -30,14 +30,14 @@ export function BulkActionsBar({
     const { toast } = useToast();
 
     const handleAction = async (
-        action: (() => Promise<void>) | undefined,
+        action: (() => Promise<void>) | (() => void) | undefined,
         actionName: string
     ) => {
         if (!action) return;
 
         setIsProcessing(true);
         try {
-            await action();
+            await Promise.resolve(action());
             toast({
                 title: 'Acción completada',
                 description: `${actionName} ejecutada exitosamente en ${selectedCount} elemento(s).`,
