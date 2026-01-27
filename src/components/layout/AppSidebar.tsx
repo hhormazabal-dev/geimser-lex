@@ -99,15 +99,15 @@ export function AppSidebar({
     const filtered = !q
       ? base
       : base.filter((item) => {
-          const haystack = [
-            item.label,
-            item.description ?? '',
-            (item.keywords ?? []).join(' '),
-          ]
-            .join(' ')
-            .toLowerCase();
-          return haystack.includes(q);
-        });
+        const haystack = [
+          item.label,
+          item.description ?? '',
+          (item.keywords ?? []).join(' '),
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      });
     const pinnedSet = new Set(pinned);
     const pinnedItems = q ? [] : filtered.filter((i) => pinnedSet.has(i.href));
     const rest = q ? filtered : filtered.filter((i) => !pinnedSet.has(i.href));
@@ -193,7 +193,7 @@ export function AppSidebar({
   };
 
   const SidebarContent = (
-      <div className={cn('flex h-full min-h-screen flex-col overflow-x-hidden', collapsed ? 'px-3' : 'px-4')}>
+    <div className={cn('flex h-full min-h-screen flex-col overflow-x-hidden', collapsed ? 'px-3' : 'px-4')}>
       <div className={cn('flex items-center justify-between', collapsed ? 'py-3' : 'py-4')}>
         <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 via-white/50 to-white/20 text-primary shadow-sm">

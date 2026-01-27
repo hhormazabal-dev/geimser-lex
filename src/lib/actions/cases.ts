@@ -1022,14 +1022,20 @@ export async function deleteCase(caseId: string) {
     await requireAuth('admin_firma');
     const supabase = await getSB();
 
-    const { error } = await supabase.from('cases').delete().eq('id', caseId);
+    // Soft delete: update deleted_at
+    const { error } = await supabase
+      .from('cases')
+      // @ts-ignore: deleted_at column exists in DB but not in types yet
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', caseId);
+
     if (error) throw error;
 
     await logAuditAction({
-      action: 'DELETE',
+      action: 'SOFT_DELETE',
       entity_type: 'case',
       entity_id: caseId,
-      diff_json: { deleted: true },
+      diff_json: { deleted_at: new Date().toISOString() },
     });
 
     revalidatePath('/cases');
@@ -1038,6 +1044,73 @@ export async function deleteCase(caseId: string) {
     return { success: true };
   } catch (error) {
     console.error('Error in deleteCase:', error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+export async function getDeletedCases() {
+  try {
+    const profile = await getCurrentProfile();
+    if (!profile) throw new Error('Unauthorized');
+    const supabase = await getSB();
+
+    let query = supabase
+      .from('cases')
+      .select(`
+        *,
+        cliente_principal:profiles!cases_cliente_principal_id_fkey(id, nombre, rut)
+      `)
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
+
+    // Role-based filtering
+    if (profile.role === 'admin_firma') {
+      // Company Admin: only last 10 days
+      const tenDaysAgo = new Date();
+      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+      query = query.gte('deleted_at', tenDaysAgo.toISOString());
+    } else {
+      // Super Admin (or other authorized roles): See all history
+      // Note: Implementation assumes 'admin_firma' and potentially super-admin access logic in page wrapper
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error in getDeletedCases:', error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+export async function restoreCase(caseId: string) {
+  try {
+    await requireAuth('admin_firma');
+    const supabase = await getSB();
+
+    const { error } = await supabase
+      .from('cases')
+      // @ts-ignore: deleted_at column exists in DB but not in types yet
+      .update({ deleted_at: null })
+      .eq('id', caseId);
+
+    if (error) throw error;
+
+    await logAuditAction({
+      action: 'RESTORE',
+      entity_type: 'case',
+      entity_id: caseId,
+      diff_json: { restored: true },
+    });
+
+    revalidatePath('/cases');
+    revalidatePath('/dashboard');
+    revalidatePath('/inbox');
+    revalidatePath('/admin/trash');
+    revalidatePath('/admin-global/deleted');
+    return { success: true };
+  } catch (error) {
+    console.error('Error in restoreCase:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -1054,16 +1127,19 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
 
     const supabase = await getSB();
 
-    let query = supabase.from('cases').select(
-      `
+    let query = supabase
+      .from('cases')
+      .select(
+        `
         *,
         cliente_principal:profiles!cases_cliente_principal_id_fkey(id, nombre, rut),
-        abogado_responsable:profiles!cases_abogado_responsable_fkey(id, nombre),
+        abogado_responsable_profile:profiles!cases_abogado_responsable_fkey(id, nombre, email, telefono),
         case_stages(id, etapa, estado, fecha_programada, orden),
         counterparties:case_counterparties(nombre, tipo)
       `,
-      { count: 'exact' }
-    );
+        { count: 'exact' }
+      )
+      .is('deleted_at', null); // Filter out soft-deleted cases
 
     if (profile.role === 'cliente') {
       const { data: clientCases } = await supabase
