@@ -845,6 +845,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
     if (window.location.hash !== nextHash) {
       window.history.replaceState(null, '', nextHash);
     }
+    // Scroll to top when tab changes to improve UX
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }, [activeTab]);
 
   return (

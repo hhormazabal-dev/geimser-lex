@@ -197,6 +197,10 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
     for (const row of (stagesRes.data ?? []) as any[]) {
       const linkedCase = row.case;
       if (!linkedCase?.id) continue;
+      // Failsafe: asegurar que no procesamos casos eliminados si el filtro SQL falló
+      // @ts-ignore
+      if (linkedCase.deleted_at) continue;
+
       const estadoCaso = String(linkedCase.estado ?? '').trim();
       if (['archivado', 'terminado', 'terminado_desistido_demandante'].includes(estadoCaso)) continue;
 
