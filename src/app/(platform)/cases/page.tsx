@@ -26,12 +26,16 @@ export default function CasesPage() {
     search: string;
     initialFilters: { estado?: string; prioridad?: string; workflow_state?: string; materia?: string };
   }>({ search: '', initialFilters: {} });
+  const [sortState, setSortState] = useState<{ column: string; order: 'asc' | 'desc' }>({
+    column: 'created_at',
+    order: 'desc',
+  });
 
   const loadCases = async (newFilters: CaseFiltersInput = filters) => {
     setIsLoading(true);
     try {
       const result = await getCases(newFilters);
-      
+
       if (result.success) {
         setCases(result.cases);
         setTotal(result.total);
@@ -106,6 +110,24 @@ export default function CasesPage() {
     loadCases(updatedFilters);
   };
 
+  const handleSort = (column: string) => {
+    setSortState((prev) => {
+      const isSameColumn = prev.column === column;
+      const newOrder: 'asc' | 'desc' = isSameColumn && prev.order === 'desc' ? 'asc' : 'desc';
+      const nextSort = { column, order: newOrder };
+
+      const updatedFilters = {
+        ...filters,
+        sort_by: column as any,
+        order: newOrder,
+        page: 1, // Reset page on sort? Often good UX.
+      };
+      setFilters(updatedFilters);
+      loadCases(updatedFilters);
+      return nextSort;
+    });
+  };
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -145,6 +167,8 @@ export default function CasesPage() {
         initialFilterValues={uiSeed.initialFilters}
         canCreate
         canEdit
+        onSort={handleSort}
+        sortState={sortState}
       />
     );
   };

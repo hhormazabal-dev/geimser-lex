@@ -1109,7 +1109,7 @@ export async function getCases(filters: Partial<CaseFiltersInput> = {}) {
 
     const { data: cases, error, count } = await query
       .range(from, to)
-      .order('created_at', { ascending: false });
+      .order(validatedFilters.sort_by ?? 'created_at', { ascending: validatedFilters.order === 'asc' });
     if (error) throw error;
 
     return {

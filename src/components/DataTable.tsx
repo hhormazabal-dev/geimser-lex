@@ -30,8 +30,11 @@ interface DataTableProps {
     workflow_state: string;
     materia: string;
   }>;
+
   canCreate?: boolean;
   canEdit?: boolean;
+  onSort?: (column: string) => void;
+  sortState?: { column: string; order: 'asc' | 'desc' };
 }
 
 const STATUS_VARIANTS: Record<string, { label: string; chipClass: string }> = {
@@ -63,8 +66,11 @@ export function DataTable({
   onFilter,
   initialSearchTerm,
   initialFilterValues,
+
   canCreate = false,
   canEdit = false,
+  onSort,
+  sortState,
 }: DataTableProps) {
   const [searchTerm, setSearchTerm] = useState(() => initialSearchTerm ?? '');
   const [showFilters, setShowFilters] = useState(false);
@@ -90,10 +96,10 @@ export function DataTable({
 
   const handleFilterChange =
     (field: 'estado' | 'prioridad' | 'workflow_state' | 'materia') =>
-    (event: React.ChangeEvent<HTMLSelectElement>) => {
-      const value = event.target.value;
-      setFilterValues((prev) => ({ ...prev, [field]: value }));
-    };
+      (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = event.target.value;
+        setFilterValues((prev) => ({ ...prev, [field]: value }));
+      };
 
   const applyFilters = () => {
     const cleaned = Object.fromEntries(
@@ -223,13 +229,13 @@ export function DataTable({
                   className='mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100'
                 >
                   <option value=''>Todos</option>
-	                  <option value='activo'>Activo</option>
-	                  <option value='suspendido'>Suspendido</option>
-	                  <option value='archivado'>Archivado</option>
-	                  <option value='terminado_apelacion'>Terminado – Apelación</option>
-	                  <option value='terminado'>Terminado</option>
-	                  <option value='terminado_desistido_demandante'>Terminada - Desistida por Demandante</option>
-	                </select>
+                  <option value='activo'>Activo</option>
+                  <option value='suspendido'>Suspendido</option>
+                  <option value='archivado'>Archivado</option>
+                  <option value='terminado_apelacion'>Terminado – Apelación</option>
+                  <option value='terminado'>Terminado</option>
+                  <option value='terminado_desistido_demandante'>Terminada - Desistida por Demandante</option>
+                </select>
               </div>
 
               <div>
@@ -305,9 +311,31 @@ export function DataTable({
                 <th scope='col' className='px-5 py-3 text-left'>Caso</th>
                 <th scope='col' className='px-5 py-3 text-left'>Cliente (empresa)</th>
                 <th scope='col' className='px-5 py-3 text-left'>Demandado(s)</th>
-                <th scope='col' className='px-5 py-3 text-left'>Estado</th>
-                <th scope='col' className='px-5 py-3 text-left'>Prioridad</th>
-                <th scope='col' className='px-5 py-3 text-left'>Etapa</th>
+                <th scope='col' className='px-5 py-3 text-left'>Juzgado</th>
+                <th scope='col' className='px-5 py-3 text-left'>
+                  <button onClick={() => onSort?.('estado')} className="flex items-center gap-1 hover:text-slate-700">
+                    Estado
+                    {sortState?.column === 'estado' && (
+                      <span className="text-xs">{sortState.order === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </button>
+                </th>
+                <th scope='col' className='px-5 py-3 text-left'>
+                  <button onClick={() => onSort?.('prioridad')} className="flex items-center gap-1 hover:text-slate-700">
+                    Prioridad
+                    {sortState?.column === 'prioridad' && (
+                      <span className="text-xs">{sortState.order === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </button>
+                </th>
+                <th scope='col' className='px-5 py-3 text-left'>
+                  <button onClick={() => onSort?.('etapa_actual')} className="flex items-center gap-1 hover:text-slate-700">
+                    Etapa
+                    {sortState?.column === 'etapa_actual' && (
+                      <span className="text-xs">{sortState.order === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </button>
+                </th>
                 <th scope='col' className='px-5 py-3 text-left whitespace-nowrap'>Inicio</th>
                 <th scope='col' className='px-5 py-3 text-left'>Cuantía</th>
                 <th scope='col' className='px-5 py-3 text-right'>Acciones</th>
@@ -368,6 +396,13 @@ export function DataTable({
                         </div>
                       );
                     })()}
+                  </td>
+                  <td className='px-5 py-4 align-top'>
+                    {caseItem.tribunal ? (
+                      <span className='text-sm text-slate-600'>{caseItem.tribunal}</span>
+                    ) : (
+                      <span className='text-xs text-slate-400'>-</span>
+                    )}
                   </td>
                   <td className='px-5 py-4 align-top'>{renderStatusBadge(caseItem.estado)}</td>
                   <td className='px-5 py-4 align-top'>{renderPriorityBadge(caseItem.prioridad)}</td>

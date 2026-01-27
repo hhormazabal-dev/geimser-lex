@@ -176,11 +176,11 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   } | null>(
     caseData.abogado_responsable
       ? {
-          id: caseData.abogado_responsable.id,
-          nombre: caseData.abogado_responsable.nombre,
-          telefono: caseData.abogado_responsable.telefono ?? null,
-          email: caseData.abogado_responsable.email ?? null,
-        }
+        id: caseData.abogado_responsable.id,
+        nombre: caseData.abogado_responsable.nombre,
+        telefono: caseData.abogado_responsable.telefono ?? null,
+        email: caseData.abogado_responsable.email ?? null,
+      }
       : null,
   );
   const [availableLawyers, setAvailableLawyers] = useState<
@@ -188,13 +188,13 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   >(
     caseData.abogado_responsable
       ? [
-          {
-            id: caseData.abogado_responsable.id,
-            nombre: caseData.abogado_responsable.nombre,
-            email: caseData.abogado_responsable.email ?? null,
-            telefono: caseData.abogado_responsable.telefono ?? null,
-          },
-        ]
+        {
+          id: caseData.abogado_responsable.id,
+          nombre: caseData.abogado_responsable.nombre,
+          email: caseData.abogado_responsable.email ?? null,
+          telefono: caseData.abogado_responsable.telefono ?? null,
+        },
+      ]
       : [],
   );
 
@@ -525,11 +525,11 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
             ensureLawyer ??
             (currentLawyer
               ? {
-                  id: currentLawyer.id,
-                  nombre: currentLawyer.nombre,
-                  email: currentLawyer.email ?? null,
-                  telefono: currentLawyer.telefono ?? null,
-                }
+                id: currentLawyer.id,
+                nombre: currentLawyer.nombre,
+                email: currentLawyer.email ?? null,
+                telefono: currentLawyer.telefono ?? null,
+              }
               : null);
 
           if (fallback && !options.some((lawyer) => lawyer.id === fallback.id)) {
@@ -598,9 +598,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
 
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          variants[status] || 'bg-gray-100 text-gray-800'
-        }`}
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variants[status] || 'bg-gray-100 text-gray-800'
+          }`}
       >
         {labels[status] ?? status}
       </span>
@@ -617,9 +616,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
 
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          variants[priority] || 'bg-gray-100 text-gray-800'
-        }`}
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variants[priority] || 'bg-gray-100 text-gray-800'
+          }`}
       >
         {priority.charAt(0).toUpperCase() + priority.slice(1)}
       </span>
@@ -707,9 +705,8 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         setClientAdvance((prev) => ({ ...prev, autorizado: authorizedOrder }));
         toast({
           title: 'Avance autorizado',
-          description: `Se autorizó avanzar hasta ${
-            stageNamesByOrder.get(authorizedOrder) ?? `la etapa ${authorizedOrder}`
-          }.`,
+          description: `Se autorizó avanzar hasta ${stageNamesByOrder.get(authorizedOrder) ?? `la etapa ${authorizedOrder}`
+            }.`,
         });
         router.refresh();
       } else {
@@ -787,31 +784,31 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
   const tabs = useMemo(() => {
     const base: Array<{
       id:
-        | 'overview'
-        | 'timeline'
-        | 'documents'
-        | 'activity'
-        | 'monitoring'
-        | 'daily'
-        | 'notes'
-        | 'messages'
-        | 'requests'
-        | 'checklist'
-        | 'clients';
+      | 'overview'
+      | 'timeline'
+      | 'documents'
+      | 'activity'
+      | 'monitoring'
+      | 'daily'
+      | 'notes'
+      | 'messages'
+      | 'requests'
+      | 'checklist'
+      | 'clients';
       label: string;
       icon: any;
       count?: number;
     }> = [
-      { id: 'overview', label: 'Resumen', icon: Scale },
-      { id: 'timeline', label: 'Timeline', icon: Clock },
-      { id: 'documents', label: 'Documentos', icon: FileText },
-      { id: 'activity', label: 'Actividad', icon: ClipboardList, count: caseEvents.length },
-      { id: 'monitoring', label: 'Monitoreo', icon: ShieldCheck },
-      { id: 'daily', label: 'Estado Diario', icon: Calendar },
-      { id: 'notes', label: 'Notas', icon: MessageCircle },
-      { id: 'messages', label: 'Mensajes', icon: MessageCircle, count: messages.length },
-      { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
-    ];
+        { id: 'overview', label: 'Resumen', icon: Scale },
+        { id: 'timeline', label: 'Timeline', icon: Clock },
+        { id: 'documents', label: 'Documentos', icon: FileText },
+        { id: 'activity', label: 'Actividad', icon: ClipboardList, count: caseEvents.length },
+        { id: 'monitoring', label: 'Monitoreo', icon: ShieldCheck },
+        { id: 'daily', label: 'Estado Diario', icon: Calendar },
+        { id: 'notes', label: 'Notas', icon: MessageCircle },
+        { id: 'messages', label: 'Mensajes', icon: MessageCircle, count: messages.length },
+        { id: 'requests', label: 'Solicitudes', icon: MessageCircle },
+      ];
 
     if (showPrivateContent) {
       base.push({
@@ -873,32 +870,32 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         }
         actions={
           <>
-	            <Button
-	              variant="ghost"
-	              size="sm"
-	              className="rounded-2xl border border-white/25 bg-white/50 px-3 text-foreground/70 shadow-sm hover:bg-white hover:text-foreground"
-	              onClick={() => router.back()}
-	            >
-	              <ArrowLeft className="mr-2 h-4 w-4" />
-	              Volver
-	            </Button>
-	            <Button
-	              asChild
-	              size="sm"
-	              variant="outline"
-	              className="rounded-2xl border border-white/25 bg-white/60 px-3 text-foreground/70 shadow-sm hover:bg-white hover:text-foreground"
-	            >
-	              <Link href={`/billing?caseId=${caseData.id}`}>
-	                <Wallet className="mr-2 h-4 w-4" />
-	                Cobros
-	              </Link>
-	            </Button>
-	            {canEdit && (
-	              <Button
-	                asChild
-	                size="sm"
-	                className="rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
-	              >
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-2xl border border-white/25 bg-white/50 px-3 text-foreground/70 shadow-sm hover:bg-white hover:text-foreground"
+              onClick={() => router.back()}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Button>
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="rounded-2xl border border-white/25 bg-white/60 px-3 text-foreground/70 shadow-sm hover:bg-white hover:text-foreground"
+            >
+              <Link href={`/billing?caseId=${caseData.id}`}>
+                <Wallet className="mr-2 h-4 w-4" />
+                Cobros
+              </Link>
+            </Button>
+            {canEdit && (
+              <Button
+                asChild
+                size="sm"
+                className="rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
+              >
                 <Link href={`/cases/${caseData.id}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
                   Editar
@@ -909,377 +906,391 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
         }
       />
 
-        {/* Header del caso */}
-        <Card className="mb-10 shadow-[0_35px_65px_-34px_rgba(15,23,42,0.45)]">
-          <CardContent className="pt-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-foreground/60">
-                  {caseData.numero_causa && (
-                    <span className="flex items-center">
-                      <Scale className="h-4 w-4 mr-1 text-blue-600" />
-                      Causa: {caseData.numero_causa}
-                    </span>
-                  )}
-                  {caseData.materia && <span className="inline-flex items-center gap-2">
-                    <Badge variant="outline" className="badge-spark capitalize">
-                      {caseData.materia.toLowerCase()}
-                    </Badge>
-                  </span>}
-                  {caseData.tribunal && (
-                    <span className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-1 text-foreground/40" />
-                      {caseData.tribunal}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2 md:flex-col md:items-end md:gap-3">
-                {getStatusBadge(caseData.estado || 'activo')}
-                {caseData.prioridad && getPriorityBadge(caseData.prioridad)}
-                {stageInsights.etapaActual && (
-                  <Badge variant="outline" className="badge-spark">
-                    {stageInsights.etapaActual}
-                  </Badge>
+      {/* Header del caso */}
+      <Card className="mb-10 shadow-[0_35px_65px_-34px_rgba(15,23,42,0.45)]">
+        <CardContent className="pt-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-foreground/60">
+                {caseData.numero_causa && (
+                  <span className="flex items-center">
+                    <Scale className="h-4 w-4 mr-1 text-blue-600" />
+                    Causa: {caseData.numero_causa}
+                  </span>
                 )}
-                {caseData.sentencia_estado && caseData.sentencia_estado !== 'no_registra' && (
-                  <span className="text-xs text-foreground/60">
-                    Sentencia: {getSentenceStatusLabel(caseData.sentencia_estado)}
-                    {caseData.sentencia_fecha && <> · {formatDate(caseData.sentencia_fecha)}</>}
+                {caseData.materia && <span className="inline-flex items-center gap-2">
+                  <Badge variant="outline" className="badge-spark capitalize">
+                    {caseData.materia.toLowerCase()}
+                  </Badge>
+                </span>}
+                {caseData.tribunal && (
+                  <span className="flex items-center">
+                    <MapPin className="h-4 w-4 mr-1 text-foreground/40" />
+                    {caseData.tribunal}
                   </span>
                 )}
               </div>
             </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 md:flex-col md:items-end md:gap-3">
+              {getStatusBadge(caseData.estado || 'activo')}
+              {caseData.prioridad && getPriorityBadge(caseData.prioridad)}
+              {stageInsights.etapaActual && (
+                <Badge variant="outline" className="badge-spark">
+                  {stageInsights.etapaActual}
+                </Badge>
+              )}
+              {caseData.sentencia_estado && caseData.sentencia_estado !== 'no_registra' && (
+                <span className="text-xs text-foreground/60">
+                  Sentencia: {getSentenceStatusLabel(caseData.sentencia_estado)}
+                  {caseData.sentencia_fecha && <> · {formatDate(caseData.sentencia_fecha)}</>}
+                </span>
+              )}
+            </div>
+          </div>
 
-            {/* Información principal */}
-            <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
-              {/* Abogado responsable */}
-              <div className="group relative overflow-hidden rounded-2xl border border-blue-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+          {/* Información principal */}
+          <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {/* Abogado responsable */}
+            <div className="group relative overflow-hidden rounded-2xl border border-blue-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+              />
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                      Abogado responsable
+                    </p>
+                    {currentLawyer ? (
+                      <div className="mt-3 space-y-1.5 text-sm text-foreground/70">
+                        <p className="text-base font-semibold text-foreground">{currentLawyer.nombre}</p>
+                        {currentLawyer.telefono && (
+                          <p className="flex items-center gap-2 text-foreground/60">
+                            <Phone className="h-3.5 w-3.5 text-blue-500" />
+                            {currentLawyer.telefono}
+                          </p>
+                        )}
+                        {currentLawyer.email && (
+                          <p className="flex items-center gap-2 text-foreground/60">
+                            <Mail className="h-3.5 w-3.5 text-blue-500" />
+                            {currentLawyer.email}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-foreground/60">
+                        Este caso aún no tiene un abogado asignado.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-transparent text-blue-600">
+                    <User className="h-5 w-5" />
+                  </div>
+                </div>
+
+                {canReassign && (
+                  <form className="space-y-3" onSubmit={handleReassignLawyer}>
+                    <Label
+                      htmlFor="case-lawyer-select"
+                      className="text-[11px] font-semibold uppercase tracking-[0.32em] text-foreground/45"
+                    >
+                      Reasignar · asignar abogado
+                    </Label>
+                    <div className="flex flex-col gap-2">
+                      <select
+                        id="case-lawyer-select"
+                        className="input-field w-full"
+                        value={selectedLawyerId}
+                        onChange={(event) => setSelectedLawyerId(event.target.value)}
+                        disabled={isLoadingLawyers || isReassigning}
+                      >
+                        <option value="">
+                          {isLoadingLawyers ? 'Cargando abogados…' : 'Selecciona un abogado'}
+                        </option>
+                        {availableLawyers.map((lawyer) => (
+                          <option key={lawyer.id} value={lawyer.id}>
+                            {lawyer.nombre}
+                            {lawyer.email ? ` · ${lawyer.email}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="rounded-full px-4 self-start"
+                        disabled={isReassigning || !selectedLawyerId || selectedLawyerId === currentLawyer?.id}
+                      >
+                        {isReassigning ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Guardando…
+                          </>
+                        ) : (
+                          'Actualizar'
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-foreground/50">
+                      Los cambios quedarán registrados automáticamente en el historial del caso.
+                    </p>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            {/* Cliente */}
+            {(parties.primaryClients.length > 0 || parties.demandantes.length > 0 || parties.demandados.length > 0) && (
+              <div className="group relative overflow-hidden rounded-2xl border border-emerald-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                 />
-                <div className="relative z-10 space-y-4">
+                <div className="relative z-10">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
-                        Abogado responsable
+                        Partes
                       </p>
-                      {currentLawyer ? (
-                        <div className="mt-3 space-y-1.5 text-sm text-foreground/70">
-                          <p className="text-base font-semibold text-foreground">{currentLawyer.nombre}</p>
-                          {currentLawyer.telefono && (
-                            <p className="flex items-center gap-2 text-foreground/60">
-                              <Phone className="h-3.5 w-3.5 text-blue-500" />
-                              {currentLawyer.telefono}
-                            </p>
-                          )}
-                          {currentLawyer.email && (
-                            <p className="flex items-center gap-2 text-foreground/60">
-                              <Mail className="h-3.5 w-3.5 text-blue-500" />
-                              {currentLawyer.email}
-                            </p>
-                          )}
+                      <div className="mt-3 space-y-3 text-sm text-foreground/70">
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="badge-spark shrink-0">
+                            Clientes principales
+                          </Badge>
+                          <div className="min-w-0">
+                            {parties.primaryClients.length === 0 ? (
+                              <p className="font-semibold text-foreground">Sin registrar</p>
+                            ) : (
+                              <>
+                                {parties.primaryClients.slice(0, 2).map((client, idx) => (
+                                  <div key={`primary-client-${client.id}-${idx}`} className="space-y-0.5">
+                                    <p className="font-semibold text-foreground">{client.nombre}</p>
+                                    {(client.rut || client.email) && (
+                                      <p className="text-xs text-foreground/55">
+                                        {client.rut ? `RUT · ${client.rut}` : ''}
+                                        {client.rut && client.email ? ' · ' : ''}
+                                        {client.email ? client.email : ''}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                                {parties.primaryClients.length > 2 && (
+                                  <p className="text-xs text-foreground/55">
+                                    +{parties.primaryClients.length - 2} más
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <p className="mt-3 text-sm text-foreground/60">
-                          Este caso aún no tiene un abogado asignado.
-                        </p>
-                      )}
+
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="badge-spark shrink-0">
+                            Demandante
+                          </Badge>
+                          <div className="min-w-0 space-y-1">
+                            {parties.demandantes.length === 0 ? (
+                              <p className="text-foreground/55">Sin registrar</p>
+                            ) : (
+                              <>
+                                {parties.demandantes.slice(0, 2).map((row, idx) => (
+                                  <p key={`demandante-${row.nombre}-${idx}`} className="text-foreground/75">
+                                    {row.nombre}
+                                    {row.rut ? <span className="text-xs text-foreground/55">{` · RUT ${row.rut}`}</span> : null}
+                                  </p>
+                                ))}
+                                {parties.demandantes.length > 2 && (
+                                  <p className="text-xs text-foreground/55">+{parties.demandantes.length - 2} más</p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="badge-spark shrink-0">
+                            Demandado
+                          </Badge>
+                          <div className="min-w-0 space-y-1">
+                            {parties.demandados.length === 0 ? (
+                              <p className="text-foreground/55">Sin registrar</p>
+                            ) : (
+                              <>
+                                {parties.demandados.slice(0, 2).map((row, idx) => (
+                                  <p key={`demandado-${row.nombre}-${idx}`} className="text-foreground/75">
+                                    {row.nombre}
+                                    {row.rut ? <span className="text-xs text-foreground/55">{` · RUT ${row.rut}`}</span> : null}
+                                  </p>
+                                ))}
+                                {parties.demandados.length > 2 && (
+                                  <p className="text-xs text-foreground/55">+{parties.demandados.length - 2} más</p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-transparent text-blue-600">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-600">
                       <User className="h-5 w-5" />
                     </div>
                   </div>
-
-                  {canReassign && (
-                    <form className="space-y-3" onSubmit={handleReassignLawyer}>
-                      <Label
-                        htmlFor="case-lawyer-select"
-                        className="text-[11px] font-semibold uppercase tracking-[0.32em] text-foreground/45"
-                      >
-                        Reasignar · asignar abogado
-                      </Label>
-                      <div className="flex flex-col gap-2">
-                        <select
-                          id="case-lawyer-select"
-                          className="input-field w-full"
-                          value={selectedLawyerId}
-                          onChange={(event) => setSelectedLawyerId(event.target.value)}
-                          disabled={isLoadingLawyers || isReassigning}
-                        >
-                          <option value="">
-                            {isLoadingLawyers ? 'Cargando abogados…' : 'Selecciona un abogado'}
-                          </option>
-                          {availableLawyers.map((lawyer) => (
-                            <option key={lawyer.id} value={lawyer.id}>
-                              {lawyer.nombre}
-                              {lawyer.email ? ` · ${lawyer.email}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          type="submit"
-                          size="sm"
-                          className="rounded-full px-4 self-start"
-                          disabled={isReassigning || !selectedLawyerId || selectedLawyerId === currentLawyer?.id}
-                        >
-                          {isReassigning ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Guardando…
-                            </>
-                          ) : (
-                            'Actualizar'
-                          )}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-foreground/50">
-                        Los cambios quedarán registrados automáticamente en el historial del caso.
-                      </p>
-                    </form>
-                  )}
                 </div>
               </div>
+            )}
 
-              {/* Cliente */}
-              {(parties.primaryClients.length > 0 || parties.demandantes.length > 0 || parties.demandados.length > 0) && (
-                <div className="group relative overflow-hidden rounded-2xl border border-emerald-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                  />
-                  <div className="relative z-10">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
-                          Partes
-                        </p>
-                        <div className="mt-3 space-y-3 text-sm text-foreground/70">
-                          <div className="flex items-start gap-2">
-                            <Badge variant="outline" className="badge-spark shrink-0">
-                              Clientes principales
-                            </Badge>
-                            <div className="min-w-0">
-                              {parties.primaryClients.length === 0 ? (
-                                <p className="font-semibold text-foreground">Sin registrar</p>
-                              ) : (
-                                <>
-                                  {parties.primaryClients.slice(0, 2).map((client, idx) => (
-                                    <div key={`primary-client-${client.id}-${idx}`} className="space-y-0.5">
-                                      <p className="font-semibold text-foreground">{client.nombre}</p>
-                                      {(client.rut || client.email) && (
-                                        <p className="text-xs text-foreground/55">
-                                          {client.rut ? `RUT · ${client.rut}` : ''}
-                                          {client.rut && client.email ? ' · ' : ''}
-                                          {client.email ? client.email : ''}
-                                        </p>
-                                      )}
-                                    </div>
-                                  ))}
-                                  {parties.primaryClients.length > 2 && (
-                                    <p className="text-xs text-foreground/55">
-                                      +{parties.primaryClients.length - 2} más
-                                    </p>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-start gap-2">
-                            <Badge variant="outline" className="badge-spark shrink-0">
-                              Demandante
-                            </Badge>
-                            <div className="min-w-0 space-y-1">
-                              {parties.demandantes.length === 0 ? (
-                                <p className="text-foreground/55">Sin registrar</p>
-                              ) : (
-                                <>
-                                  {parties.demandantes.slice(0, 2).map((row, idx) => (
-                                    <p key={`demandante-${row.nombre}-${idx}`} className="text-foreground/75">
-                                      {row.nombre}
-                                      {row.rut ? <span className="text-xs text-foreground/55">{` · RUT ${row.rut}`}</span> : null}
-                                    </p>
-                                  ))}
-                                  {parties.demandantes.length > 2 && (
-                                    <p className="text-xs text-foreground/55">+{parties.demandantes.length - 2} más</p>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-start gap-2">
-                            <Badge variant="outline" className="badge-spark shrink-0">
-                              Demandado
-                            </Badge>
-                            <div className="min-w-0 space-y-1">
-                              {parties.demandados.length === 0 ? (
-                                <p className="text-foreground/55">Sin registrar</p>
-                              ) : (
-                                <>
-                                  {parties.demandados.slice(0, 2).map((row, idx) => (
-                                    <p key={`demandado-${row.nombre}-${idx}`} className="text-foreground/75">
-                                      {row.nombre}
-                                      {row.rut ? <span className="text-xs text-foreground/55">{` · RUT ${row.rut}`}</span> : null}
-                                    </p>
-                                  ))}
-                                  {parties.demandados.length > 2 && (
-                                    <p className="text-xs text-foreground/55">+{parties.demandados.length - 2} más</p>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-600">
-                        <User className="h-5 w-5" />
-                      </div>
+            {/* Fechas */}
+            <div className="group relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+              />
+              <div className="relative z-10 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                      Fechas clave
+                    </p>
+                    <div className="mt-3 space-y-1.5 text-sm text-foreground/65">
+                      {caseMilestones.length === 0 ? (
+                        <p className="text-foreground/55">Sin fechas registradas</p>
+                      ) : (
+                        caseMilestones.slice(0, 6).map((milestone) => (
+                          <p key={milestone.key}>
+                            {milestone.label} ·{' '}
+                            <span className="font-medium text-foreground">{formatDate(milestone.date)}</span>
+                            {milestone.detail ? (
+                              <span className="text-xs text-foreground/50"> · {milestone.detail}</span>
+                            ) : null}
+                          </p>
+                        ))
+                      )}
                     </div>
                   </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 via-indigo-500/10 to-transparent text-indigo-600">
+                    <Calendar className="h-5 w-5" />
+                  </div>
                 </div>
-              )}
+              </div>
+            </div>
 
-              {/* Fechas */}
-              <div className="group relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+            {/* Valor */}
+            {caseData.valor_estimado && (
+              <div className="group relative overflow-hidden rounded-2xl border border-amber-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                 />
                 <div className="relative z-10 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
-                        Fechas clave
+                        Cuantía en disputa
                       </p>
-                      <div className="mt-3 space-y-1.5 text-sm text-foreground/65">
-                        {caseMilestones.length === 0 ? (
-                          <p className="text-foreground/55">Sin fechas registradas</p>
+                      <p className="mt-3 text-2xl font-semibold text-foreground">
+                        {formatCurrency(caseData.valor_estimado)}
+                      </p>
+                      <p className="mt-1 text-xs text-foreground/50">Monto reclamado o discutido (no honorarios).</p>
+                    </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent text-amber-600">
+                      <DollarSign className="h-5 w-5" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(clientAdvance.solicitado > 0 || clientAdvance.autorizado > 0) && (
+              <div className="group relative overflow-hidden rounded-2xl border border-sky-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                />
+                <div className="relative z-10 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
+                        Alcance del cliente
+                      </p>
+                      <div className="mt-3 space-y-1.5 text-sm text-foreground/60">
+                        <p>
+                          {clientAdvance.solicitado > 0
+                            ? `Solicitado · ${requestedStageName ?? `Etapa ${clientAdvance.solicitado}`}`
+                            : 'Sin solicitudes vigentes'}
+                        </p>
+                        <p>
+                          {clientAdvance.autorizado > 0
+                            ? `Autorizado · ${authorizedStageName ?? `Etapa ${clientAdvance.autorizado}`}`
+                            : 'Aprobación pendiente'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 via-sky-500/10 to-transparent text-sky-600">
+                      <Clock className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  {(profile.role === 'admin_firma' || profile.role === 'analista') &&
+                    clientAdvance.solicitado > clientAdvance.autorizado && (
+                      <Button
+                        size="sm"
+                        className="inline-flex items-center gap-2 rounded-full px-4"
+                        onClick={() => handleAuthorizeAdvance(clientAdvance.solicitado)}
+                        disabled={isAuthorizing}
+                      >
+                        {isAuthorizing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Autorizando…
+                          </>
                         ) : (
-                          caseMilestones.slice(0, 6).map((milestone) => (
-                            <p key={milestone.key}>
-                              {milestone.label} ·{' '}
-                              <span className="font-medium text-foreground">{formatDate(milestone.date)}</span>
-                              {milestone.detail ? (
-                                <span className="text-xs text-foreground/50"> · {milestone.detail}</span>
-                              ) : null}
-                            </p>
-                          ))
+                          'Autorizar solicitud'
                         )}
-                      </div>
-                    </div>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 via-indigo-500/10 to-transparent text-indigo-600">
-                      <Calendar className="h-5 w-5" />
-                    </div>
-                  </div>
+                      </Button>
+                    )}
                 </div>
               </div>
+            )}
 
-              {/* Valor */}
-              {caseData.valor_estimado && (
-                <div className="group relative overflow-hidden rounded-2xl border border-amber-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                  />
-                  <div className="relative z-10 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
-                          Cuantía en disputa
-                        </p>
-                        <p className="mt-3 text-2xl font-semibold text-foreground">
-                          {formatCurrency(caseData.valor_estimado)}
-                        </p>
-                        <p className="mt-1 text-xs text-foreground/50">Monto reclamado o discutido (no honorarios).</p>
-                      </div>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent text-amber-600">
-                        <DollarSign className="h-5 w-5" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+          </div>
 
-              {(clientAdvance.solicitado > 0 || clientAdvance.autorizado > 0) && (
-                <div className="group relative overflow-hidden rounded-2xl border border-sky-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-200/50 via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                  />
-                  <div className="relative z-10 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-foreground/40">
-                          Alcance del cliente
-                        </p>
-                        <div className="mt-3 space-y-1.5 text-sm text-foreground/60">
-                          <p>
-                            {clientAdvance.solicitado > 0
-                              ? `Solicitado · ${requestedStageName ?? `Etapa ${clientAdvance.solicitado}`}`
-                              : 'Sin solicitudes vigentes'}
-                          </p>
-                          <p>
-                            {clientAdvance.autorizado > 0
-                              ? `Autorizado · ${authorizedStageName ?? `Etapa ${clientAdvance.autorizado}`}`
-                              : 'Aprobación pendiente'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500/20 via-sky-500/10 to-transparent text-sky-600">
-                        <Clock className="h-5 w-5" />
-                      </div>
-                    </div>
-
-                    {(profile.role === 'admin_firma' || profile.role === 'analista') &&
-                      clientAdvance.solicitado > clientAdvance.autorizado && (
-                        <Button
-                          size="sm"
-                          className="inline-flex items-center gap-2 rounded-full px-4"
-                          onClick={() => handleAuthorizeAdvance(clientAdvance.solicitado)}
-                          disabled={isAuthorizing}
-                        >
-                          {isAuthorizing ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Autorizando…
-                            </>
-                          ) : (
-                            'Autorizar solicitud'
-                          )}
-                        </Button>
-                      )}
-                  </div>
-                </div>
-              )}
-
+          {/* Contraparte */}
+          {caseData.contraparte && (
+            <div className="mt-8 rounded-3xl border border-white/30 bg-white/75 p-6 shadow-inner">
+              <h3 className="text-lg font-semibold text-foreground mb-2">Contraparte</h3>
+              <p className="text-sm text-foreground/65">{caseData.contraparte}</p>
             </div>
+          )}
 
-            {/* Contraparte */}
+          {/* Observaciones */}
+          {observacionesClean && (
+            <div className="mt-6 rounded-3xl border border-white/30 bg-white/75 p-6 shadow-inner">
+              <h3 className="text-lg font-semibold text-foreground mb-2">Observaciones</h3>
+              <p className="text-sm text-foreground/65 whitespace-pre-wrap">
+                {observacionesClean}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tabs de navegación */}
+      <div className="sticky top-16 z-40 -mx-4 border-y border-white/20 bg-white/65 py-3 backdrop-blur-2xl sm:-mx-6 lg:-mx-8">
+        <nav className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          {/* Extended Sticky Header Content */}
+          <div className="hidden lg:flex flex-col flex-1 min-w-0 mr-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-800 truncate">{caseData.caratulado}</h2>
+              {caseData.numero_causa && <span className="text-xs text-slate-500 font-medium whitespace-nowrap bg-slate-100 px-1.5 py-0.5 rounded">{caseData.numero_causa}</span>}
+            </div>
             {caseData.contraparte && (
-              <div className="mt-8 rounded-3xl border border-white/30 bg-white/75 p-6 shadow-inner">
-                <h3 className="text-lg font-semibold text-foreground mb-2">Contraparte</h3>
-                <p className="text-sm text-foreground/65">{caseData.contraparte}</p>
-              </div>
+              <p className="text-xs text-slate-500 truncate">
+                Contraparte: <span className="font-medium text-slate-700">{caseData.contraparte}</span>
+              </p>
             )}
+          </div>
 
-            {/* Observaciones */}
-            {observacionesClean && (
-              <div className="mt-6 rounded-3xl border border-white/30 bg-white/75 p-6 shadow-inner">
-                <h3 className="text-lg font-semibold text-foreground mb-2">Observaciones</h3>
-                <p className="text-sm text-foreground/65 whitespace-pre-wrap">
-                  {observacionesClean}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tabs de navegación */}
-        <div className="sticky top-16 z-40 -mx-4 border-y border-white/20 bg-white/65 py-3 backdrop-blur-2xl sm:-mx-6 lg:-mx-8">
-          <nav className="mx-auto flex w-full max-w-[1600px] items-center justify-start gap-2 overflow-x-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-start gap-2 overflow-x-auto no-scrollbar flex-1 lg:flex-none">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const count = tab.count ?? 0;
@@ -1287,19 +1298,17 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                    activeTab === tab.id
+                  className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${activeTab === tab.id
                       ? 'bg-foreground text-white shadow-md'
                       : 'border border-white/20 bg-white/40 text-foreground/60 hover:bg-white/70 hover:text-foreground'
-                  }`}
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                   <span>{tab.label}</span>
                   {count > 0 && (
                     <span
-                      className={`ml-1 inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
-                      }`}
+                      className={`ml-1 inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
+                        }`}
                     >
                       {count > 99 ? '99+' : count}
                     </span>
@@ -1307,12 +1316,13 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                 </button>
               );
             })}
-          </nav>
-        </div>
+          </div>
+        </nav>
+      </div>
 
-        {/* Contenido de las tabs */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-          <div className="min-w-0">
+      {/* Contenido de las tabs */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <div className="min-w-0">
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,4.5fr)_minmax(0,2.5fr)] xl:items-start">
               <div className="space-y-6">
@@ -1581,45 +1591,45 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
           {activeTab === 'clients' && canManageClients && (
             <div className="space-y-6">
               {/* Lista de clientes asociados */}
-		              {caseData.clients && caseData.clients.length > 0 && (
-	                <Card>
-	                  <CardHeader>
-	                    <CardTitle className="flex items-center gap-2">
-	                      <Users className="h-5 w-5" />
-	                      Clientes Asociados ({caseData.clients.length})
-	                    </CardTitle>
-	                  </CardHeader>
-	                  <CardContent>
-	                    <div className="space-y-3">
-	                      {caseData.clients.map((client) => (
-	                        <div
-	                          key={client.id}
-	                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-4 py-3"
-	                        >
-	                          <div className="flex items-center space-x-3">
-	                            <div
-	                              className="flex h-10 w-10 items-center justify-center rounded-2xl text-white font-medium"
-	                              style={{ backgroundColor: stringToColor(client.nombre) }}
-	                            >
-	                              {getInitials(client.nombre)}
-	                            </div>
-	                            <div>
-	                              <h4 className="font-semibold text-foreground">{client.nombre}</h4>
-	                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground/55">
-	                                <span className="flex items-center">
-	                                  <Mail className="mr-1 h-3 w-3" />
-	                                  {client.email}
-	                                </span>
-	                                {client.telefono && (
-	                                  <span className="flex items-center">
-	                                    <Phone className="mr-1 h-3 w-3" />
-	                                    {client.telefono}
-	                                  </span>
-	                                )}
-	                              </div>
-	                            </div>
-	                          </div>
-	                          <Badge variant="outline">Cliente</Badge>
+              {caseData.clients && caseData.clients.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Clientes Asociados ({caseData.clients.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {caseData.clients.map((client) => (
+                        <div
+                          key={client.id}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-4 py-3"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className="flex h-10 w-10 items-center justify-center rounded-2xl text-white font-medium"
+                              style={{ backgroundColor: stringToColor(client.nombre) }}
+                            >
+                              {getInitials(client.nombre)}
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-foreground">{client.nombre}</h4>
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground/55">
+                                <span className="flex items-center">
+                                  <Mail className="mr-1 h-3 w-3" />
+                                  {client.email}
+                                </span>
+                                {client.telefono && (
+                                  <span className="flex items-center">
+                                    <Phone className="mr-1 h-3 w-3" />
+                                    {client.telefono}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Badge variant="outline">Cliente</Badge>
                         </div>
                       ))}
                     </div>
@@ -1655,14 +1665,14 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                         onChange={(event) => handleCounterpartyInputChange('rut', event.target.value)}
                       />
                     </div>
-	                    <div className="space-y-2">
-	                      <Label htmlFor="counterparty_tipo">Rol</Label>
-	                      <select
-	                        id="counterparty_tipo"
-	                        className="h-11 w-full rounded-2xl border border-white/25 bg-white/60 px-4 text-sm text-foreground shadow-inner outline-none transition focus:border-primary/40 focus:bg-white/85 focus:ring-2 focus:ring-primary/20"
-	                        value={counterpartyForm.tipo}
-	                        onChange={(event) => handleCounterpartyInputChange('tipo', event.target.value as 'demandado' | 'demandante' | 'tercero')}
-	                      >
+                    <div className="space-y-2">
+                      <Label htmlFor="counterparty_tipo">Rol</Label>
+                      <select
+                        id="counterparty_tipo"
+                        className="h-11 w-full rounded-2xl border border-white/25 bg-white/60 px-4 text-sm text-foreground shadow-inner outline-none transition focus:border-primary/40 focus:bg-white/85 focus:ring-2 focus:ring-primary/20"
+                        value={counterpartyForm.tipo}
+                        onChange={(event) => handleCounterpartyInputChange('tipo', event.target.value as 'demandado' | 'demandante' | 'tercero')}
+                      >
                         <option value="demandado">Demandado</option>
                         <option value="demandante">Demandante</option>
                         <option value="tercero">Tercero</option>
@@ -1686,34 +1696,34 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
                     </div>
                   </form>
 
-	                  <div className="space-y-3">
-	                    {counterparties.length === 0 ? (
-	                      <p className="text-sm text-foreground/60">
-	                        Aún no se agregan demandados al expediente. Regístralos para tener claridad de las partes involucradas.
-	                      </p>
-	                    ) : (
-	                      counterparties.map((item) => (
-	                        <div
-	                          key={item.id}
-	                          className="flex items-center justify-between rounded-2xl border border-white/20 bg-white/55 px-4 py-3 text-sm shadow-sm"
-	                        >
-	                          <div className="flex flex-col">
-	                            <span className="font-semibold text-foreground">{item.nombre}</span>
-	                            <div className="flex flex-wrap gap-3 text-xs text-foreground/55">
-	                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-600">
-	                                {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)}
-	                              </span>
-	                              {item.rut && <span>RUT: {item.rut}</span>}
-	                              <span>Agregado: {item.created_at ? formatDate(item.created_at) : '—'}</span>
-	                            </div>
-	                          </div>
-	                          <Button
-	                            variant="ghost"
-	                            size="icon"
-	                            className="h-9 w-9 rounded-full text-foreground/45 hover:text-red-600"
-	                            onClick={() => handleDeleteCounterparty(item.id)}
-	                            disabled={pendingDeleteCounterparty === item.id}
-	                          >
+                  <div className="space-y-3">
+                    {counterparties.length === 0 ? (
+                      <p className="text-sm text-foreground/60">
+                        Aún no se agregan demandados al expediente. Regístralos para tener claridad de las partes involucradas.
+                      </p>
+                    ) : (
+                      counterparties.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between rounded-2xl border border-white/20 bg-white/55 px-4 py-3 text-sm shadow-sm"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-foreground">{item.nombre}</span>
+                            <div className="flex flex-wrap gap-3 text-xs text-foreground/55">
+                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-600">
+                                {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)}
+                              </span>
+                              {item.rut && <span>RUT: {item.rut}</span>}
+                              <span>Agregado: {item.created_at ? formatDate(item.created_at) : '—'}</span>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-full text-foreground/45 hover:text-red-600"
+                            onClick={() => handleDeleteCounterparty(item.id)}
+                            disabled={pendingDeleteCounterparty === item.id}
+                          >
                             {pendingDeleteCounterparty === item.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
@@ -1728,152 +1738,152 @@ export function CaseDetailView({ case: caseData, profile, messages }: CaseDetail
               </Card>
             </div>
           )}
-          </div>
-
-          {/* Right rail (Salesforce-like) */}
-          <aside className="space-y-6 lg:sticky lg:top-24">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Acciones rápidas</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('documents')}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Documentos
-                  </Button>
-                  <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('requests')}>
-                    <ClipboardList className="mr-2 h-4 w-4" />
-                    Solicitudes
-                  </Button>
-                  <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('messages')}>
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    Mensajes
-                  </Button>
-                  <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('activity')}>
-                    <Clock className="mr-2 h-4 w-4" />
-                    Bitácora
-                  </Button>
-                </div>
-                {canEdit && (
-                  <Button
-                    asChild
-                    className="w-full rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
-                  >
-                    <Link href={`/cases/${caseData.id}/edit`}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Editar caso
-                    </Link>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Equipo y contacto</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {currentLawyer ? (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/45">
-                      Abogado responsable
-                    </p>
-                    <p className="text-sm font-semibold text-foreground">{currentLawyer.nombre}</p>
-                    <div className="flex flex-wrap gap-2 pt-1 text-xs text-foreground/60">
-                      {currentLawyer.email && (
-                        <a className="pill hover:bg-white/70" href={`mailto:${currentLawyer.email}`}>
-                          <Mail className="h-3.5 w-3.5" />
-                          {currentLawyer.email}
-                        </a>
-                      )}
-                      {currentLawyer.telefono && (
-                        <a className="pill hover:bg-white/70" href={`tel:${currentLawyer.telefono}`}>
-                          <Phone className="h-3.5 w-3.5" />
-                          {currentLawyer.telefono}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-foreground/60">Sin abogado responsable asignado.</p>
-                )}
-
-                {caseData.clients && caseData.clients.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/45">
-                      Clientes
-                    </p>
-                    <div className="space-y-2">
-                      {caseData.clients.slice(0, 3).map((client) => (
-                        <div
-                          key={client.id}
-                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-foreground">{client.nombre}</p>
-                            <p className="truncate text-xs text-foreground/55">{client.email}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {client.telefono && (
-                              <a
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/25 bg-white/60 text-foreground/70 hover:bg-white"
-                                href={`tel:${client.telefono}`}
-                                aria-label="Llamar"
-                              >
-                                <Phone className="h-4 w-4" />
-                              </a>
-                            )}
-                            {client.email && (
-                              <a
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/25 bg-white/60 text-foreground/70 hover:bg-white"
-                                href={`mailto:${client.email}`}
-                                aria-label="Enviar correo"
-                              >
-                                <Mail className="h-4 w-4" />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      {caseData.clients.length > 3 && (
-                        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => setActiveTab('clients')}>
-                          Ver {caseData.clients.length - 3} más…
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Resumen</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-foreground/70">
-                <div className="flex items-center justify-between gap-3">
-                  <span>Etapa actual</span>
-                  <span className="font-medium text-foreground">{stageInsights.etapaActual ?? 'Sin definir'}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Estado</span>
-                  <span className="font-medium text-foreground">{caseData.estado ?? 'Sin definir'}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Sentencia</span>
-                  <span className="font-medium text-foreground">{getSentenceStatusLabel(caseData.sentencia_estado)}</span>
-                </div>
-                {typeof caseData.valor_estimado === 'number' && (
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Cuantía</span>
-                    <span className="font-medium text-foreground">{formatCurrency(caseData.valor_estimado)}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </aside>
         </div>
+
+        {/* Right rail (Salesforce-like) */}
+        <aside className="space-y-6 lg:sticky lg:top-24">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Acciones rápidas</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('documents')}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Documentos
+                </Button>
+                <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('requests')}>
+                  <ClipboardList className="mr-2 h-4 w-4" />
+                  Solicitudes
+                </Button>
+                <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('messages')}>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Mensajes
+                </Button>
+                <Button type="button" variant="outline" className="justify-start" onClick={() => setActiveTab('activity')}>
+                  <Clock className="mr-2 h-4 w-4" />
+                  Bitácora
+                </Button>
+              </div>
+              {canEdit && (
+                <Button
+                  asChild
+                  className="w-full rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
+                >
+                  <Link href={`/cases/${caseData.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Editar caso
+                  </Link>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Equipo y contacto</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentLawyer ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/45">
+                    Abogado responsable
+                  </p>
+                  <p className="text-sm font-semibold text-foreground">{currentLawyer.nombre}</p>
+                  <div className="flex flex-wrap gap-2 pt-1 text-xs text-foreground/60">
+                    {currentLawyer.email && (
+                      <a className="pill hover:bg-white/70" href={`mailto:${currentLawyer.email}`}>
+                        <Mail className="h-3.5 w-3.5" />
+                        {currentLawyer.email}
+                      </a>
+                    )}
+                    {currentLawyer.telefono && (
+                      <a className="pill hover:bg-white/70" href={`tel:${currentLawyer.telefono}`}>
+                        <Phone className="h-3.5 w-3.5" />
+                        {currentLawyer.telefono}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-foreground/60">Sin abogado responsable asignado.</p>
+              )}
+
+              {caseData.clients && caseData.clients.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/45">
+                    Clientes
+                  </p>
+                  <div className="space-y-2">
+                    {caseData.clients.slice(0, 3).map((client) => (
+                      <div
+                        key={client.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-white/55 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{client.nombre}</p>
+                          <p className="truncate text-xs text-foreground/55">{client.email}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {client.telefono && (
+                            <a
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/25 bg-white/60 text-foreground/70 hover:bg-white"
+                              href={`tel:${client.telefono}`}
+                              aria-label="Llamar"
+                            >
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          )}
+                          {client.email && (
+                            <a
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/25 bg-white/60 text-foreground/70 hover:bg-white"
+                              href={`mailto:${client.email}`}
+                              aria-label="Enviar correo"
+                            >
+                              <Mail className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {caseData.clients.length > 3 && (
+                      <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => setActiveTab('clients')}>
+                        Ver {caseData.clients.length - 3} más…
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Resumen</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-foreground/70">
+              <div className="flex items-center justify-between gap-3">
+                <span>Etapa actual</span>
+                <span className="font-medium text-foreground">{stageInsights.etapaActual ?? 'Sin definir'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Estado</span>
+                <span className="font-medium text-foreground">{caseData.estado ?? 'Sin definir'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Sentencia</span>
+                <span className="font-medium text-foreground">{getSentenceStatusLabel(caseData.sentencia_estado)}</span>
+              </div>
+              {typeof caseData.valor_estimado === 'number' && (
+                <div className="flex items-center justify-between gap-3">
+                  <span>Cuantía</span>
+                  <span className="font-medium text-foreground">{formatCurrency(caseData.valor_estimado)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
     </div>
   );
 }

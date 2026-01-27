@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { createCase, updateCase } from '@/lib/actions/cases';
+import { createCase, updateCase, deleteCase } from '@/lib/actions/cases';
 import { uploadDocument } from '@/lib/actions/documents';
 import { createClientProfile } from '@/lib/actions/clients';
 import {
@@ -2464,31 +2464,63 @@ export function CaseForm({
               </div>
             </section>
 
-            <div className='flex justify-end space-x-4'>
-              {onCancel && (
-                <Button
-                  type='button'
-                  variant='outline'
-                  onClick={onCancel}
-                  disabled={isLoading}
-                >
-                  <X className='w-4 h-4 mr-2' />
-                  Cancelar
-                </Button>
-              )}
-              <Button type='submit' disabled={isLoading || !canSubmit}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className='w-4 h-4 mr-2 animate-spin' />
-                    {existingCase ? 'Actualizando...' : 'Creando...'}
-                  </>
-                ) : (
-                  <>
-                    <Save className='w-4 h-4 mr-2' />
-                    {existingCase ? 'Actualizar Caso' : 'Crear Caso'}
-                  </>
+            <div className='flex items-center justify-between w-full'>
+              <div>
+                {existingCase && currentProfile.role === 'admin_firma' && (
+                  <Button
+                    type='button'
+                    variant='destructive'
+                    onClick={async () => {
+                      if (!confirm('¿Estás seguro de eliminar este caso? Esta acción no se puede deshacer.')) return;
+                      setIsLoading(true);
+                      try {
+                        const result = await deleteCase(existingCase.id);
+                        if (result.success) {
+                          toast({ title: 'Caso eliminado', description: 'El expediente ha sido eliminado correctamente.' });
+                          window.location.href = '/cases';
+                        } else {
+                          toast({ title: 'Error', description: result.error ?? 'No se pudo eliminar el caso', variant: 'destructive' });
+                        }
+                      } catch (error) {
+                        console.error(error);
+                        toast({ title: 'Error', description: 'Ocurrió un error inesperado', variant: 'destructive' });
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Trash2 className='w-4 h-4 mr-2' />
+                    Eliminar caso
+                  </Button>
                 )}
-              </Button>
+              </div>
+              <div className='flex space-x-4'>
+                {onCancel && (
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={onCancel}
+                    disabled={isLoading}
+                  >
+                    <X className='w-4 h-4 mr-2' />
+                    Cancelar
+                  </Button>
+                )}
+                <Button type='submit' disabled={isLoading || !canSubmit}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                      {existingCase ? 'Actualizando...' : 'Creando...'}
+                    </>
+                  ) : (
+                    <>
+                      <Save className='w-4 h-4 mr-2' />
+                      {existingCase ? 'Actualizar Caso' : 'Crear Caso'}
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>

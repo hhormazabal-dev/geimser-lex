@@ -105,7 +105,7 @@ const baseCaseSchema = z.object({
       .optional(),
   ),
   audiencia_inicial_tipo: z.preprocess(
-    (value) => (value === '' ? undefined : value),
+    (value) => (value === '' || value === null ? undefined : value),
     z.enum(['preparatoria', 'juicio', 'preparatoria_sin_fecha', 'juicio_sin_fecha']).optional(),
   ),
   audiencia_inicial_fecha: z.preprocess(
@@ -352,6 +352,8 @@ export const caseFiltersSchema = z.object({
   search: z.string().optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(10),
+  sort_by: z.enum(['created_at', 'updated_at', 'prioridad', 'estado', 'etapa_actual']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
 });
 
 export const caseStatsSchema = z.object({
