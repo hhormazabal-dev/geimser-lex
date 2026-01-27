@@ -1,30 +1,52 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getDeletedCases, restoreCase } from '@/lib/actions/cases';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
-import { RotateCcw, Trash2, Search, ArrowLeft } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { RotateCcw, Trash2, ArrowLeft } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 export default function TrashPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const caseId = searchParams.get('caseId');
+    const q = (searchParams.get('q') ?? '').trim();
     const [cases, setCases] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [restoringId, setRestoringId] = useState<string | null>(null);
 
     useEffect(() => {
         loadDeleted();
-    }, []);
+    }, [caseId, q]);
 
     async function loadDeleted() {
         setIsLoading(true);
         const res = await getDeletedCases();
         if (res.success && res.data) {
-            setCases(res.data);
+            let next = res.data as any[];
+
+            if (caseId) {
+                next = next.filter((c) => c?.id === caseId);
+            } else if (q.length >= 2) {
+                const needle = q.toLowerCase();
+                next = next.filter((c) => {
+                    const haystack = [
+                        c?.caratulado,
+                        c?.numero_causa,
+                        c?.cliente_principal?.nombre,
+                        c?.nombre_cliente,
+                    ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                    return haystack.includes(needle);
+                });
+            }
+
+            setCases(next);
         }
         setIsLoading(false);
     }

@@ -43,6 +43,16 @@ export function CommandPalette({
       caratulado: string;
       numero_causa: string | null;
       materia: string | null;
+      deleted_at?: string | null;
+    }>
+  >([]);
+  const [remoteDeletedCases, setRemoteDeletedCases] = useState<
+    Array<{
+      id: string;
+      caratulado: string;
+      numero_causa: string | null;
+      materia: string | null;
+      deleted_at: string | null;
     }>
   >([]);
   const [remoteClients, setRemoteClients] = useState<
@@ -120,6 +130,7 @@ export function CommandPalette({
     const q = search.trim();
     if (q.length < 2) {
       setRemoteCases([]);
+      setRemoteDeletedCases([]);
       setRemoteClients([]);
       setRemoteLoading(false);
       return;
@@ -135,14 +146,17 @@ export function CommandPalette({
         });
         if (!res.ok) throw new Error('Search failed');
         const json = (await res.json()) as {
-          cases: Array<{ id: string; caratulado: string; numero_causa: string | null; materia: string | null }>;
+          cases: Array<{ id: string; caratulado: string; numero_causa: string | null; materia: string | null; deleted_at?: string | null }>;
+          deletedCases: Array<{ id: string; caratulado: string; numero_causa: string | null; materia: string | null; deleted_at: string | null }>;
           clients: Array<{ id: string; nombre: string; email: string; rut: string | null }>;
         };
         setRemoteCases(json.cases ?? []);
+        setRemoteDeletedCases(json.deletedCases ?? []);
         setRemoteClients(json.clients ?? []);
       } catch (e) {
         if ((e as any)?.name === 'AbortError') return;
         setRemoteCases([]);
+        setRemoteDeletedCases([]);
         setRemoteClients([]);
       } finally {
         setRemoteLoading(false);
@@ -193,61 +207,104 @@ export function CommandPalette({
                 </div>
               )}
 
-              {!remoteLoading && (remoteCases.length > 0 || remoteClients.length > 0) && (
-                <Command.Group
-                  heading="Resultados"
-                  className={cn(
-                    'mb-3',
-                    '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-2 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.22em] [&_[cmdk-group-heading]]:text-foreground/45',
-                  )}
-                >
-                  {remoteCases.map((c) => (
-                    <Command.Item
-                      key={c.id}
-                      value={[c.caratulado, c.numero_causa ?? '', c.materia ?? '', c.id].join(' ')}
-                      onSelect={() => {
-                        router.push(`/cases/${c.id}`);
-                        onOpenChange(false);
-                      }}
-                      className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm text-foreground outline-none transition data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary"
+              {!remoteLoading && (remoteCases.length > 0 || remoteDeletedCases.length > 0 || remoteClients.length > 0) && (
+                <>
+                  {remoteCases.length > 0 && (
+                    <Command.Group
+                      heading="Casos"
+                      className={cn(
+                        'mb-3',
+                        '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-2 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.22em] [&_[cmdk-group-heading]]:text-foreground/45',
+                      )}
                     >
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{c.caratulado}</span>
-                        <span className="block truncate text-xs text-foreground/55">
-                          {c.numero_causa ? `Causa ${c.numero_causa}` : 'Caso'}{c.materia ? ` · ${c.materia}` : ''}
-                        </span>
-                      </span>
-                      <span className="text-xs font-semibold text-foreground/40">Caso</span>
-                    </Command.Item>
-                  ))}
-
-                  {(role === 'admin_firma' || role === 'analista') &&
-                    remoteClients.map((c) => (
-                      <Command.Item
-                        key={c.id}
-                        value={[c.nombre, c.email, c.rut ?? '', c.id].join(' ')}
-                        onSelect={() => {
-                          router.push(`/clients?clientId=${encodeURIComponent(c.id)}&q=${encodeURIComponent(search.trim())}`);
-                          onOpenChange(false);
-                        }}
-                        className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm text-foreground outline-none transition data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary"
-                      >
-                        <span className="flex min-w-0 items-center gap-3">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/20 bg-white/60 text-foreground/70">
-                            <Users className="h-4 w-4" />
-                          </span>
+                      {remoteCases.map((c) => (
+                        <Command.Item
+                          key={c.id}
+                          value={[c.caratulado, c.numero_causa ?? '', c.materia ?? '', c.id].join(' ')}
+                          onSelect={() => {
+                            router.push(`/cases/${c.id}`);
+                            onOpenChange(false);
+                          }}
+                          className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm text-foreground outline-none transition data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary"
+                        >
                           <span className="min-w-0">
-                            <span className="block truncate font-medium">{c.nombre}</span>
+                            <span className="block truncate font-medium">{c.caratulado}</span>
                             <span className="block truncate text-xs text-foreground/55">
-                              {c.email}
-                              {c.rut ? ` · ${c.rut}` : ''}
+                              {c.numero_causa ? `Causa ${c.numero_causa}` : 'Caso'}{c.materia ? ` · ${c.materia}` : ''}
                             </span>
                           </span>
-                        </span>
-                        <span className="text-xs font-semibold text-foreground/40">Cliente</span>
-                      </Command.Item>
-                    ))}
-                </Command.Group>
+                          <span className="text-xs font-semibold text-foreground/40">Caso</span>
+                        </Command.Item>
+                      ))}
+                    </Command.Group>
+                  )}
+
+                  {(role === 'admin_firma' || role === 'analista') && remoteDeletedCases.length > 0 && (
+                    <Command.Group
+                      heading="Papelera"
+                      className={cn(
+                        'mb-3',
+                        '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-2 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.22em] [&_[cmdk-group-heading]]:text-foreground/45',
+                      )}
+                    >
+                      {remoteDeletedCases.map((c) => (
+                        <Command.Item
+                          key={c.id}
+                          value={[c.caratulado, c.numero_causa ?? '', c.materia ?? '', c.id].join(' ')}
+                          onSelect={() => {
+                            router.push(`/admin/trash?caseId=${encodeURIComponent(c.id)}&q=${encodeURIComponent(search.trim())}`);
+                            onOpenChange(false);
+                          }}
+                          className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm text-foreground outline-none transition data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium">{c.caratulado}</span>
+                            <span className="block truncate text-xs text-foreground/55">
+                              {c.numero_causa ? `Causa ${c.numero_causa}` : 'Caso'}{c.materia ? ` · ${c.materia}` : ''}
+                            </span>
+                          </span>
+                          <span className="text-xs font-semibold text-foreground/40">Eliminado</span>
+                        </Command.Item>
+                      ))}
+                    </Command.Group>
+                  )}
+
+                  {(role === 'admin_firma' || role === 'analista') && remoteClients.length > 0 && (
+                    <Command.Group
+                      heading="Clientes"
+                      className={cn(
+                        'mb-3',
+                        '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-2 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.22em] [&_[cmdk-group-heading]]:text-foreground/45',
+                      )}
+                    >
+                      {remoteClients.map((c) => (
+                        <Command.Item
+                          key={c.id}
+                          value={[c.nombre, c.email, c.rut ?? '', c.id].join(' ')}
+                          onSelect={() => {
+                            router.push(`/clients?clientId=${encodeURIComponent(c.id)}&q=${encodeURIComponent(search.trim())}`);
+                            onOpenChange(false);
+                          }}
+                          className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm text-foreground outline-none transition data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary"
+                        >
+                          <span className="flex min-w-0 items-center gap-3">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/20 bg-white/60 text-foreground/70">
+                              <Users className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{c.nombre}</span>
+                              <span className="block truncate text-xs text-foreground/55">
+                                {c.email}
+                                {c.rut ? ` · ${c.rut}` : ''}
+                              </span>
+                            </span>
+                          </span>
+                          <span className="text-xs font-semibold text-foreground/40">Cliente</span>
+                        </Command.Item>
+                      ))}
+                    </Command.Group>
+                  )}
+                </>
               )}
 
               {grouped.map(([group, groupItems]) => (

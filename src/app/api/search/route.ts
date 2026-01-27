@@ -9,6 +9,7 @@ type CaseResult = {
   materia: string | null;
   prioridad: string | null;
   workflow_state: string | null;
+  deleted_at?: string | null;
 };
 
 type ClientResult = {
@@ -38,16 +39,24 @@ export async function GET(req: Request) {
   const q = rawQuery;
 
   if (q.length < 2) {
-    return json({ cases: [], clients: [] } satisfies { cases: CaseResult[]; clients: ClientResult[] });
+    return json(
+      {
+        cases: [],
+        deletedCases: [],
+        clients: [],
+      } satisfies { cases: CaseResult[]; deletedCases: CaseResult[]; clients: ClientResult[] },
+    );
   }
 
   const supabase = await createServerClient();
   const MAX_CASES = 8;
+  const MAX_DELETED_CASES = 6;
   const MAX_CLIENTS = 6;
 
-  let casesQuery = supabase
+  let activeCasesQuery = supabase
     .from('cases')
     .select('id, caratulado, numero_causa, materia, prioridad, workflow_state, updated_at')
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false })
     .limit(MAX_CASES);
 
@@ -56,12 +65,26 @@ export async function GET(req: Request) {
     .filter((term) => term.length > 0)
     .map((term) => `caratulado.ilike.%${term}%,numero_causa.ilike.%${term}%`)
     .join(',');
-  casesQuery = casesQuery.or(orFilters);
+  activeCasesQuery = activeCasesQuery.or(orFilters);
 
   const role = (profile as any)._role_override ?? profile.role;
+  const canSeeTrash = role === 'admin_firma' || role === 'analista';
 
-  const casesRes = await casesQuery;
+  const [casesRes, deletedCasesRes] = await Promise.all([
+    activeCasesQuery,
+    canSeeTrash
+      ? supabase
+        .from('cases')
+        .select('id, caratulado, numero_causa, materia, prioridad, workflow_state, deleted_at')
+        .not('deleted_at', 'is', null)
+        .or(orFilters)
+        .order('deleted_at', { ascending: false })
+        .limit(MAX_DELETED_CASES)
+      : Promise.resolve({ data: [], error: null } as any),
+  ]);
+
   if (casesRes.error) return json({ error: casesRes.error.message }, 500);
+  if (deletedCasesRes?.error) return json({ error: deletedCasesRes.error.message }, 500);
 
   const cases: CaseResult[] = (casesRes.data ?? []).map((row: any) => ({
     id: row.id,
@@ -70,6 +93,16 @@ export async function GET(req: Request) {
     materia: row.materia ?? null,
     prioridad: row.prioridad ?? null,
     workflow_state: row.workflow_state ?? null,
+  }));
+
+  const deletedCases: CaseResult[] = (deletedCasesRes?.data ?? []).map((row: any) => ({
+    id: row.id,
+    caratulado: row.caratulado,
+    numero_causa: row.numero_causa ?? null,
+    materia: row.materia ?? null,
+    prioridad: row.prioridad ?? null,
+    workflow_state: row.workflow_state ?? null,
+    deleted_at: row.deleted_at ?? null,
   }));
 
   let clients: ClientResult[] = [];
@@ -93,5 +126,7 @@ export async function GET(req: Request) {
     }));
   }
 
-  return json({ cases, clients } satisfies { cases: CaseResult[]; clients: ClientResult[] });
+  return json(
+    { cases, deletedCases, clients } satisfies { cases: CaseResult[]; deletedCases: CaseResult[]; clients: ClientResult[] },
+  );
 }

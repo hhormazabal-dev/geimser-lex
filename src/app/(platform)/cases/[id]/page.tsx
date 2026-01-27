@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getCurrentProfile, canAccessCase } from '@/lib/auth/roles';
+import { createServerClient } from '@/lib/supabase/server';
 import { getCaseById } from '@/lib/actions/cases';
 import { listCaseMessages } from '@/lib/actions/messages';
 import { CaseDetailView } from '@/components/CaseDetailView';
@@ -52,6 +53,20 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         : profile.role === 'abogado'
           ? '/dashboard/abogado'
           : '/dashboard/cliente';
+
+  // 2) Si el caso está en papelera, mandamos a la vista correcta (evita el "sin permisos" al abrir desde búsquedas).
+  if (profile.role === 'admin_firma' || profile.role === 'analista') {
+    const supabase = await createServerClient();
+    const { data } = await supabase
+      .from('cases')
+      .select('id, deleted_at')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (data?.deleted_at) {
+      redirect(`/admin/trash?caseId=${encodeURIComponent(id)}`);
+    }
+  }
 
   // 2) Permisos (NO 404 si no tiene acceso)
   const hasAccess = await canAccessCase(id);
