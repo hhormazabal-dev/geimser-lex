@@ -111,6 +111,8 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
         ].join(','),
       )
       // Inbox: solo casos activos / en seguimiento. No alertar casos finalizados.
+      // @ts-ignore
+      .is('deleted_at', null)
       .not('estado', 'in', '("archivado","terminado","terminado_desistido_demandante")');
     if (casesError) throw casesError;
 
@@ -176,9 +178,11 @@ export async function getWorkQueue(): Promise<{ success: boolean; data?: WorkQue
           'fecha_programada',
           'audiencia_tipo',
           'es_publica',
-          'case:cases(id, caratulado, materia, prioridad, workflow_state, estado)',
+          'case:cases!inner(id, caratulado, materia, prioridad, workflow_state, estado, deleted_at)',
         ].join(','),
       )
+      // @ts-ignore
+      .is('case.deleted_at', null)
       .in('estado', ['pendiente', 'en_proceso'])
       .not('fecha_programada', 'is', null)
       .not('audiencia_tipo', 'is', null);

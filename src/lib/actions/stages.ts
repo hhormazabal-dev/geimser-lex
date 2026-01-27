@@ -631,7 +631,12 @@ export async function getStages(filters?: Partial<StageFiltersInput>) {
       }
       query = query.in('case_id', caseIds);
     } else if (profile.role === 'abogado') {
-      const { data: abogadoCases } = await supabase.from('cases').select('id').eq('abogado_responsable', profile.id);
+      const { data: abogadoCases } = await supabase
+        .from('cases')
+        .select('id')
+        .eq('abogado_responsable', profile.id)
+        // @ts-ignore
+        .is('deleted_at', null);
       const caseIds = abogadoCases?.map((c: { id: string }) => c.id) || [];
       if (caseIds.length === 0) {
         return { success: true, stages: [], total: 0, page: validatedFilters.page, limit: validatedFilters.limit };

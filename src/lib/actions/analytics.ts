@@ -176,6 +176,8 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
     const caseQuery = supabase.from('cases').select('*');
     // Para abogado/admin/analista confiamos en RLS (has_case_access) para traer
     // todos los casos accesibles en la empresa activa, incluyendo colaboraciones.
+    // @ts-ignore
+    caseQuery = caseQuery.is('deleted_at', null);
 
     const { data: caseRows, error: casesError } = await caseQuery;
     if (casesError) throw casesError;
@@ -331,7 +333,7 @@ export async function getCasesByStatus(): Promise<{ success: boolean; data?: Cas
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('estado, sentencia_estado');
+    const query = supabase.from('cases').select('estado, sentencia_estado').is('deleted_at', null); // @ts-ignore
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -375,7 +377,7 @@ export async function getCasesByMateria(): Promise<{ success: boolean; data?: Ca
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('materia');
+    const query = supabase.from('cases').select('materia').is('deleted_at', null); // @ts-ignore
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -417,7 +419,7 @@ export async function getCasesByPriority(): Promise<{ success: boolean; data?: C
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('prioridad');
+    const query = supabase.from('cases').select('prioridad').is('deleted_at', null); // @ts-ignore
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -463,7 +465,7 @@ export async function getCasesByWorkflowState(): Promise<{
 
     const supabase = await createServerClient();
 
-    const query = supabase.from('cases').select('workflow_state');
+    const query = supabase.from('cases').select('workflow_state').is('deleted_at', null); // @ts-ignore
 
     const { data: casesData, error } = await query;
     if (error) throw error;
@@ -524,11 +526,15 @@ export async function getMonthlyStats(): Promise<{ success: boolean; data?: Mont
     const newCasesQuery = supabase
       .from('cases')
       .select('fecha_inicio, valor_estimado')
+      // @ts-ignore
+      .is('deleted_at', null)
       .gte('fecha_inicio', startDate.toISOString());
 
     const completedCasesQuery = supabase
       .from('cases')
       .select('updated_at, valor_estimado')
+      // @ts-ignore
+      .is('deleted_at', null)
       .in('estado', ['terminado', 'terminado_desistido_demandante'])
       .gte('updated_at', startDate.toISOString());
 
@@ -622,11 +628,15 @@ export async function getAbogadoWorkload(): Promise<{ success: boolean; data?: A
           .from('cases')
           .select('valor_estimado')
           .eq('abogado_responsable', abogado.id)
+          // @ts-ignore
+          .is('deleted_at', null)
           .in('estado', ['activo', 'terminado_apelacion']),
         supabase
           .from('cases')
           .select('valor_estimado')
           .eq('abogado_responsable', abogado.id)
+          // @ts-ignore
+          .is('deleted_at', null)
           .in('estado', ['terminado', 'terminado_desistido_demandante']),
       ]);
 
@@ -687,6 +697,8 @@ export async function getLawyerDetail(abogadoId: string): Promise<{ success: boo
       .from('cases')
       .select('id, caratulado, estado, etapa_actual, prioridad, valor_estimado, fecha_inicio, workflow_state, nombre_cliente, updated_at')
       .eq('abogado_responsable', abogadoId)
+      // @ts-ignore
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (casesError) throw casesError;
@@ -737,13 +749,13 @@ export async function getLawyerDetail(abogadoId: string): Promise<{ success: boo
         nombre_cliente: caseItem.nombre_cliente ?? null,
         nextStage: nextStage
           ? {
-              etapa: nextStage.etapa,
-              fecha_programada: nextStage.fecha_programada ?? null,
-              estado: nextStage.estado ?? 'pendiente',
-              orden: nextStage.orden ?? null,
-              isOverdue:
-                Boolean(nextStage.fecha_programada) && nextStage.fecha_programada < today,
-            }
+            etapa: nextStage.etapa,
+            fecha_programada: nextStage.fecha_programada ?? null,
+            estado: nextStage.estado ?? 'pendiente',
+            orden: nextStage.orden ?? null,
+            isOverdue:
+              Boolean(nextStage.fecha_programada) && nextStage.fecha_programada < today,
+          }
           : null,
         pendingStages: pendingStages.length,
         completedStages: completedStages.length,
@@ -1169,8 +1181,8 @@ export async function getClientDetail(
     const cases = casesRaw
       .map((row) => row.case as any)
       .filter(Boolean) as Array<
-      ClientPortfolioCase & { abogado_responsable?: { id: string; nombre: string | null } | null }
-    >;
+        ClientPortfolioCase & { abogado_responsable?: { id: string; nombre: string | null } | null }
+      >;
 
     const caseIds = cases.map((c) => c.id);
     let stageMap = new Map<string, any[]>();
@@ -1234,12 +1246,12 @@ export async function getClientDetail(
         abogado_responsable: lawyer ? { id: lawyer.id, nombre: lawyer.nombre ?? null } : null,
         nextStage: nextStage
           ? {
-              etapa: nextStage.etapa,
-              fecha_programada: nextStage.fecha_programada ?? null,
-              estado: nextStage.estado ?? 'pendiente',
-              orden: nextStage.orden ?? null,
-              isOverdue: Boolean(nextStage.fecha_programada) && nextStage.fecha_programada < today,
-            }
+            etapa: nextStage.etapa,
+            fecha_programada: nextStage.fecha_programada ?? null,
+            estado: nextStage.estado ?? 'pendiente',
+            orden: nextStage.orden ?? null,
+            isOverdue: Boolean(nextStage.fecha_programada) && nextStage.fecha_programada < today,
+          }
           : null,
         pendingStages: pendingStages.length,
         completedStages: completedStages.length,
