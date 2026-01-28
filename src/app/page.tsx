@@ -234,7 +234,9 @@ export default async function Home() {
           <div className="flex gap-8 text-sm text-slate-500 font-medium">
             <Link href="/login" className="hover:text-blue-900 transition-colors">Portal de Clientes</Link>
             <Link href="#" className="hover:text-blue-900 transition-colors">Privacidad y Seguridad</Link>
-            <Link href="#" className="hover:text-blue-900 transition-colors">Contacto Comercial</Link>
+            <a href="tel:+56227121162" className="hover:text-blue-900 transition-colors">
+              Contacto: 227121162
+            </a>
           </div>
         </div>
       </footer>
