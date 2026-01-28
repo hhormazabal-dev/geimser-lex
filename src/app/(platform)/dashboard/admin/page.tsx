@@ -6,6 +6,7 @@ export const fetchCache = 'force-no-store';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AdminDashboard } from '@/components/AdminDashboard';
+import { AdminDashboardBI } from '@/components/AdminDashboardBI';
 import { getCurrentProfile } from '@/lib/auth/roles';
 import {
   getDashboardStats,
@@ -19,6 +20,12 @@ import {
   getClientPortfolio,
 } from '@/lib/actions/analytics';
 import { getWorkQueue } from '@/lib/actions/work-queue';
+import {
+  getFinancialKPIs,
+  getConversionFunnel,
+  getRevenueByMateria,
+  getLawyerPerformanceGrid,
+} from '@/lib/actions/analytics-bi';
 
 export const metadata: Metadata = {
   title: 'Dashboard Administrativo - Xel Chile',
@@ -59,6 +66,10 @@ export default async function AdminDashboardPage(props: {
     deadlinesResult,
     portfolioResult,
     workQueueResult,
+    financialKPIsResult,
+    conversionFunnelResult,
+    revenueByMateriaResult,
+    lawyerPerformanceResult,
   ] = await Promise.all([
     getDashboardStats(months),
     getCasesByStatus(months),
@@ -70,6 +81,10 @@ export default async function AdminDashboardPage(props: {
     getUpcomingDeadlines(), // Usually future-looking, ignoring filter
     getClientPortfolio(30), // Portfolio usually is snapshot, kept as is.
     getWorkQueue(), // Inbox is operational, ignoring filter
+    getFinancialKPIs(),
+    getConversionFunnel(),
+    getRevenueByMateria(),
+    getLawyerPerformanceGrid(),
   ]);
 
   const dashboardData = {
@@ -96,7 +111,18 @@ export default async function AdminDashboardPage(props: {
       statsResult.success && statsResult.highlights
         ? statsResult.highlights
         : { recentCases: [], clients: [], documents: [], pending: [] },
+    // New BI data
+    financialKPIs: financialKPIsResult.success ? financialKPIsResult.data ?? null : null,
+    conversionFunnel: conversionFunnelResult.success ? conversionFunnelResult.data ?? [] : [],
+    revenueByMateria: revenueByMateriaResult.success ? revenueByMateriaResult.data ?? [] : [],
+    lawyerPerformance: lawyerPerformanceResult.success ? lawyerPerformanceResult.data ?? [] : [],
   };
 
-  return <AdminDashboard profile={profile} data={dashboardData} />;
+  // Clean Power BI-style Executive Dashboard - ONLY business insights
+  return <AdminDashboardBI
+    financialKPIs={dashboardData.financialKPIs}
+    conversionFunnel={dashboardData.conversionFunnel}
+    revenueByMateria={dashboardData.revenueByMateria}
+    lawyerPerformance={dashboardData.lawyerPerformance}
+  />;
 }

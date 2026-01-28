@@ -142,9 +142,11 @@ export async function getCurrentProfile(): Promise<(ProfileRow & { role: Role })
   const profile = await ensureProfile();
   if (!profile) return null;
 
-  let effectiveRole = ((profile.role ?? 'cliente') as Role) ?? 'cliente';
+  // Rol base de la BD (fuente de verdad principal)
+  const dbRole = ((profile.role ?? 'cliente') as Role);
+  let effectiveRole: Role = dbRole;
 
-  // RBAC (multi-rol): si existe, el rol efectivo es el de mayor prioridad.
+  // RBAC (multi-rol): solo sobrescribir si RPC devuelve un rol válido de mayor jerarquía
   try {
     const supabase = (await createServerClient()) as any;
     const [{ data: isSuperAdmin }, { data: roleFromRbac, error: rbacErr }] = await Promise.all([
@@ -152,18 +154,26 @@ export async function getCurrentProfile(): Promise<(ProfileRow & { role: Role })
       supabase.rpc('effective_global_role'),
     ]);
 
+    // Solo usar rol de RPC si es válido y NO es 'cliente' (que es el default fallback)
     const rbacCandidate = String(roleFromRbac ?? '').trim() as Role;
-    if (!rbacErr && (['admin_firma', 'abogado', 'analista', 'cliente'] as const).includes(rbacCandidate as any)) {
+    const validRoles = ['admin_firma', 'abogado', 'analista'] as const;
+
+    if (!rbacErr && validRoles.includes(rbacCandidate as any)) {
+      // RPC devolvió un rol privilegiado válido
       effectiveRole = rbacCandidate;
+    } else if (validRoles.includes(dbRole as any)) {
+      // Si el DB role es privilegiado, mantenerlo aunque RPC falle
+      effectiveRole = dbRole;
     }
 
-    // Contexto por empresa activa: el rol real para UI/permisos depende del membership en esa empresa.
-    // - org_admin => admin_firma
-    // - lawyer => abogado
-    // - staff => analista
-    // Super admin mantiene rol global.
+    // Super admin siempre gana
+    if (isSuperAdmin) {
+      effectiveRole = 'admin_firma';
+    }
+
+    // Contexto por empresa activa
     const activeOrgId = (profile as any)?.active_organization_id ?? null;
-    if (!isSuperAdmin && effectiveRole !== 'cliente' && activeOrgId) {
+    if (!isSuperAdmin && activeOrgId) {
       const { data: membership } = await supabase
         .from('org_members')
         .select('role')
@@ -177,7 +187,8 @@ export async function getCurrentProfile(): Promise<(ProfileRow & { role: Role })
       else if (orgRole === 'staff') effectiveRole = 'analista';
     }
   } catch {
-    // ignore: RBAC aún no migrado o RPC no disponible
+    // Si RBAC falla completamente, usar el rol de la BD
+    effectiveRole = dbRole;
   }
 
   console.warn('[ROLE DEBUG] getCurrentProfile()', {
@@ -185,7 +196,6 @@ export async function getCurrentProfile(): Promise<(ProfileRow & { role: Role })
     table_user_id: profile.user_id,
     email: profile.email,
     role_db: profile.role,
-    role_override: null,
     role_effective: effectiveRole,
   });
 

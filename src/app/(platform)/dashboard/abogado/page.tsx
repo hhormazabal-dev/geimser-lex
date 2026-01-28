@@ -4,20 +4,19 @@ export const fetchCache = 'force-no-store';
 
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { LawyerDashboard } from '@/components/LawyerDashboard';
+import { LawyerDashboardBI } from '@/components/LawyerDashboardBI';
 import { getCurrentProfile } from '@/lib/auth/roles';
-import { getCases } from '@/lib/actions/cases';
 import {
-  getDashboardStats,
-  getCasesByStatus,
-  getCasesByPriority,
-  getUpcomingDeadlines,
-} from '@/lib/actions/analytics';
-import { listQuickLinks, listLegalTemplates } from '@/lib/actions/resources';
+  getPersonalStats,
+  getWorkloadGauge,
+  getTimeDistribution,
+  getUpcomingDeadlines48h,
+} from '@/lib/actions/analytics-personal';
+import { getUpcomingCaseStages } from '@/lib/actions/cases-kanban';
 
 export const metadata: Metadata = {
-  title: 'Panel del Abogado - Xel Chile',
-  description: 'Gestión diaria de casos para abogados',
+  title: 'Dashboard 360° - Xel Chile',
+  description: 'Dashboard personal de desempeño y gestión de casos',
 };
 
 export default async function AbogadoDashboardPage() {
@@ -26,52 +25,39 @@ export default async function AbogadoDashboardPage() {
     redirect('/login');
   }
 
-  // En este tablero aceptamos 'abogado', 'cliente' y 'admin_firma'
+  // En este tablero aceptamos 'abogado' y 'admin_firma'
   if (profile.role === 'analista') {
     redirect('/dashboard/analista');
   }
-  if (profile.role !== 'abogado' && profile.role !== 'cliente' && profile.role !== 'admin_firma') {
+  if (profile.role === 'cliente') {
+    redirect('/dashboard/cliente');
+  }
+  if (profile.role !== 'abogado' && profile.role !== 'admin_firma') {
     redirect('/login');
   }
 
   const [
-    statsResult,
-    statusResult,
-    priorityResult,
-    deadlinesResult,
+    personalStatsResult,
+    workloadGaugeResult,
+    timeDistributionResult,
+    upcomingDeadlinesResult,
     casesResult,
-    quickLinks,
-    templates,
   ] = await Promise.all([
-    getDashboardStats(),
-    getCasesByStatus(),
-    getCasesByPriority(),
-    getUpcomingDeadlines(),
-    // `caseFiltersSchema` limita `limit` a 100.
-    getCases({ page: 1, limit: 100 }),
-    listQuickLinks().catch(() => []),
-    listLegalTemplates().catch(() => []),
+    getPersonalStats(),
+    getWorkloadGauge(),
+    getTimeDistribution(),
+    getUpcomingDeadlines48h(),
+    getUpcomingCaseStages(),
   ]);
 
-  const baseData = {
-    stats: statsResult.success ? statsResult.stats ?? null : null,
-    casesByStatus: statusResult.success ? statusResult.data ?? [] : [],
-    casesByPriority: priorityResult.success ? priorityResult.data ?? [] : [],
-    upcomingDeadlines: deadlinesResult.success ? deadlinesResult.data ?? [] : [],
-  };
-
-  const cases =
-    casesResult && 'success' in casesResult && casesResult.success
-      ? casesResult.cases
-      : [];
-
   return (
-    <LawyerDashboard
-      profile={profile}
-      data={baseData}
-      cases={cases}
-      quickLinks={quickLinks}
-      templates={templates}
+    <LawyerDashboardBI
+      personalStats={personalStatsResult.success ? personalStatsResult.data ?? null : null}
+      workloadGauge={workloadGaugeResult.success ? workloadGaugeResult.data ?? null : null}
+      timeDistribution={timeDistributionResult.success ? timeDistributionResult.data ?? [] : []}
+      upcomingDeadlines={upcomingDeadlinesResult.success ? upcomingDeadlinesResult.data ?? [] : []}
+      cases={casesResult.success ? casesResult.data ?? [] : []}
+      lawyerName={profile.nombre ?? 'Abogado'}
     />
   );
 }

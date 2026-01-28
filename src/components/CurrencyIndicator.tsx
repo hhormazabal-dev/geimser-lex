@@ -53,6 +53,15 @@ export function CurrencyIndicator({ type, className }: CurrencyIndicatorProps) {
                 }
 
                 const result = await response.json();
+
+                // Verificar que la respuesta tenga datos
+                if (!result.serie || !result.serie[0]) {
+                    console.warn(`No data available for ${type}`);
+                    setError('No disponible'); // Set error if no data
+                    setIsLoading(false); // Stop loading
+                    return;
+                }
+
                 const latest = result.serie[0];
 
                 setData({
