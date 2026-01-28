@@ -3,9 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, AlertCircle } from 'lucide-react';
-import { cn, formatRelativeTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import type { UpcomingDeadline } from '@/lib/actions/analytics-personal';
+import { zonedTimeToUtc } from 'date-fns-tz';
 
 interface UpcomingTimelineProps {
     data: UpcomingDeadline[];
@@ -48,6 +49,22 @@ export function UpcomingTimeline({ data }: UpcomingTimelineProps) {
         if (horas <= 6) return 'border-red-200 bg-red-50';
         if (horas <= 24) return 'border-amber-200 bg-amber-50';
         return 'border-blue-200 bg-blue-50';
+    };
+
+    const CHILE_TZ = 'America/Santiago';
+    const dateFmt = new Intl.DateTimeFormat('es-CL', {
+        timeZone: CHILE_TZ,
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+    });
+
+    const formatChileDateOnly = (dateOnly: string) => {
+        const normalized = String(dateOnly ?? '').slice(0, 10);
+        if (normalized.length !== 10) return '';
+        // Usar mediodía para evitar bordes por DST (si aplica).
+        const d = zonedTimeToUtc(`${normalized}T12:00:00`, CHILE_TZ);
+        return dateFmt.format(d);
     };
 
     return (
@@ -98,13 +115,7 @@ export function UpcomingTimeline({ data }: UpcomingTimelineProps) {
                                         En {deadline.horasRestantes}h
                                     </span>
                                     <span className="text-muted-foreground">
-                                        · {new Date(deadline.fechaProgramada).toLocaleString('es-CL', {
-                                            weekday: 'short',
-                                            day: 'numeric',
-                                            month: 'short',
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                        })}
+                                        · {formatChileDateOnly(deadline.fechaProgramada)}
                                     </span>
                                 </div>
                             </div>

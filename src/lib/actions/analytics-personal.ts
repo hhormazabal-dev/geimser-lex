@@ -2,6 +2,7 @@
 
 import { createServerClient } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth/roles';
+import { zonedTimeToUtc } from 'date-fns-tz';
 
 /* ==================== Personal Performance Interfaces ==================== */
 
@@ -262,15 +263,30 @@ export async function getUpcomingDeadlines48h(lawyerId?: string): Promise<{ succ
 
         const supabase = await createServerClient();
 
+        const CHILE_TZ = 'America/Santiago';
+        const chileDateOnly = new Intl.DateTimeFormat('fr-CA', {
+            timeZone: CHILE_TZ,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        });
+
         const now = new Date();
-        const next48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+        const maxHours = 48;
+
+        // `fecha_programada` es DATE (YYYY-MM-DD). Consultamos por rango de fechas en hora Chile
+        // para evitar desfases por UTC y luego filtramos por <= 48h.
+        const today = chileDateOnly.format(now);
+        const plus2 = new Date(now);
+        plus2.setDate(plus2.getDate() + 2);
+        const plus2Day = chileDateOnly.format(plus2);
 
         // Get upcoming stages
         const { data: stages } = await supabase
             .from('case_stages')
             .select('case_id, etapa, fecha_programada, estado')
-            .gte('fecha_programada', now.toISOString())
-            .lte('fecha_programada', next48h.toISOString())
+            .gte('fecha_programada', today)
+            .lte('fecha_programada', plus2Day)
             .eq('estado', 'pendiente');
 
         if (!stages || stages.length === 0) {
@@ -295,8 +311,11 @@ export async function getUpcomingDeadlines48h(lawyerId?: string): Promise<{ succ
             .filter((stage: any) => casos?.some((c: any) => c.id === stage.case_id))
             .map((stage: any) => {
                 const caso = casos?.find((c: any) => c.id === stage.case_id);
-                const fechaProgramada = new Date(stage.fecha_programada);
-                const horasRestantes = Math.round((fechaProgramada.getTime() - now.getTime()) / (1000 * 60 * 60));
+                const dateOnly = String(stage.fecha_programada ?? '').slice(0, 10);
+                // Interpretar DATE como fin del día en Chile para no adelantar vencimientos por desfase UTC.
+                const endOfDayUtc = zonedTimeToUtc(`${dateOnly}T23:59:59.999`, CHILE_TZ);
+                const deltaHours = Math.round((endOfDayUtc.getTime() - now.getTime()) / (1000 * 60 * 60));
+                const horasRestantes = Math.max(0, deltaHours);
 
                 return {
                     caseId: stage.case_id,
@@ -307,6 +326,7 @@ export async function getUpcomingDeadlines48h(lawyerId?: string): Promise<{ succ
                     prioridad: caso?.prioridad ?? 'media',
                 };
             })
+            .filter((d) => d.horasRestantes <= maxHours)
             .sort((a, b) => a.horasRestantes - b.horasRestantes);
 
         return { success: true, data: result };
