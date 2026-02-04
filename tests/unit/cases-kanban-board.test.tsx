@@ -56,4 +56,55 @@ describe('CasesKanbanBoard', () => {
     expect(screen.getByText('Caso B')).toBeInTheDocument();
     expect(screen.queryByText('Caso C')).not.toBeInTheDocument();
   });
+
+  it('deduplica filas cuando comparten el mismo numero_causa', async () => {
+    const { CasesKanbanBoard } = await import('@/components/dashboard/CasesKanbanBoard');
+
+    const cases: any[] = [
+      {
+        case_id: 'c1',
+        caratulado: 'PARRA/SALCOBRAND S.A',
+        numero_causa: 'O-2436-2025',
+        materia: 'Laboral',
+        prioridad: 'Baja',
+        etapa_actual: 'Preparatoria',
+        nombre_cliente: 'Daniel Esteban',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        last_activity_at: '2026-01-01T00:00:00.000Z',
+        fecha_proxima: null,
+      },
+      {
+        case_id: 'c2',
+        caratulado: 'PARRA/SALCOBRAND S.A',
+        numero_causa: ' O-2436-2025 ', // misma causa con espacios
+        materia: 'Laboral',
+        prioridad: 'Baja',
+        etapa_actual: 'Preparatoria',
+        nombre_cliente: 'Daniel Esteban',
+        updated_at: '2026-02-01T00:00:00.000Z',
+        last_activity_at: '2026-02-01T00:00:00.000Z',
+        fecha_proxima: null,
+      },
+      {
+        case_id: 'c3',
+        caratulado: 'Caso X',
+        numero_causa: 'C-1',
+        materia: 'Laboral',
+        prioridad: 'Baja',
+        etapa_actual: 'Sentencia',
+        nombre_cliente: 'Cliente X',
+        updated_at: '2026-02-01T00:00:00.000Z',
+        last_activity_at: '2026-02-01T00:00:00.000Z',
+        fecha_proxima: null,
+      },
+    ];
+
+    render(<CasesKanbanBoard cases={cases} />);
+
+    // Debe mostrar 2 casos activos (c1+c2 colapsan por numero_causa) + c3
+    expect(screen.getByText('2 casos activos')).toBeInTheDocument();
+
+    // El caratulado repetido debe aparecer una sola vez
+    expect(screen.getAllByText('PARRA/SALCOBRAND S.A')).toHaveLength(1);
+  });
 });

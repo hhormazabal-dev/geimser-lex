@@ -59,6 +59,7 @@ const STAGE_COLORS = [
 interface CaseForAgenda {
     case_id: string;
     caratulado: string;
+    numero_causa?: string | null;
     materia: string;
     prioridad: string;
     etapa_actual: string;
@@ -79,8 +80,14 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
     const [search, setSearch] = useState('');
     const [stageFilter, setStageFilter] = useState<string | null>(null);
 
+    const normalizeCaseNumber = (value?: string | null) => {
+        const raw = String(value ?? '').trim();
+        if (!raw) return null;
+        return raw.replace(/\s+/g, '').toUpperCase();
+    };
+
     const uniqueCases = useMemo(() => {
-        const byId = new Map<string, CaseForAgenda>();
+        const byKey = new Map<string, CaseForAgenda>();
 
         const getSortTime = (row: CaseForAgenda) => {
             const dt = row.last_activity_at ?? row.updated_at;
@@ -94,18 +101,19 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                 etapa_actual: sanitizeStageLabel(String((raw as any)?.etapa_actual ?? '')),
             };
 
-            const existing = byId.get(normalized.case_id);
+            const key = normalizeCaseNumber((normalized as any).numero_causa) ?? normalized.case_id;
+            const existing = byKey.get(key);
             if (!existing) {
-                byId.set(normalized.case_id, normalized);
+                byKey.set(key, normalized);
                 continue;
             }
 
             if (getSortTime(normalized) >= getSortTime(existing)) {
-                byId.set(normalized.case_id, normalized);
+                byKey.set(key, normalized);
             }
         }
 
-        return [...byId.values()];
+        return [...byKey.values()];
     }, [cases]);
 
     const exactStageCounts = useMemo(() => {
@@ -155,7 +163,8 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
         return uniqueCases.filter(c => {
             const matchesSearch = !search ||
                 c.caratulado.toLowerCase().includes(search.toLowerCase()) ||
-                c.nombre_cliente.toLowerCase().includes(search.toLowerCase());
+                c.nombre_cliente.toLowerCase().includes(search.toLowerCase()) ||
+                String(c.numero_causa ?? '').toLowerCase().includes(search.toLowerCase());
             const matchesStage = !stageFilter
                 ? true
                 : STAGE_ORDER.includes(stageFilter)

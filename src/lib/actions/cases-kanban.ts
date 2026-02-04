@@ -6,6 +6,7 @@ import { getCurrentProfile } from '@/lib/auth/roles';
 interface CaseForAgenda {
     case_id: string;
     caratulado: string;
+    numero_causa: string | null;
     materia: string;
     prioridad: string;
     etapa_actual: string;
@@ -38,6 +39,7 @@ export async function getActiveCasesForAgenda(): Promise<{
             .select(`
         id,
         caratulado,
+        numero_causa,
         materia,
         prioridad,
         etapa_actual,
@@ -96,6 +98,7 @@ export async function getActiveCasesForAgenda(): Promise<{
             return {
             case_id: c.id,
             caratulado: c.caratulado,
+            numero_causa: c.numero_causa ?? null,
             materia: c.materia || 'Sin materia',
             prioridad: c.prioridad || 'media',
             etapa_actual: c.etapa_actual || 'Sin etapa',

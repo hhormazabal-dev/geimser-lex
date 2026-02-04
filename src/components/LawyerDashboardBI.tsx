@@ -18,11 +18,13 @@ import type {
 interface CaseForAgenda {
     case_id: string;
     caratulado: string;
+    numero_causa?: string | null;
     materia: string;
     prioridad: string;
     etapa_actual: string;
     nombre_cliente: string;
     updated_at: string;
+    last_activity_at?: string | null;
     fecha_proxima: string | null;
 }
 
