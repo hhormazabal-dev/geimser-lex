@@ -19,6 +19,32 @@ const STAGE_ORDER = [
     'Cierre',
 ];
 
+const normalizeStageLabel = (value: string) =>
+    value
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+const STAGE_MATCH_ORDER = [...STAGE_ORDER].sort((a, b) => b.length - a.length);
+
+const sanitizeStageLabel = (value: string) => value.trim().replace(/\s+/g, ' ');
+
+const getPipelineStage = (rawStage?: string | null) => {
+    const normalized = normalizeStageLabel(rawStage ?? '');
+    if (!normalized) return null;
+
+    // Common "closed" labels that should map to the pipeline end.
+    if (normalized.includes('terminad')) return 'Cierre';
+
+    for (const stage of STAGE_MATCH_ORDER) {
+        const stageNeedle = normalizeStageLabel(stage);
+        if (normalized.includes(stageNeedle)) return stage;
+    }
+
+    return null;
+};
+
 const STAGE_COLORS = [
     'bg-slate-500',
     'bg-blue-500',
@@ -38,6 +64,7 @@ interface CaseForAgenda {
     etapa_actual: string;
     nombre_cliente: string;
     updated_at: string;
+    last_activity_at?: string | null;
     fecha_proxima: string | null;
 }
 
@@ -52,29 +79,91 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
     const [search, setSearch] = useState('');
     const [stageFilter, setStageFilter] = useState<string | null>(null);
 
+    const uniqueCases = useMemo(() => {
+        const byId = new Map<string, CaseForAgenda>();
+
+        const getSortTime = (row: CaseForAgenda) => {
+            const dt = row.last_activity_at ?? row.updated_at;
+            const t = new Date(dt ?? '').getTime();
+            return Number.isFinite(t) ? t : 0;
+        };
+
+        for (const raw of cases) {
+            const normalized: CaseForAgenda = {
+                ...raw,
+                etapa_actual: sanitizeStageLabel(String((raw as any)?.etapa_actual ?? '')),
+            };
+
+            const existing = byId.get(normalized.case_id);
+            if (!existing) {
+                byId.set(normalized.case_id, normalized);
+                continue;
+            }
+
+            if (getSortTime(normalized) >= getSortTime(existing)) {
+                byId.set(normalized.case_id, normalized);
+            }
+        }
+
+        return [...byId.values()];
+    }, [cases]);
+
+    const exactStageCounts = useMemo(() => {
+        const acc: Record<string, number> = {};
+        for (const caso of uniqueCases) {
+            const stage = sanitizeStageLabel(String(caso.etapa_actual ?? ''));
+            if (!stage) continue;
+            acc[stage] = (acc[stage] ?? 0) + 1;
+        }
+        return acc;
+    }, [uniqueCases]);
+
     // Get extra stages from data
     const extraStages = useMemo(() => {
-        return [...new Set(cases.map(c => c.etapa_actual))].filter(s => !STAGE_ORDER.includes(s));
-    }, [cases]);
+        const stages = new Set<string>();
+        for (const caso of uniqueCases) {
+            const rawStage = sanitizeStageLabel(String(caso.etapa_actual ?? ''));
+            if (!rawStage) continue;
+            if (STAGE_ORDER.includes(rawStage)) continue;
+            if (getPipelineStage(rawStage)) continue; // sub-etapas ya están representadas en el pipeline principal
+            stages.add(rawStage);
+        }
+        return [...stages];
+    }, [uniqueCases]);
 
     // Count by stage
     const stageCounts = useMemo(() => {
-        return [...STAGE_ORDER, ...extraStages].reduce((acc, stage) => {
-            acc[stage] = cases.filter(c => c.etapa_actual === stage).length;
-            return acc;
-        }, {} as Record<string, number>);
-    }, [cases, extraStages]);
+        const acc: Record<string, number> = {};
+
+        // Pipeline counts: include sub-etapas (e.g. "Sentencia/Tramitación") under their main stage.
+        for (const stage of STAGE_ORDER) acc[stage] = 0;
+        for (const caso of uniqueCases) {
+            const bucket = getPipelineStage(caso.etapa_actual) ?? caso.etapa_actual;
+            if (STAGE_ORDER.includes(bucket)) acc[bucket] = (acc[bucket] ?? 0) + 1;
+        }
+
+        // Extra stages: keep exact counts for filtering and pills.
+        for (const stage of extraStages) {
+            acc[stage] = exactStageCounts[stage] ?? 0;
+        }
+
+        return acc;
+    }, [uniqueCases, extraStages, exactStageCounts]);
 
     // Filter cases
     const filteredCases = useMemo(() => {
-        return cases.filter(c => {
+        return uniqueCases.filter(c => {
             const matchesSearch = !search ||
                 c.caratulado.toLowerCase().includes(search.toLowerCase()) ||
                 c.nombre_cliente.toLowerCase().includes(search.toLowerCase());
-            const matchesStage = !stageFilter || c.etapa_actual === stageFilter;
+            const matchesStage = !stageFilter
+                ? true
+                : STAGE_ORDER.includes(stageFilter)
+                    ? getPipelineStage(c.etapa_actual) === stageFilter
+                    : sanitizeStageLabel(String(c.etapa_actual ?? '')) === stageFilter;
             return matchesSearch && matchesStage;
         });
-    }, [cases, search, stageFilter]);
+    }, [uniqueCases, search, stageFilter]);
 
     const getPriorityBadge = (prioridad: string) => {
         switch (prioridad?.toLowerCase()) {
@@ -94,7 +183,7 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
         return new Date(dateStr).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
     };
 
-    const totalCases = cases.length;
+    const totalCases = uniqueCases.length;
 
     return (
         <div className="space-y-6">
@@ -238,8 +327,10 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                             </tr>
                         ) : (
                             filteredCases.slice(0, 20).map((caso) => {
-                                const stageIdx = STAGE_ORDER.indexOf(caso.etapa_actual);
+                                const stageIdx = STAGE_ORDER.indexOf(getPipelineStage(caso.etapa_actual) ?? caso.etapa_actual);
                                 const color = stageIdx >= 0 ? STAGE_COLORS[stageIdx] : 'bg-slate-400';
+
+                                const lastChange = (caso.last_activity_at ?? caso.updated_at) || null;
 
                                 return (
                                     <tr key={caso.case_id} className="group hover:bg-muted/30 transition-colors">
@@ -266,7 +357,7 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                                         <td className="px-4 py-3 text-right text-muted-foreground text-xs hidden lg:table-cell">
                                             <div className="flex items-center justify-end gap-1">
                                                 <Clock className="h-3 w-3" />
-                                                {formatDate(caso.updated_at)}
+                                                {formatDate(lastChange)}
                                             </div>
                                         </td>
                                         <td className="px-2 py-3">

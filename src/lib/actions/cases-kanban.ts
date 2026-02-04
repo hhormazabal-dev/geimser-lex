@@ -11,6 +11,7 @@ interface CaseForAgenda {
     etapa_actual: string;
     nombre_cliente: string;
     updated_at: string;
+    last_activity_at?: string | null;
     fecha_proxima: string | null;
 }
 
@@ -58,7 +59,41 @@ export async function getActiveCasesForAgenda(): Promise<{
             return { success: true, data: [] };
         }
 
-        const result: CaseForAgenda[] = cases.map((c: any) => ({
+        const caseIds = cases.map((c: any) => c.id).filter(Boolean);
+
+        const latestAuditByCaseId = new Map<string, string>();
+        if (caseIds.length > 0) {
+            const { data: auditRows, error: auditError } = await supabase
+                .from('audit_log')
+                .select('entity_id, created_at')
+                .eq('entity_type', 'case')
+                .in('entity_id', caseIds)
+                .order('created_at', { ascending: false })
+                .limit(2000);
+
+            if (auditError) {
+                console.warn('Error fetching case audit logs:', auditError.message);
+            } else {
+                for (const row of (auditRows ?? []) as any[]) {
+                    const id = row?.entity_id as string | null | undefined;
+                    const createdAt = row?.created_at as string | null | undefined;
+                    if (!id || !createdAt) continue;
+                    if (!latestAuditByCaseId.has(id)) latestAuditByCaseId.set(id, createdAt);
+                }
+            }
+        }
+
+        const result: CaseForAgenda[] = cases.map((c: any) => {
+            const auditAt = latestAuditByCaseId.get(c.id) ?? null;
+            const caseUpdatedAt = (c.updated_at as string | null | undefined) ?? null;
+            const lastActivityAt =
+                auditAt && caseUpdatedAt
+                    ? new Date(auditAt).getTime() >= new Date(caseUpdatedAt).getTime()
+                        ? auditAt
+                        : caseUpdatedAt
+                    : auditAt ?? caseUpdatedAt;
+
+            return {
             case_id: c.id,
             caratulado: c.caratulado,
             materia: c.materia || 'Sin materia',
@@ -66,8 +101,10 @@ export async function getActiveCasesForAgenda(): Promise<{
             etapa_actual: c.etapa_actual || 'Sin etapa',
             nombre_cliente: c.nombre_cliente || 'Sin cliente',
             updated_at: c.updated_at,
+            last_activity_at: lastActivityAt,
             fecha_proxima: c.next_action_at,
-        }));
+            };
+        });
 
         return { success: true, data: result };
     } catch (error) {

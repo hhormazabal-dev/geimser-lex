@@ -1,6 +1,8 @@
 'use client';
 
 import { User, TrendingUp, Briefcase } from 'lucide-react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { PersonalPerformanceCards } from '@/components/dashboard/PersonalPerformanceCards';
 import { WorkloadGaugeChart } from '@/components/dashboard/WorkloadGaugeChart';
 import { TimeDistributionChart } from '@/components/dashboard/TimeDistributionChart';
@@ -46,6 +48,24 @@ export function LawyerDashboardBI({
     cases,
     lawyerName,
 }: LawyerDashboardBIProps) {
+    const router = useRouter();
+
+    useEffect(() => {
+        // Evita estados stale al volver desde otras pantallas (BFCache / client cache).
+        router.refresh();
+
+        const onFocus = () => router.refresh();
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') router.refresh();
+        };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [router]);
+
     if (!personalStats || !workloadGauge) {
         return (
             <div className="flex min-h-[400px] items-center justify-center">
