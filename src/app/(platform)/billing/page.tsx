@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { createBillingAccount, listBillingAccounts, type BillingAccountSummary } from '@/lib/actions/billing';
-import { getCases } from '@/lib/actions/cases';
+import { getCaseById, getCases } from '@/lib/actions/cases';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import type { Case } from '@/lib/supabase/types';
 
@@ -57,6 +57,8 @@ const EMPTY_FORM: BillingCreateForm = {
   due_date: '',
 };
 
+const CASES_SELECT_LIMIT = 100;
+
 export default function BillingPage() {
   const searchParams = useSearchParams();
   const caseIdFilter = searchParams.get('caseId')?.trim() || '';
@@ -75,14 +77,30 @@ export default function BillingPage() {
     setIsLoading(true);
     try {
       const accountsResPromise = canManage ? listBillingAccounts() : Promise.resolve({ success: true as const, accounts: [] as BillingAccountSummary[] });
-      const casesResPromise = canManage ? getCases({ page: 1, limit: 200 }) : Promise.resolve({ success: true as const, cases: [] as any[] });
+      const casesResPromise = canManage ? getCases({ page: 1, limit: CASES_SELECT_LIMIT }) : Promise.resolve({ success: true as const, cases: [] as any[] });
 
       const [accountsRes, casesRes] = await Promise.all([accountsResPromise, casesResPromise]);
 
       if (accountsRes.success) setAccounts(accountsRes.accounts);
       else throw new Error(accountsRes.error ?? 'No se pudieron cargar los cobros.');
 
-      if ((casesRes as any).success) setCases((casesRes as any).cases as any);
+      if ((casesRes as any).success) {
+        let nextCases = ((casesRes as any).cases as Case[]) ?? [];
+        if (caseIdFilter && !nextCases.some((c) => c.id === caseIdFilter)) {
+          const caseByIdRes = await getCaseById(caseIdFilter);
+          if ((caseByIdRes as any)?.success && (caseByIdRes as any)?.case) {
+            nextCases = [((caseByIdRes as any).case as Case), ...nextCases];
+          }
+        }
+        setCases(nextCases);
+      } else {
+        setCases([]);
+        toast({
+          title: 'No se pudieron cargar los casos',
+          description: (casesRes as any).error ?? 'No se pudieron cargar los casos para asociar el cobro.',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
       console.error('[billing] load error', error);
       toast({
@@ -109,6 +127,12 @@ export default function BillingPage() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!showCreate) return;
+    if (!caseIdFilter) return;
+    setForm((prev) => (prev.case_id ? prev : { ...prev, case_id: caseIdFilter }));
+  }, [showCreate, caseIdFilter]);
 
   useEffect(() => {
     if (!roleReady) return;
