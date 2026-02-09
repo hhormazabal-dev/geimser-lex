@@ -91,37 +91,45 @@ export default async function Home() {
     <main className={`${serif.variable} ${sans.variable} font-sans bg-white text-slate-900 selection:bg-blue-900 selection:text-white`}>
       <Navbar ctaHref={primaryCtaHref} />
 
-      {/* Hero Cinematográfico */}
+      {/* Hero Cinematográfico con Video */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
-        {/* Background con gradiente y patrón */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-          <div className="absolute inset-0 opacity-20" style={{
-            backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)',
-            backgroundSize: '40px 40px'
-          }} />
-          {/* Glows */}
-          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-500/30 blur-[120px] rounded-full" />
-          <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-indigo-500/20 blur-[100px] rounded-full" />
+        {/* Video de fondo */}
+        <div className="absolute inset-0">
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          >
+            <source src="/1.mp4" type="video/mp4" />
+          </video>
+          {/* Overlay oscuro para legibilidad */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-slate-900/85 to-slate-900/70" />
+          {/* Glows sutiles */}
+          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-500/20 blur-[120px] rounded-full" />
+          <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-indigo-500/15 blur-[100px] rounded-full" />
         </div>
 
         <div className="container mx-auto px-6 lg:px-12 max-w-7xl relative z-10 py-32">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="max-w-3xl">
             {/* Texto Hero */}
             <Reveal>
               <div>
-                <span className="inline-flex items-center gap-2 py-2 px-4 mb-8 text-xs font-bold tracking-widest uppercase text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-full backdrop-blur-sm">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-                  Software Jurídico de Elite
-                </span>
+                <div className="flex items-center gap-3 mb-8">
+                  <span className="px-4 py-2 bg-blue-500/10 backdrop-blur-sm border border-blue-400/20 rounded-full text-blue-300 text-xs font-bold uppercase tracking-widest">
+                    Legal CRM #1 en Chile
+                  </span>
+                </div>
 
-                <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-white leading-[1.05] mb-8 font-medium">
-                  Tu firma legal,<br />
-                  <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+                <h1 className="font-serif text-5xl lg:text-7xl text-white leading-[1.1] mb-8">
+                  Gestión legal{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
                     potenciada.
                   </span>
                 </h1>
 
-                <p className="text-xl text-slate-300 max-w-xl leading-relaxed mb-10">
+                <p className="text-xl lg:text-2xl text-slate-300 max-w-2xl leading-relaxed mb-12">
                   Automatiza lo operativo. Visualiza lo estratégico.
                   <span className="text-white font-medium"> Xel centraliza toda la inteligencia de tu estudio</span> para que te dediques a lo que importa: ganar casos.
                 </p>
@@ -129,46 +137,31 @@ export default async function Home() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Link
                     href="https://calendar.app.google/HYTZd6X8eN4zFqYZA"
-                    className="magnetic-btn inline-flex items-center justify-center px-8 py-4 bg-white text-blue-900 text-sm font-bold tracking-wide uppercase hover:bg-blue-50 transition-all duration-300 rounded-xl shadow-2xl shadow-white/10 hover:-translate-y-0.5 animate-pulse-glow"
+                    className="magnetic-btn inline-flex items-center justify-center px-10 py-5 bg-white text-blue-900 text-sm font-bold tracking-wide uppercase hover:bg-blue-50 transition-all duration-300 rounded-xl shadow-2xl shadow-white/10 hover:-translate-y-0.5 animate-pulse-glow"
                   >
                     Agendar Demo Gratis
                   </Link>
                   <Link
                     href="#problemas"
-                    className="magnetic-btn inline-flex items-center justify-center px-8 py-4 bg-white/5 backdrop-blur-sm border border-white/10 text-white text-sm font-bold tracking-wide uppercase hover:bg-white/10 transition-all duration-300 rounded-xl"
+                    className="magnetic-btn inline-flex items-center justify-center px-10 py-5 bg-white/5 backdrop-blur-sm border border-white/10 text-white text-sm font-bold tracking-wide uppercase hover:bg-white/10 transition-all duration-300 rounded-xl"
                   >
                     Ver Beneficios
                   </Link>
                 </div>
-              </div>
-            </Reveal>
 
-            {/* Imagen Hero */}
-            <Reveal delay={0.3}>
-              <div className="relative">
-                <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 blur-2xl rounded-3xl" />
-                <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-3 shadow-2xl">
-                  <Image
-                    src="/dashboard-straight.png"
-                    alt="Dashboard Xel - Gestión Legal Inteligente"
-                    width={800}
-                    height={600}
-                    className="rounded-xl w-full"
-                    priority
-                  />
-                </div>
-                {/* Badge flotante */}
-                <div className="absolute -bottom-6 -left-6 bg-white rounded-xl p-4 shadow-xl border border-slate-100 animate-float">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">+500 Abogados</p>
-                      <p className="text-xs text-slate-500">confían en Xel</p>
-                    </div>
+                {/* Stats inline */}
+                <div className="flex flex-wrap gap-8 mt-16 pt-8 border-t border-white/10">
+                  <div>
+                    <p className="text-4xl font-serif text-white">+500</p>
+                    <p className="text-sm text-slate-400">Abogados activos</p>
+                  </div>
+                  <div>
+                    <p className="text-4xl font-serif text-white">40%</p>
+                    <p className="text-sm text-slate-400">Más eficiencia</p>
+                  </div>
+                  <div>
+                    <p className="text-4xl font-serif text-white">99.9%</p>
+                    <p className="text-sm text-slate-400">Uptime garantizado</p>
                   </div>
                 </div>
               </div>
