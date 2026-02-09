@@ -6,20 +6,20 @@ import { useEffect, useState } from 'react';
 
 const menu = [
   {
-    label: 'Productos',
-    items: ['Gestión de casos', 'Documentos', 'Línea de tiempo', 'Portal cliente'],
-  },
-  {
     label: 'Soluciones',
-    items: ['Estudios corporativos', 'Equipos multi-sede', 'Operación de cumplimiento', 'Dirección ejecutiva'],
+    href: '#problemas',
   },
   {
-    label: 'Recursos',
-    items: ['Guías de operación', 'Metodología Xel', 'Blog corporativo'],
+    label: 'Producto',
+    href: '#showcase',
   },
   {
-    label: 'Nosotros',
-    items: ['Equipo', 'Cultura', 'Seguridad'],
+    label: 'Resultados',
+    href: '#impacto',
+  },
+  {
+    label: 'Precios',
+    href: '#precios',
   },
 ] as const;
 
@@ -58,33 +58,20 @@ export function Navbar({ ctaHref }: { ctaHref: string }) {
           Xel Chile
         </Link>
 
+        {/* Desktop Menu */}
         <div className={`hidden items-center gap-8 text-xs font-semibold uppercase tracking-[0.15em] lg:flex ${scrolled ? 'text-slate-600' : 'text-white/80'
           }`}>
           {menu.map((item) => (
-            <div key={item.label} className="group relative">
-              <button
-                type="button"
-                className={`flex items-center gap-1 transition ${scrolled ? 'hover:text-slate-900' : 'hover:text-white'
-                  }`}
-              >
-                {item.label}
-                <svg className={`w-3 h-3 transition-colors ${scrolled ? 'text-slate-400 group-hover:text-slate-900' : 'text-white/50 group-hover:text-white'
-                  }`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              <div className="pointer-events-none absolute left-0 top-8 w-64 translate-y-2 rounded-lg border border-slate-200 bg-white p-2 shadow-xl opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
-                <div className="flex flex-col">
-                  {item.items.map((subItem) => (
-                    <Link key={subItem} href="#" className="flex items-center justify-between px-4 py-3 rounded-md hover:bg-slate-50 transition-colors group/item">
-                      <span className="text-slate-600 group-hover/item:text-slate-900 font-medium normal-case tracking-normal text-sm">{subItem}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`transition hover:-translate-y-0.5 ${scrolled ? 'hover:text-slate-900' : 'hover:text-white'
+                }`}
+            >
+              {item.label}
+            </Link>
           ))}
-          <Link href="#contacto" className={`transition ${scrolled ? 'hover:text-slate-900' : 'hover:text-white'}`}>
+          <Link href="#contacto" className={`transition hover:-translate-y-0.5 ${scrolled ? 'hover:text-slate-900' : 'hover:text-white'}`}>
             Contacto
           </Link>
         </div>

@@ -6,6 +6,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { Navbar } from '@/components/landing/Navbar';
 import { Reveal } from '@/components/landing/Reveal';
 import { ContactForm } from '@/components/landing/ContactForm';
+import { Pricing } from '@/components/landing/Pricing';
 import {
   Clock,
   FolderOpen,
@@ -234,7 +235,7 @@ export default async function Home() {
       </section>
 
       {/* Showcase del Producto */}
-      <section className="py-24 lg:py-32 bg-slate-900 relative overflow-hidden">
+      <section id="showcase" className="py-24 lg:py-32 bg-slate-900 relative overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
@@ -301,7 +302,7 @@ export default async function Home() {
       </section>
 
       {/* Testimonial / Impacto */}
-      <section className="py-0 relative">
+      <section id="impacto" className="py-0 relative">
         <div className="grid lg:grid-cols-2 min-h-[600px]">
           {/* Imagen */}
           <div className="relative h-[400px] lg:h-auto overflow-hidden group">
@@ -352,6 +353,9 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {/* Pricing Section */}
+      <Pricing />
 
       {/* Formulario de Contacto */}
       <section id="contacto" className="py-24 lg:py-32 relative overflow-hidden">
