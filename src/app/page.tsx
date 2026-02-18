@@ -416,8 +416,8 @@ export default async function Home() {
                     contacto@xel.cl
                   </a>
                   <span className="mx-3 text-slate-300">|</span>
-                  <a href="tel:+56227121162" className="text-blue-800 font-bold text-lg hover:text-blue-600 transition-colors">
-                    +56 2 2712 1162
+                  <a href="tel:+56227121163" className="text-blue-800 font-bold text-lg hover:text-blue-600 transition-colors">
+                    +56 2 2712 1163
                   </a>
                 </div>
               </div>
@@ -519,8 +519,8 @@ export default async function Home() {
                   </a>
                 </li>
                 <li>
-                  <a href="tel:+56227121162" className="hover:text-blue-800 transition-colors">
-                    +56 2 2712 1162
+                  <a href="tel:+56227121163" className="hover:text-blue-800 transition-colors">
+                    +56 2 2712 1163
                   </a>
                 </li>
                 <li className="text-sm">Santiago, Chile</li>
