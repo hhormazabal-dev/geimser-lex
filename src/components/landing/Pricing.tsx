@@ -30,7 +30,7 @@ const plans = [
         features: [
             'Todo lo del Plan Inicial',
             'Gestión de hasta 100 causas activas',
-            'Portal de Clientes (Marca Blanca)',
+            'Portal de Clientes',
             'Reportes de Inteligencia de Negocios',
             'Facturación y Control de Horas',
             'Soporte Prioritario WhatsApp'
