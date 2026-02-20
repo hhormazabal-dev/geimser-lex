@@ -117,7 +117,7 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
 
         const todayStr = new Date().toISOString().split('T')[0] || '';
 
-        const result: CaseForAgenda[] = cases.map((c: any) => {
+        const result = cases.map((c: any) => {
             const auditAt = latestAuditByCaseId.get(c.id) ?? null;
             const caseUpdatedAt = (c.updated_at as string | null | undefined) ?? null;
             const lastActivityAt =
@@ -132,23 +132,17 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
             const s = String(c.etapa_actual || '').toLowerCase();
             const isTerminated = s.includes('terminad') || s.includes('cierre') || s.includes('desistim') || s.includes('archiv') || s.includes('abandon');
 
+            if (isTerminated) {
+                return null;
+            }
+
             let targetMilestone = null;
             let isFuture = false;
 
-            if (isTerminated) {
-                // If the case is dead, prioritize finding its termination date (or highest past milestone) rather than any future stray dates
-                targetMilestone = milestones.slice().reverse().find(m =>
-                    m.key === 'fecha_desistimiento' ||
-                    m.key === 'sentencia_fecha' ||
-                    m.label.toLowerCase().includes('cierre') ||
-                    m.label.toLowerCase().includes('término')
-                ) || (milestones.length > 0 ? milestones[milestones.length - 1] : null);
-            } else {
-                // If the case is active, look for the upcoming future event
-                const futureMilestones = milestones.filter(m => m.date > todayStr);
-                targetMilestone = futureMilestones.length > 0 ? futureMilestones[0] : null;
-                isFuture = !!targetMilestone;
-            }
+            // If the case is active, look for the upcoming future event
+            const futureMilestones = milestones.filter(m => m.date > todayStr);
+            targetMilestone = futureMilestones.length > 0 ? futureMilestones[0] : null;
+            isFuture = !!targetMilestone;
 
             return {
                 case_id: c.id,
@@ -165,7 +159,7 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
                 etapa_proxima: targetMilestone ? (targetMilestone.detail ?? targetMilestone.label) : null,
                 is_future_hito: isFuture
             };
-        });
+        }).filter(Boolean) as CaseForAgenda[];
 
         return { success: true, data: result };
     } catch (error) {

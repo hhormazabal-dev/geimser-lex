@@ -358,12 +358,7 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                                                 <div className={cn('h-2 w-2 rounded-full shrink-0', color)} />
                                                 <div className="flex flex-col">
                                                     <span className="text-xs font-medium">
-                                                        {caso.fecha_proxima && caso.etapa_proxima ? caso.etapa_proxima : caso.etapa_actual}
-                                                        {caso.fecha_proxima && caso.etapa_proxima && (
-                                                            <span className="text-[10px] text-muted-foreground ml-2 font-normal">
-                                                                {caso.is_future_hito ? '(Próxima)' : '(Hito final)'}
-                                                            </span>
-                                                        )}
+                                                        {caso.etapa_actual}
                                                     </span>
                                                 </div>
                                             </div>
@@ -371,14 +366,21 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                                         <td className="px-4 py-3 text-center">
                                             {getPriorityBadge(caso.prioridad)}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-muted-foreground text-xs hidden lg:table-cell">
+                                        <td className="px-4 py-3 text-right text-xs hidden lg:table-cell">
                                             {caso.fecha_proxima ? (
-                                                <div className="flex items-center justify-end gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-                                                    <Clock className="h-3 w-3" />
-                                                    {formatDate(caso.fecha_proxima)}
+                                                <div className="flex flex-col items-end gap-0.5">
+                                                    <div className={cn("flex items-center justify-end gap-1 font-medium", caso.is_future_hito ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                                                        <Clock className="h-3 w-3" />
+                                                        {formatDate(caso.fecha_proxima)}
+                                                    </div>
+                                                    {caso.etapa_proxima && (
+                                                        <span className="text-[10px] text-muted-foreground/80 font-medium max-w-[140px] truncate">
+                                                            {caso.etapa_proxima}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             ) : (
-                                                <span className="opacity-50">—</span>
+                                                <span className="opacity-50 text-muted-foreground">—</span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-right text-muted-foreground text-xs hidden lg:table-cell">
