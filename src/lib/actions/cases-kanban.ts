@@ -50,7 +50,8 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
         etapa_actual,
         nombre_cliente,
         updated_at,
-        next_action_at
+        next_action_at,
+        next_action_stage
       `)
             .is('deleted_at', null)
             .in('estado', ['activo', 'terminado_apelacion'])
@@ -118,6 +119,7 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
                 updated_at: c.updated_at,
                 last_activity_at: lastActivityAt,
                 fecha_proxima: c.next_action_at,
+                etapa_proxima: c.next_action_stage || null,
             };
         });
 

@@ -68,6 +68,7 @@ interface CaseForAgenda {
     updated_at: string;
     last_activity_at?: string | null;
     fecha_proxima: string | null;
+    etapa_proxima?: string | null;
 }
 
 interface CasesKanbanBoardProps {
@@ -302,6 +303,7 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                     <thead>
                         <tr className="border-b bg-muted/50">
                             <th className="text-left font-semibold px-4 py-3">Caso</th>
+                            <th className="text-left font-semibold px-4 py-3 hidden xl:table-cell">RIT / ROL</th>
                             <th className="text-left font-semibold px-4 py-3 hidden sm:table-cell">Demandado</th>
                             <th className="text-left font-semibold px-4 py-3 hidden md:table-cell">Materia</th>
                             <th className="text-left font-semibold px-4 py-3">Etapa</th>
@@ -333,6 +335,9 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                                                 {caso.caratulado}
                                             </Link>
                                         </td>
+                                        <td className="px-4 py-3 text-muted-foreground hidden xl:table-cell">
+                                            <span className="font-mono text-xs">{caso.numero_causa || '—'}</span>
+                                        </td>
                                         <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
                                             <span className="truncate block max-w-[140px]">{caso.demandado || caso.nombre_cliente}</span>
                                         </td>
@@ -342,7 +347,14 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <div className={cn('h-2 w-2 rounded-full shrink-0', color)} />
-                                                <span className="text-xs font-medium">{caso.etapa_actual}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-medium">
+                                                        {caso.fecha_proxima && caso.etapa_proxima ? caso.etapa_proxima : caso.etapa_actual}
+                                                        {caso.fecha_proxima && caso.etapa_proxima && (
+                                                            <span className="text-[10px] text-muted-foreground ml-2 font-normal">(Próxima)</span>
+                                                        )}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
