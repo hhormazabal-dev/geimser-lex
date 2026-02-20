@@ -2,6 +2,7 @@
 
 import { createServerClient } from '@/lib/supabase/server';
 import { getCurrentProfile } from '@/lib/auth/roles';
+import { deriveCaseMilestones } from '@/lib/cases/milestones';
 
 interface CaseForAgenda {
     case_id: string;
@@ -14,6 +15,7 @@ interface CaseForAgenda {
     updated_at: string;
     last_activity_at?: string | null;
     fecha_proxima: string | null;
+    etapa_proxima?: string | null;
 }
 
 /**
@@ -50,7 +52,23 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
         etapa_actual,
         nombre_cliente,
         updated_at,
-        next_action_at
+        next_action_at,
+        next_action_title,
+        fecha_inicio,
+        notificacion_demanda_fecha,
+        notificacion_demanda_estado,
+        sentencia_fecha,
+        sentencia_estado,
+        fecha_desistimiento,
+        case_stages (
+            id,
+            etapa,
+            fecha_programada,
+            fecha_cumplida,
+            estado,
+            audiencia_tipo,
+            orden
+        )
       `)
             .is('deleted_at', null)
             .in('estado', ['activo', 'terminado_apelacion'])
@@ -96,6 +114,8 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
             }
         }
 
+        const todayStr = new Date().toISOString().split('T')[0] || '';
+
         const result: CaseForAgenda[] = cases.map((c: any) => {
             const auditAt = latestAuditByCaseId.get(c.id) ?? null;
             const caseUpdatedAt = (c.updated_at as string | null | undefined) ?? null;
@@ -105,6 +125,10 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
                         ? auditAt
                         : caseUpdatedAt
                     : auditAt ?? caseUpdatedAt;
+
+            const milestones = deriveCaseMilestones(c);
+            const futureMilestones = milestones.filter(m => m.date >= todayStr);
+            const nextMilestone = futureMilestones.length > 0 ? futureMilestones[0] : null;
 
             return {
                 case_id: c.id,
@@ -117,7 +141,8 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
                 nombre_cliente: c.nombre_cliente || 'Sin cliente',
                 updated_at: c.updated_at,
                 last_activity_at: lastActivityAt,
-                fecha_proxima: c.next_action_at,
+                fecha_proxima: nextMilestone ? nextMilestone.date : c.next_action_at ?? null,
+                etapa_proxima: nextMilestone ? (nextMilestone.detail ?? nextMilestone.label) : null,
             };
         });
 
