@@ -16,6 +16,7 @@ interface CaseForAgenda {
     last_activity_at?: string | null;
     fecha_proxima: string | null;
     etapa_proxima?: string | null;
+    is_future_hito?: boolean;
 }
 
 /**
@@ -127,8 +128,27 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
                     : auditAt ?? caseUpdatedAt;
 
             const milestones = deriveCaseMilestones(c);
-            const futureMilestones = milestones.filter(m => m.date >= todayStr);
-            const nextMilestone = futureMilestones.length > 0 ? futureMilestones[0] : null;
+
+            const s = String(c.etapa_actual || '').toLowerCase();
+            const isTerminated = s.includes('terminad') || s.includes('cierre') || s.includes('desistim') || s.includes('archiv') || s.includes('abandon');
+
+            let targetMilestone = null;
+            let isFuture = false;
+
+            if (isTerminated) {
+                // If the case is dead, prioritize finding its termination date (or highest past milestone) rather than any future stray dates
+                targetMilestone = milestones.slice().reverse().find(m =>
+                    m.key === 'fecha_desistimiento' ||
+                    m.key === 'sentencia_fecha' ||
+                    m.label.toLowerCase().includes('cierre') ||
+                    m.label.toLowerCase().includes('término')
+                ) || (milestones.length > 0 ? milestones[milestones.length - 1] : null);
+            } else {
+                // If the case is active, look for the upcoming future event
+                const futureMilestones = milestones.filter(m => m.date >= todayStr);
+                targetMilestone = futureMilestones.length > 0 ? futureMilestones[0] : null;
+                isFuture = !!targetMilestone;
+            }
 
             return {
                 case_id: c.id,
@@ -141,8 +161,9 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
                 nombre_cliente: c.nombre_cliente || 'Sin cliente',
                 updated_at: c.updated_at,
                 last_activity_at: lastActivityAt,
-                fecha_proxima: nextMilestone ? nextMilestone.date : c.next_action_at ?? null,
-                etapa_proxima: nextMilestone ? (nextMilestone.detail ?? nextMilestone.label) : null,
+                fecha_proxima: targetMilestone ? targetMilestone.date : (isTerminated ? null : c.next_action_at ?? null),
+                etapa_proxima: targetMilestone ? (targetMilestone.detail ?? targetMilestone.label) : null,
+                is_future_hito: isFuture
             };
         });
 
