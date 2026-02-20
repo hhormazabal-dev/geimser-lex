@@ -175,11 +175,13 @@ export async function getConversionFunnel(): Promise<{ success: boolean; data?: 
         startDate.setMonth(startDate.getMonth() - 12);
 
         // 1. Consultas = todos los casos creados en el periodo
-        const { data: todos } = await supabase
+        const { data: todos, error } = await supabase
             .from('cases')
-            .select('id, estado, resultado, etapa_actual')
+            .select('id, estado, sentencia_estado, etapa_actual')
             .is('deleted_at', null)
             .gte('created_at', startDate.toISOString());
+
+        if (error) console.error("Error in getConversionFunnel cases query:", error);
 
         const todosLista = todos ?? [];
         const countConsultas = todosLista.length;
@@ -204,8 +206,8 @@ export async function getConversionFunnel(): Promise<{ success: boolean; data?: 
 
         // 5. Ganados = casos con resultado favorable
         const ganados = terminados.filter((c: any) => {
-            const resultado = (c.resultado ?? '').toLowerCase();
-            return resultado.includes('favorable') || resultado.includes('ganado') || resultado.includes('acuerdo') || resultado.includes('exitoso');
+            const sentencia = (c.sentencia_estado ?? '').toLowerCase();
+            return sentencia === 'dictada' || sentencia.includes('favorable') || sentencia.includes('ganado') || sentencia.includes('acuerdo') || sentencia.includes('exitoso');
         });
         const countGanados = ganados.length;
 
