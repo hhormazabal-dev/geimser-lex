@@ -60,6 +60,7 @@ interface CaseForAgenda {
     case_id: string;
     caratulado: string;
     numero_causa?: string | null;
+    demandado?: string | null;
     materia: string;
     prioridad: string;
     etapa_actual: string;
@@ -146,6 +147,7 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
             const matchesSearch = !search ||
                 c.caratulado.toLowerCase().includes(search.toLowerCase()) ||
                 c.nombre_cliente.toLowerCase().includes(search.toLowerCase()) ||
+                String(c.demandado ?? '').toLowerCase().includes(search.toLowerCase()) ||
                 String(c.numero_causa ?? '').toLowerCase().includes(search.toLowerCase());
             const matchesStage = !stageFilter
                 ? true
@@ -300,10 +302,11 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                     <thead>
                         <tr className="border-b bg-muted/50">
                             <th className="text-left font-semibold px-4 py-3">Caso</th>
-                            <th className="text-left font-semibold px-4 py-3 hidden sm:table-cell">Cliente</th>
+                            <th className="text-left font-semibold px-4 py-3 hidden sm:table-cell">Demandado</th>
                             <th className="text-left font-semibold px-4 py-3 hidden md:table-cell">Materia</th>
                             <th className="text-left font-semibold px-4 py-3">Etapa</th>
                             <th className="text-center font-semibold px-4 py-3">Prioridad</th>
+                            <th className="text-right font-semibold px-4 py-3 hidden lg:table-cell">Próximo Hito</th>
                             <th className="text-right font-semibold px-4 py-3 hidden lg:table-cell">Actualizado</th>
                             <th className="w-10"></th>
                         </tr>
@@ -331,7 +334,7 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                                             </Link>
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                                            <span className="truncate block max-w-[140px]">{caso.nombre_cliente}</span>
+                                            <span className="truncate block max-w-[140px]">{caso.demandado || caso.nombre_cliente}</span>
                                         </td>
                                         <td className="px-4 py-3 hidden md:table-cell">
                                             <Badge variant="outline" className="text-[10px]">{caso.materia}</Badge>
@@ -346,7 +349,17 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                                             {getPriorityBadge(caso.prioridad)}
                                         </td>
                                         <td className="px-4 py-3 text-right text-muted-foreground text-xs hidden lg:table-cell">
-                                            <div className="flex items-center justify-end gap-1">
+                                            {caso.fecha_proxima ? (
+                                                <div className="flex items-center justify-end gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                                                    <Clock className="h-3 w-3" />
+                                                    {formatDate(caso.fecha_proxima)}
+                                                </div>
+                                            ) : (
+                                                <span className="opacity-50">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-muted-foreground text-xs hidden lg:table-cell">
+                                            <div className="flex items-center justify-end gap-1 opacity-60">
                                                 <Clock className="h-3 w-3" />
                                                 {formatDate(lastChange)}
                                             </div>
