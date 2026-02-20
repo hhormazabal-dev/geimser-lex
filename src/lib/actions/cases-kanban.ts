@@ -145,7 +145,7 @@ export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
                 ) || (milestones.length > 0 ? milestones[milestones.length - 1] : null);
             } else {
                 // If the case is active, look for the upcoming future event
-                const futureMilestones = milestones.filter(m => m.date >= todayStr);
+                const futureMilestones = milestones.filter(m => m.date > todayStr);
                 targetMilestone = futureMilestones.length > 0 ? futureMilestones[0] : null;
                 isFuture = !!targetMilestone;
             }
