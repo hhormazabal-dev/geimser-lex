@@ -87,33 +87,15 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
     };
 
     const uniqueCases = useMemo(() => {
-        const byKey = new Map<string, CaseForAgenda>();
-
-        const getSortTime = (row: CaseForAgenda) => {
-            const dt = row.last_activity_at ?? row.updated_at;
-            const t = new Date(dt ?? '').getTime();
-            return Number.isFinite(t) ? t : 0;
-        };
-
-        for (const raw of cases) {
-            const normalized: CaseForAgenda = {
-                ...raw,
-                etapa_actual: sanitizeStageLabel(String((raw as any)?.etapa_actual ?? '')),
+        // Simply return all cases without deduplicating by numero_causa
+        return [...cases].sort((a, b) => {
+            const getSortTime = (row: CaseForAgenda) => {
+                const dt = row.last_activity_at ?? row.updated_at;
+                const t = new Date(dt ?? '').getTime();
+                return Number.isFinite(t) ? t : 0;
             };
-
-            const key = normalizeCaseNumber((normalized as any).numero_causa) ?? normalized.case_id;
-            const existing = byKey.get(key);
-            if (!existing) {
-                byKey.set(key, normalized);
-                continue;
-            }
-
-            if (getSortTime(normalized) >= getSortTime(existing)) {
-                byKey.set(key, normalized);
-            }
-        }
-
-        return [...byKey.values()];
+            return getSortTime(b) - getSortTime(a); // sort descending by activity
+        });
     }, [cases]);
 
     const exactStageCounts = useMemo(() => {
