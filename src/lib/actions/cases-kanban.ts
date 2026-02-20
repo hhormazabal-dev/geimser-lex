@@ -20,7 +20,7 @@ interface CaseForAgenda {
  * Get ALL active cases for the lawyer dashboard agenda
  * Groups by etapa_actual, shows all cases regardless of scheduled date
  */
-export async function getActiveCasesForAgenda(): Promise<{
+export async function getActiveCasesForAgenda(lawyerId?: string): Promise<{
     success: boolean;
     data?: CaseForAgenda[];
     error?: string;
@@ -31,10 +31,14 @@ export async function getActiveCasesForAgenda(): Promise<{
             return { success: false, error: 'No autenticado' };
         }
 
+        const role = (profile.role ?? '').trim().toLowerCase();
+        const isAdmin = role === 'admin_firma' || role === 'admin';
+        const targetLawyerId = lawyerId ?? (isAdmin ? null : profile.id);
+
         const supabase = await createServerClient();
 
         // Get ALL active cases - no date filtering
-        const { data: cases, error: casesError } = await supabase
+        let query = supabase
             .from('cases')
             .select(`
         id,
@@ -48,9 +52,15 @@ export async function getActiveCasesForAgenda(): Promise<{
         next_action_at
       `)
             .is('deleted_at', null)
-            .eq('estado', 'activo')
+            .in('estado', ['activo', 'terminado_apelacion'])
             .order('prioridad', { ascending: true })
             .order('updated_at', { ascending: false });
+
+        if (targetLawyerId) {
+            query = query.eq('abogado_responsable', targetLawyerId);
+        }
+
+        const { data: cases, error: casesError } = await query;
 
         if (casesError) {
             console.error('Error fetching cases:', JSON.stringify(casesError, null, 2));
@@ -96,16 +106,16 @@ export async function getActiveCasesForAgenda(): Promise<{
                     : auditAt ?? caseUpdatedAt;
 
             return {
-            case_id: c.id,
-            caratulado: c.caratulado,
-            numero_causa: c.numero_causa ?? null,
-            materia: c.materia || 'Sin materia',
-            prioridad: c.prioridad || 'media',
-            etapa_actual: c.etapa_actual || 'Sin etapa',
-            nombre_cliente: c.nombre_cliente || 'Sin cliente',
-            updated_at: c.updated_at,
-            last_activity_at: lastActivityAt,
-            fecha_proxima: c.next_action_at,
+                case_id: c.id,
+                caratulado: c.caratulado,
+                numero_causa: c.numero_causa ?? null,
+                materia: c.materia || 'Sin materia',
+                prioridad: c.prioridad || 'media',
+                etapa_actual: c.etapa_actual || 'Sin etapa',
+                nombre_cliente: c.nombre_cliente || 'Sin cliente',
+                updated_at: c.updated_at,
+                last_activity_at: lastActivityAt,
+                fecha_proxima: c.next_action_at,
             };
         });
 
@@ -117,10 +127,10 @@ export async function getActiveCasesForAgenda(): Promise<{
 }
 
 // Backward compatibility alias
-export async function getCasesWithStages() {
-    return getActiveCasesForAgenda();
+export async function getCasesWithStages(lawyerId?: string) {
+    return getActiveCasesForAgenda(lawyerId);
 }
 
-export async function getUpcomingCaseStages() {
-    return getActiveCasesForAgenda();
+export async function getUpcomingCaseStages(lawyerId?: string) {
+    return getActiveCasesForAgenda(lawyerId);
 }
