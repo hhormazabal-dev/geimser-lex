@@ -68,7 +68,6 @@ interface CaseForAgenda {
     updated_at: string;
     last_activity_at?: string | null;
     fecha_proxima: string | null;
-    etapa_proxima?: string | null;
 }
 
 interface CasesKanbanBoardProps {
@@ -348,12 +347,7 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
                                             <div className="flex items-center gap-2">
                                                 <div className={cn('h-2 w-2 rounded-full shrink-0', color)} />
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs font-medium">
-                                                        {caso.fecha_proxima && caso.etapa_proxima ? caso.etapa_proxima : caso.etapa_actual}
-                                                        {caso.fecha_proxima && caso.etapa_proxima && (
-                                                            <span className="text-[10px] text-muted-foreground ml-2 font-normal">(Próxima)</span>
-                                                        )}
-                                                    </span>
+                                                    <span className="text-xs font-medium">{caso.etapa_actual}</span>
                                                 </div>
                                             </div>
                                         </td>
