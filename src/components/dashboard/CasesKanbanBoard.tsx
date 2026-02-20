@@ -16,7 +16,6 @@ const STAGE_ORDER = [
     'Sentencia',
     'Recurso/Apelación',
     'Ejecución',
-    'Cierre',
 ];
 
 const normalizeStageLabel = (value: string) =>
@@ -33,9 +32,6 @@ const sanitizeStageLabel = (value: string) => value.trim().replace(/\s+/g, ' ');
 const getPipelineStage = (rawStage?: string | null) => {
     const normalized = normalizeStageLabel(rawStage ?? '');
     if (!normalized) return null;
-
-    // Common "closed" labels that should map to the pipeline end.
-    if (normalized.includes('terminad')) return 'Cierre';
 
     for (const stage of STAGE_MATCH_ORDER) {
         const stageNeedle = normalizeStageLabel(stage);
