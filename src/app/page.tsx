@@ -7,6 +7,7 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Reveal } from '@/components/landing/Reveal';
 import { ContactForm } from '@/components/landing/ContactForm';
 import { Pricing } from '@/components/landing/Pricing';
+import { LawyerBotWidget } from '@/components/landing/LawyerBotWidget';
 import {
   Clock,
   FolderOpen,
@@ -540,6 +541,7 @@ export default async function Home() {
           </div>
         </div>
       </footer>
+      <LawyerBotWidget />
     </main>
   );
 }
