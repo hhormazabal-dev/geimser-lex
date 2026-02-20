@@ -19,15 +19,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Faltan datos obligatorios' }, { status: 400 });
         }
 
-        // Buscar tenant_id de geimser
+        // Buscar tenant_id de xel
         const { data: tenantData, error: tenantError } = await supabase
             .from('tenants')
             .select('id')
-            .eq('slug', 'geimser')
+            .eq('slug', 'xel')
             .single();
 
         if (tenantError || !tenantData?.id) {
-            throw new Error('No se pudo encontrar el tenant geimser en DB Geimser2025');
+            throw new Error('No se pudo encontrar el tenant xel en DB Geimser2025');
         }
 
         const leadToSave = {
