@@ -175,7 +175,19 @@ export function CasesKanbanBoard({ cases }: CasesKanbanBoardProps) {
 
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return '—';
-        return new Date(dateStr).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+        try {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                const [y, m, d] = dateStr.split('-');
+                if (y && m && d) {
+                    return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10)).toLocaleDateString('es-CL', {
+                        day: '2-digit', month: 'short', year: 'numeric'
+                    });
+                }
+            }
+            return new Date(dateStr).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch (e) {
+            return '—';
+        }
     };
 
     const totalCases = uniqueCases.length;
