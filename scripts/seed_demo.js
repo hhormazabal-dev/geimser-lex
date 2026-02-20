@@ -34,7 +34,7 @@ async function run() {
     console.log(`Buscando usuario ${DEMO_EMAIL}...`);
     const { data: users, error: userError } = await supabase
         .from('profiles')
-        .select('id, nombre')
+        .select('id, nombre, active_organization_id')
         .eq('email', DEMO_EMAIL)
         .single();
 
@@ -44,7 +44,8 @@ async function run() {
     }
 
     const userId = users.id;
-    console.log(`Usuario encontrado: ${users.nombre} (${userId})`);
+    const orgId = users.active_organization_id;
+    console.log(`Usuario encontrado: ${users.nombre} (${userId}) | Org: ${orgId}`);
 
     console.log(`Generando ${NUM_CASES} casos aleatorios para 2026...`);
     const newCases = [];
@@ -74,6 +75,7 @@ async function run() {
             valor_estimado: Math.floor(Math.random() * 5000000) + 500000,
             fecha_inicio: created_at,
             abogado_responsable: userId,
+            organization_id: orgId,
             workflow_state: randElement(wfStates),
             nombre_cliente: `Cliente Prueba ${i}`,
             sentencia_estado: sentencia,
