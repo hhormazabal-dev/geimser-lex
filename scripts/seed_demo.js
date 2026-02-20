@@ -18,6 +18,16 @@ const matters = ['Civil', 'Familia', 'Laboral', 'Comercial', 'Penal'];
 const statuses = ['activo', 'activo', 'activo', 'terminado', 'terminado_apelacion', 'terminado_desistido_demandante'];
 const priorities = ['alta', 'media', 'media', 'baja'];
 const wfStates = ['preparacion', 'mediacion', 'juicio', 'apelacion', 'cierre'];
+const stages = [
+    'Ingreso Demanda',
+    'Preparatoria',
+    'Audiencia Preparatoria',
+    'Audiencia de Juicio',
+    'Sentencia',
+    'Recurso/Apelación',
+    'Ejecución',
+    'Cierre'
+];
 
 function randomDateIn2026() {
     const start = new Date(2026, 0, 1).getTime();
@@ -77,6 +87,7 @@ async function run() {
             abogado_responsable: userId,
             organization_id: orgId,
             workflow_state: randElement(wfStates),
+            etapa_actual: randElement(stages),
             nombre_cliente: `Cliente Prueba ${i}`,
             sentencia_estado: sentencia,
             termino_sin_documento: terminoSinDoc,
